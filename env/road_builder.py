@@ -24,6 +24,10 @@ try:
     from env.road_config import TRAFFIC_LIGHT
 except ImportError:      # 신호등 설정이 없는 구버전 설정 하위호환
     TRAFFIC_LIGHT = {"enabled": False}
+try:
+    from env.road_config import INTERSECTION, PEDESTRIANS
+except ImportError:      # 교차로 설정이 없는 구버전 설정 하위호환
+    INTERSECTION, PEDESTRIANS = {}, {"enabled": False}
 
 TL_ID = "n_tl"   # 신호 노드 id = SUMO 신호(tlLogic) id. sumo_env.py도 이 값을 쓴다.
 
@@ -33,9 +37,21 @@ def tl_enabled(tl: dict = None) -> bool:
     return bool(tl and tl.get("enabled", False))
 
 
+def is_intersection(road: dict) -> bool:
+    return road.get("layout", "straight") == "intersection"
+
+
 def route_edges(road: dict, tl: dict = None) -> list:
     """ego/배경차 route r0이 지나가는 엣지 순서."""
-    return ["e0", "e1"] if tl_enabled(tl) else ["e0"]
+    if is_intersection(road) or tl_enabled(tl):
+        return ["e0", "e1"]
+    return ["e0"]
+
+
+def _custom_program(tl: dict = None) -> bool:
+    """True면 TRAFFIC_LIGHT["phases"]로 신호를 덮어쓰고, False면 netconvert 기본 신호."""
+    tl = TRAFFIC_LIGHT if tl is None else tl
+    return tl_enabled(tl) and tl.get("program", "custom") == "custom"
 
 
 def build(road: dict, ego: dict, traffic: dict, out_dir: str) -> str:
@@ -50,7 +66,10 @@ def build(road: dict, ego: dict, traffic: dict, out_dir: str) -> str:
     """
     os.makedirs(out_dir, exist_ok=True)
     use_tl = tl_enabled()
-    if use_tl:
+    cross = is_intersection(road)
+    if cross:
+        _write_intersection_geometry(road, out_dir, use_tl)
+    elif use_tl:
         tl_pos = float(TRAFFIC_LIGHT["position"])
         if not 0.0 < tl_pos < float(road["length"]):
             raise ValueError(
@@ -63,10 +82,11 @@ def build(road: dict, ego: dict, traffic: dict, out_dir: str) -> str:
     #    신호등 사용 시 position 지점에 신호 노드 n_tl 추가.
     #    type="traffic_light" 노드에 netconvert가 신호(tlLogic)를 만든다.
     # ──────────────────────────────────────────────────────
-    tl_node = (f'    <node id="{TL_ID}" x="{tl_pos}" y="0" type="traffic_light"/>\n'
-               if use_tl else "")
-    with open(os.path.join(out_dir, "highway.nod.xml"), "w") as f:
-        f.write(f"""<nodes>
+    if not cross:
+        tl_node = (f'    <node id="{TL_ID}" x="{tl_pos}" y="0" type="traffic_light"/>\n'
+                   if use_tl else "")
+        with open(os.path.join(out_dir, "highway.nod.xml"), "w") as f:
+            f.write(f"""<nodes>
     <node id="n0" x="0" y="0"/>
 {tl_node}    <node id="n1" x="{road['length']}" y="0"/>
 </nodes>
@@ -77,14 +97,15 @@ def build(road: dict, ego: dict, traffic: dict, out_dir: str) -> str:
     #    numLanes = 차선 수, speed = 제한속도(m/s)
     #    신호등 사용 시 n0 → n_tl (e0) / n_tl → n1 (e1) 두 구간으로 분할
     # ──────────────────────────────────────────────────────
-    lane_attrs = f'numLanes="{road["num_lanes"]}" speed="{road["speed_limit"]}"'
-    if use_tl:
-        edge_lines = (f'    <edge id="e0" from="n0" to="{TL_ID}" {lane_attrs}/>\n'
-                      f'    <edge id="e1" from="{TL_ID}" to="n1" {lane_attrs}/>\n')
-    else:
-        edge_lines = f'    <edge id="e0" from="n0" to="n1" {lane_attrs}/>\n'
-    with open(os.path.join(out_dir, "highway.edg.xml"), "w") as f:
-        f.write(f"""<edges>
+    if not cross:
+        lane_attrs = f'numLanes="{road["num_lanes"]}" speed="{road["speed_limit"]}"'
+        if use_tl:
+            edge_lines = (f'    <edge id="e0" from="n0" to="{TL_ID}" {lane_attrs}/>\n'
+                          f'    <edge id="e1" from="{TL_ID}" to="n1" {lane_attrs}/>\n')
+        else:
+            edge_lines = f'    <edge id="e0" from="n0" to="n1" {lane_attrs}/>\n'
+        with open(os.path.join(out_dir, "highway.edg.xml"), "w") as f:
+            f.write(f"""<edges>
 {edge_lines}</edges>
 """)
 
@@ -109,7 +130,7 @@ def build(road: dict, ego: dict, traffic: dict, out_dir: str) -> str:
         # probability 합이 1이 아니어도 되도록 자동 정규화
         total_p = sum(float(c.get("probability", 1.0))
                       for c in controllers.values())
-        vtype_lines = []
+        vtype_lines, free_lines = [], []
         for name, c in controllers.items():
             prob = float(c.get("probability", 1.0)) / total_p
             attrs = [
@@ -141,6 +162,10 @@ def build(road: dict, ego: dict, traffic: dict, out_dir: str) -> str:
             #   배경차가 차선을 유지하면 "느린 차 뒤 → 옆 틈으로 변경 →
             #   가속"이라는 추월 패턴이 재현 가능한 형태로 나타난다.
             # 특정 컨트롤러만 돌아다니게 하려면 그 항목에 "keep_lane": False.
+            # 교차로의 회전 차량용 분포(carDistFree)는 차선을 바꿔야 회전
+            # 차로로 갈 수 있으므로 차선 유지 옵션 없이 따로 만든다.
+            free_lines.append("        <vType " + " ".join(attrs).replace(
+                f'id="car_{name}"', f'id="free_{name}"') + "/>")
             if c.get("keep_lane", True):
                 attrs += ['lcStrategic="0"', 'lcCooperative="0"',
                           'lcSpeedGain="0"', 'lcKeepRight="0"']
@@ -148,6 +173,10 @@ def build(road: dict, ego: dict, traffic: dict, out_dir: str) -> str:
         vtypes_block = ('    <vTypeDistribution id="carDist">\n'
                         + "\n".join(vtype_lines)
                         + "\n    </vTypeDistribution>")
+        if cross:
+            vtypes_block += ('\n    <vTypeDistribution id="carDistFree">\n'
+                             + "\n".join(free_lines)
+                             + "\n    </vTypeDistribution>")
         flow_type = "carDist"
     else:
         # controllers 설정이 없으면 예전 방식(단일 Krauss)으로 동작 (하위호환)
@@ -156,6 +185,8 @@ def build(road: dict, ego: dict, traffic: dict, out_dir: str) -> str:
                         f'sigma="{traffic.get("sigma", 0.5)}" '
                         f'vClass="passenger" guiShape="passenger/sedan"/>')
         flow_type = "car"
+        if cross:
+            raise ValueError("교차로 layout은 TRAFFIC['controllers'] 설정이 필요합니다.")
 
     with open(os.path.join(out_dir, "highway.rou.xml"), "w") as f:
         f.write(f"""<routes>
@@ -165,7 +196,7 @@ def build(road: dict, ego: dict, traffic: dict, out_dir: str) -> str:
     <flow id="traffic" type="{flow_type}" route="r0" begin="0" end="100000"
           period="{3600.0 / traffic['vehs_per_hour']:.2f}"
           departLane="{traffic['depart_lane']}" departSpeed="{traffic['depart_speed']}"/>
-</routes>
+{_intersection_demand(traffic) if cross else ""}</routes>
 """)
 
     # ──────────────────────────────────────────────────────
@@ -211,7 +242,7 @@ def build(road: dict, ego: dict, traffic: dict, out_dir: str) -> str:
     # 5) sumocfg: "이 net 파일과 이 route 파일로 시뮬레이션해라"
     #    신호등 사용 시 highway.tll.xml(신호 주기)도 additional로 로드
     # ──────────────────────────────────────────────────────
-    additional = "highway.scenery.xml" + (",highway.tll.xml" if use_tl else "")
+    additional = "highway.scenery.xml" + (",highway.tll.xml" if _custom_program() else "")
     cfg_path = os.path.join(out_dir, "highway.sumocfg")
     with open(cfg_path, "w") as f:
         f.write(f"""<configuration>
@@ -235,7 +266,8 @@ def build(road: dict, ego: dict, traffic: dict, out_dir: str) -> str:
         [netconvert,
          "--node-files", os.path.join(out_dir, "highway.nod.xml"),
          "--edge-files", os.path.join(out_dir, "highway.edg.xml"),
-         "-o", os.path.join(out_dir, "highway.net.xml")],
+         "-o", os.path.join(out_dir, "highway.net.xml")]
+        + (_intersection_netconvert_args(road) if cross else []),
         check=True,           # 실패하면 예외를 던져서 바로 알 수 있게
         capture_output=True,  # 출력은 조용히 삼킴
     )
@@ -248,9 +280,112 @@ def build(road: dict, ego: dict, traffic: dict, out_dir: str) -> str:
     #    같은 신호 id에 새 programID를 additional로 로드하면 SUMO는 마지막에
     #    로드된 프로그램을 사용한다.
     # ──────────────────────────────────────────────────────
-    if use_tl:
+    if _custom_program():
+        if cross:
+            raise ValueError("교차로 layout에서는 아직 TRAFFIC_LIGHT['program']='default'만 지원합니다.")
         _write_tll(out_dir)
+    elif os.path.exists(os.path.join(out_dir, "highway.tll.xml")):
+        os.remove(os.path.join(out_dir, "highway.tll.xml"))   # 이전 custom 신호 잔재 제거
     return cfg_path
+
+
+# ══════════════════════════════════════════════════════════════════
+#  교차로 layout (ROAD["layout"] = "intersection")
+#
+#  본선(동서)과 교차 도로(남북)가 만나는 4지 교차로:
+#
+#                 n_n
+#                  │  side_in / side_out
+#   n0 ── e0 ──▶ n_tl ── e1 ──▶ n1      (ego: n0 → n1 직진, route r0 = e0 e1)
+#        ◀─ e0_r ─    ◀─ e1_r ─         (반대 방향 본선)
+#                  │
+#                 n_s
+#
+#  보도/횡단보도는 netconvert가 자동 생성(--sidewalks.guess --crossings.guess)하고,
+#  신호는 netconvert 기본 프로그램(차량 + 보행 신호)을 그대로 쓴다.
+# ══════════════════════════════════════════════════════════════════
+def _write_intersection_geometry(road: dict, out_dir: str, use_tl: bool):
+    length = float(road["length"])
+    pos = float(INTERSECTION.get("position", length / 2))
+    if not 0.0 < pos < length:
+        raise ValueError(f"INTERSECTION['position']={pos}는 0과 도로 길이({length}) 사이여야 합니다.")
+    arm = float(INTERSECTION.get("side_length", 150.0))
+    node_type = "traffic_light" if use_tl else "priority"
+    with open(os.path.join(out_dir, "highway.nod.xml"), "w") as f:
+        f.write(f"""<nodes>
+    <node id="n0" x="0" y="0"/>
+    <node id="{TL_ID}" x="{pos}" y="0" type="{node_type}"/>
+    <node id="n1" x="{length}" y="0"/>
+    <node id="n_n" x="{pos}" y="{arm}"/>
+    <node id="n_s" x="{pos}" y="{-arm}"/>
+</nodes>
+""")
+    main = f'numLanes="{road["num_lanes"]}" speed="{road["speed_limit"]}"'
+    opp = (f'numLanes="{INTERSECTION.get("opposite_lanes", road["num_lanes"])}" '
+           f'speed="{road["speed_limit"]}"')
+    side = (f'numLanes="{INTERSECTION.get("side_lanes", 2)}" '
+            f'speed="{INTERSECTION.get("side_speed", road["speed_limit"])}"')
+    with open(os.path.join(out_dir, "highway.edg.xml"), "w") as f:
+        f.write(f"""<edges>
+    <edge id="e0" from="n0" to="{TL_ID}" {main}/>
+    <edge id="e1" from="{TL_ID}" to="n1" {main}/>
+    <edge id="e1_r" from="n1" to="{TL_ID}" {opp}/>
+    <edge id="e0_r" from="{TL_ID}" to="n0" {opp}/>
+    <edge id="n_in" from="n_n" to="{TL_ID}" {side}/>
+    <edge id="n_out" from="{TL_ID}" to="n_n" {side}/>
+    <edge id="s_in" from="n_s" to="{TL_ID}" {side}/>
+    <edge id="s_out" from="{TL_ID}" to="n_s" {side}/>
+</edges>
+""")
+
+
+def _intersection_netconvert_args(road: dict) -> list:
+    # 보도·횡단보도 자동 생성은 기본적으로 13.89 m/s(50 km/h) 이하 도로에만
+    # 적용되므로, 기준을 이 도로의 최고 제한속도에 맞춰 둔다.
+    vmax = max(float(road["speed_limit"]),
+               float(INTERSECTION.get("side_speed", road["speed_limit"]))) + 0.1
+    args = ["--no-turnarounds"]
+    if INTERSECTION.get("crosswalks", True):
+        # SUMO는 보도를 각 엣지의 차선 0번으로 넣는다 → 본선 차로는 1번부터.
+        # (본선에 보도가 없으면 본선 횡단보도가 생성되지 않는다.)
+        # env(sumo_env.py)는 차로 번호를 "보도를 뺀 번호"로 보정해서 쓴다.
+        args += ["--sidewalks.guess", "--sidewalks.guess.max-speed", f"{vmax:.2f}",
+                 "--crossings.guess", "--crossings.guess.speed-threshold", f"{vmax:.2f}"]
+    return args
+
+
+def _intersection_demand(traffic: dict) -> str:
+    """반대 방향 본선 / 교차 도로 차량 flow + 보행자 personFlow."""
+    lines = []
+    opp_vph = float(INTERSECTION.get("opposite_vehs_per_hour", 0))
+    if opp_vph > 0:
+        lines.append(f'    <flow id="opp" type="carDist" route="r_opp" begin="0" end="100000" '
+                     f'period="{3600.0 / opp_vph:.2f}" departLane="random" '
+                     f'departSpeed="{traffic["depart_speed"]}"/>')
+        lines.insert(0, '    <route id="r_opp" edges="e1_r e0_r"/>')
+    # 교차 도로: 남북 직진 + 본선으로 좌/우회전 (회전 차량은 차선변경 가능한 분포)
+    side_vph = float(INTERSECTION.get("side_vehs_per_hour", 0))
+    if side_vph > 0:
+        side_routes = {"ns": "n_in s_out", "sn": "s_in n_out",
+                       "ne": "n_in e1", "nw": "n_in e0_r",
+                       "se": "s_in e1", "sw": "s_in e0_r"}
+        per = 3600.0 / (side_vph / len(side_routes))
+        for rid, edges in side_routes.items():
+            lines.append(f'    <route id="r_{rid}" edges="{edges}"/>')
+            lines.append(f'    <flow id="side_{rid}" type="carDistFree" route="r_{rid}" '
+                         f'begin="0" end="100000" period="{per:.2f}" departLane="best" '
+                         f'departSpeed="{traffic["depart_speed"]}"/>')
+    # 보행자: 남북으로 오가며 본선 횡단보도를 건넌다 (ego와 상호작용하는 쪽)
+    if PEDESTRIANS.get("enabled", False):
+        pph = float(PEDESTRIANS.get("persons_per_hour", 300))
+        lines.append(f'    <vType id="ped" vClass="pedestrian" '
+                     f'speed="{PEDESTRIANS.get("speed", 1.3)}" color="0,0.4,1"/>')
+        for pid, (frm, to) in {"ns": ("n_in", "s_out"), "sn": ("s_in", "n_out")}.items():
+            lines.append(f'    <personFlow id="ped_{pid}" type="ped" begin="0" end="100000" '
+                         f'period="{3600.0 / (pph / 2):.2f}" departPos="random">\n'
+                         f'        <walk from="{frm}" to="{to}" arrivalPos="random"/>\n'
+                         f'    </personFlow>')
+    return "\n".join(lines) + ("\n" if lines else "")
 
 
 def _write_tll(out_dir: str):
@@ -319,6 +454,14 @@ def _write_scenery(out_dir: str, road: dict):
     side = float(cfg.get("side_offset", 6.0))
     length = float(road["length"])
     road_bottom = -3.2 * int(road["num_lanes"])
+    road_top, gap = 0.0, None
+    if is_intersection(road):
+        # 반대 방향 차선(y > 0)과 보도 바깥에 심고, 교차 도로 주변은 비운다
+        road_top = 3.2 * int(INTERSECTION.get("opposite_lanes", road["num_lanes"])) + 2.0
+        road_bottom -= 2.0
+        half = 3.2 * int(INTERSECTION.get("side_lanes", 2)) + 2.0 + 12.0
+        center = float(INTERSECTION.get("position", length / 2))
+        gap = (center - half, center + half)
 
     # (몸통, 어두운 클럼프, 밝은 하이라이트) 초록 팔레트 — 수종별 톤
     palettes = [
@@ -360,9 +503,12 @@ def _write_scenery(out_dir: str, road: dict):
         lines.append(f'    <poly id="bs_{i}" color="{g}" fill="1" '
                      f'layer="2" shape="{_blob(x, y, r, rng, n=8)}"/>')
 
-    for side_sign, base_y in [(+1, side), (-1, road_bottom - side)]:
+    for side_sign, base_y in [(+1, road_top + side), (-1, road_bottom - side)]:
         x = rng.uniform(0, spacing)
         while x < length:
+            if gap is not None and gap[0] - 6.0 < x < gap[1] + 6.0:
+                x = gap[1] + 6.0
+                continue
             y = base_y + side_sign * rng.uniform(0, 4.0)
             roll = rng.random()
             if roll < 0.12:
