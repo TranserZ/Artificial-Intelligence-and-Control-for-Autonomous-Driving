@@ -33,7 +33,7 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 # ══════════════════════════════════════════════════════════════════
 #  하이퍼파라미터 — 실험은 여기서
 # ══════════════════════════════════════════════════════════════════
-TOTAL_TIMESTEPS = 200_000   # 총 학습 스텝 수
+TOTAL_TIMESTEPS = 500_000   # 총 학습 스텝 수 (신호등 추가로 200k → 500k)
 
 # ══════════════════════════════════════════════════════════════════
 #  보상 튜닝 — env/mdp_config.py 의 기본값을 여기서 덮어쓴다.
@@ -43,15 +43,22 @@ TOTAL_TIMESTEPS = 200_000   # 총 학습 스텝 수
 # ══════════════════════════════════════════════════════════════════
 REWARD_OVERRIDES = dict(
     speed_weight=0.1,          # 속도 보상 (스텝당 최대 이 값)
-    collision_penalty=5.0,     # 충돌 시 -이 값, 즉시 종료
-    arrival_bonus=2.0,         # 완주 보너스
+    collision_penalty=20.0,    # 충돌 시 -이 값, 즉시 종료 (5→20: 완주 보너스와 같은
+                               #   크기. 5일 땐 무리한 끼어들기로 충돌 16%)
+    arrival_bonus=20.0,        # 완주 보너스 (2→20: 500k run이 완주 0%로 수렴)
+    progress_weight=10.0,      # 진행 보상 (완주까지 누적 +10)
     close_gap_threshold=6.0,   # 이 거리(m) 미만 접근 시
     close_gap_penalty=0.1,     #   → 스텝당 감점
     blocked_penalty=0.05,      # "느린 앞차에 막힘" 스텝당 감점 (추월 학습 핵심)
-    blocked_gap=20.0,          #   막힘 판정: 앞차 이 거리 이내
-    blocked_speed_frac=0.7,    #   그리고 내 속도 < vmax × 이 값
-    lane_change_penalty=0.0,   # 변경 실행당 감점 (커리큘럼: 초기 0,
-    invalid_action_penalty=0.0,#  추월 학습 후 지그재그 과하면 0.02~0.05)
+    blocked_gap=None,          #   막힘 판정 거리 조건 없음 (35m일 때 48m 거리로
+                               #   14.5 m/s 추종하는 "캠핑" 정책으로 수렴했음)
+    blocked_speed_frac=0.85,   #   그리고 내 속도 < vmax × 이 값 (0.7→0.85 ≈ 28 m/s:
+                               #   배경차 최고속 19 m/s로 따라가도 막힘으로 판정)
+    lane_change_penalty=0.02,  # 변경 실행당 감점 (0→0.02: 추월은 배웠으나
+                               #   에피소드당 275회 지그재그 → 재도입)
+    invalid_action_penalty=0.0,
+    red_light_penalty=5.0,     # 적색 신호 위반 시 감점
+    red_light_terminate=True,  #   위반 즉시 에피소드 종료
 )
 REWARD = {**REWARD_DEFAULTS, **REWARD_OVERRIDES}
 
@@ -110,6 +117,7 @@ HPARAMS = dict(
 EVAL_INTERVAL = 5       # 몇 번의 업데이트마다 주행 지표를 평가할지 (0이면 안 함)
 EVAL_EPISODES = 5       # 평가 1회당 에피소드 수
 LOG_INTERVAL = 1        # 몇 번의 업데이트마다 콘솔에 출력할지
+CHECKPOINT_INTERVAL = 10  # 몇 번의 업데이트마다 model.pt/CSV를 중간 저장할지 (0이면 안 함)
 RESULTS_DIR = "results" # 결과 저장 폴더
 RUN_NAME = None         # None이면 run_날짜_시각 자동 생성.
                         # 문자열을 주면 그 이름으로 저장 (예: "exp_lr1e-4")
@@ -180,17 +188,42 @@ if __name__ == "__main__":
 
     # 5) 학습 → 저장
     #    try/finally: Ctrl+C나 에러로 중단돼도 SUMO 정리 + 결과 저장은 수행
+    #    checkpoint: 프로세스가 강제 종료(kill)되면 finally도 실행되지 않으므로
+    #    CHECKPOINT_INTERVAL마다 모델/CSV/설정을 미리 저장해둔다.
+    model_path = os.path.join(run_dir, "model.pt")
+    best_path = os.path.join(run_dir, "best_model.pt")
+    best = {"score": None}
+
+    def checkpoint():
+        agent.save(model_path)
+        logger.save_csv()
+        snapshot_configs(run_dir)
+        print(f"    [checkpoint @{agent.num_timesteps}] {model_path}", flush=True)
+
+    def on_eval(m):
+        # 평가 기준이 충돌률과 완주율이므로 (완주율 - 충돌률)이 높은 모델을
+        # 따로 저장한다. 동점이면 평균 보상으로 비교. 후반에 정책이
+        # 무너져도(지난 run: 300k 근처가 최선) 최선의 시점이 남는다.
+        score = (m.success_rate - m.collision_rate, m.ep_return)
+        if best["score"] is None or score > best["score"]:
+            best["score"] = score
+            agent.save(best_path)
+            print(f"    [best @{agent.num_timesteps}] 완주-충돌={score[0]:+.2f} "
+                  f"보상={score[1]:.1f} → {best_path}", flush=True)
+
     try:
         agent.learn(env,
                     total_timesteps=TOTAL_TIMESTEPS,
                     logger=logger,
                     log_interval=LOG_INTERVAL,
                     eval_interval=EVAL_INTERVAL,
-                    eval_episodes=EVAL_EPISODES)
+                    eval_episodes=EVAL_EPISODES,
+                    checkpoint_interval=CHECKPOINT_INTERVAL,
+                    checkpoint_fn=checkpoint,
+                    eval_fn=on_eval)
     finally:
         env.close()
         logger.close()
-        model_path = os.path.join(run_dir, "model.pt")
         agent.save(model_path)
         snapshot_configs(run_dir)
         print(f"\n저장 완료: {model_path}")

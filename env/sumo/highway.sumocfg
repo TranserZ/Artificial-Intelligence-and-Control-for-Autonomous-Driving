@@ -2,7 +2,7 @@
     <input>
         <net-file value="highway.net.xml"/>
         <route-files value="highway.rou.xml"/>
-        <additional-files value="highway.scenery.xml"/>
+        <additional-files value="highway.scenery.xml,highway.tll.xml"/>
     </input>
     <gui_only>
         <gui-settings-file value="highway.gui.xml"/>

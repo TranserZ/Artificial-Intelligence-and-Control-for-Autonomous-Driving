@@ -114,6 +114,7 @@ class SumoHighwayEnv(gym.Env):
         self.lc_rear_tau = float(lcs.get("rear_tau", 0.5))         # s
         self.lc_spawn_protect = float(lcs.get("spawn_protect", 60.0))  # m
         self.lc_horizon = float(lcs.get("approach_horizon", 1.0))       # s
+        self.lc_signal_zone = float(lcs.get("signal_no_change_zone", 0.0))  # m
         self.road_length = float(road["length"])
         self.traffic_max_speed = float(self.traffic.get("max_speed", self.vmax))
         # 차선당 배치 간격: 지정값이 없으면 교통류 이론대로 자동 계산
@@ -147,6 +148,11 @@ class SumoHighwayEnv(gym.Env):
         self.visibility = float(mdp_obs["visibility"])   # 관측 거리 W
         # 밀도 정규화용 "차량 1대가 점유하는 길이" (차체 + 최소 간격)
         self.density_veh_len = float(mdp_obs.get("density_veh_length", 7.5))
+        # 전방 신호 관측 (mdp_config.OBSERVATION["signal"])
+        sig = (mdp_obs.get("signal") or {})
+        self.signal_obs = bool(sig.get("enabled", False))
+        self.signal_visibility = float(sig.get("visibility", 150.0))
+        self.signal_time_scale = float(sig.get("time_scale", 30.0))
         self.act_dim = int(action["dim"])
         self.accel_index = int(action.get("accel_index", 0))
         self.lane_change_index = int(action.get("lane_change_index", 1))
@@ -170,14 +176,17 @@ class SumoHighwayEnv(gym.Env):
         # 차선변경 명령은 info["lane_change"]에 정확한 -1/0/+1로 반환한다.
         self.action_space = spaces.Box(low=-1.0, high=1.0,
                                        shape=(self.act_dim,), dtype=np.float32)
-        # 관측: 19차원, 범위 [-1,1]. 레이아웃은 env/mdp_config.py 주석 참고.
-        #   [0] 내 속도, [1..12] 3개 차선 × (선행/후행 상대거리·상대속도),
-        #   [13..15] 3개 차선의 연결성(끊김 정도),
+        # 관측: 31차원(신호 관측 사용 시 34차원), 범위 [-1,1].
+        #   레이아웃은 env/mdp_config.py 주석 참고.
+        #   [0] 내 속도, [1..20] 5개 차선 × (선행/후행 상대거리·상대속도),
+        #   [21..25] 연결성, [26..30] 밀도, [31..33] 전방 신호 (선택)
         #   시야 차선: 좌2, 좌1, 현재, 우1, 우2 (5개) — 3차선 도로에서
         #   맨 왼쪽에 있어도 오프셋 -2로 맨 오른쪽 차선까지 보인다.
         self.obs_offsets = (+2, +1, 0, -1, -2)
         n_lanes_view = len(self.obs_offsets)
         self.obs_dim = 1 + n_lanes_view * 4 + n_lanes_view + n_lanes_view
+        if self.signal_obs:
+            self.obs_dim += 3      # [31..33] 전방 신호 거리 / 정지 필요도 / 남은 시간
         self.observation_space = spaces.Box(-1.0, 1.0, shape=(self.obs_dim,),
                                             dtype=np.float32)
 
@@ -234,26 +243,70 @@ class SumoHighwayEnv(gym.Env):
         factors = (self.traffic.get("prefill", {})
                    .get("lane_spacing_factor")
                    or [1.0] * self.num_lanes)
+        # ── 여러 엣지로 나뉜 route 대응 (예: 신호등으로 e0/e1 분할) ──
+        # departPos는 "출발 엣지" 기준 위치라서, 첫 엣지 길이를 넘는 값을
+        # 주면 SUMO가 그 차를 삽입 대기열에 계속 붙잡아 두고 같은 엣지의
+        # 뒤 삽입(ego 포함)까지 막힌다. 그래서 도로 전체 좌표를 엣지별
+        # (route, 엣지 내 위치)로 바꿔서 넣는다. k번째 엣지에서 출발하는
+        # 차는 route r0의 k번째 엣지부터 시작하는 하위 route를 쓴다.
+        # 각 엣지 끝 end_margin 구간도 비워둔다 (도로 끝 / 신호 정지선 앞).
+        spans, start = [], 0.0
+        edges = traci.route.getEdges("r0")
+        for k, edge in enumerate(edges):
+            length = traci.lane.getLength(f"{edge}_0")
+            route_id = "r0" if k == 0 else f"r0_from{k}"
+            if k > 0:
+                traci.route.add(route_id, list(edges[k:]))
+            spans.append((route_id, start, length))
+            start += length
         for lane in range(self.num_lanes):
             f = float(factors[lane]) if lane < len(factors) else 1.0
             lane_spacing = self.prefill_spacing * f
             pos = self.prefill_start + rng.uniform(0, lane_spacing)
             while pos < self.road_length - self.prefill_end_margin:
+                route_id, local = None, 0.0
+                for rid, edge_start, length in spans:
+                    if edge_start <= pos < edge_start + length:
+                        local = pos - edge_start
+                        if local <= length - self.prefill_end_margin:
+                            route_id = rid
+                        break
                 vid = f"pre_{lane}_{count}"
                 vtype = str(rng.choice(self._prefill_types, p=self._prefill_probs))
                 try:
+                    if route_id is None:
+                        raise traci.TraCIException("엣지 끝 여유 구간")
                     traci.vehicle.add(
-                        vid, "r0", typeID=vtype,
+                        vid, route_id, typeID=vtype,
                         departLane=str(lane),
-                        departPos=f"{pos:.1f}",
+                        departPos=f"{local:.1f}",
                         departSpeed="max")
                     count += 1
                 except traci.TraCIException:
-                    pass  # 겹침 등으로 실패한 자리는 건너뜀
+                    pass  # 겹침 / 엣지 끝 여유 구간이면 건너뜀
                 step = lane_spacing * rng.uniform(
                     1.0 - self.prefill_jitter, 1.0 + self.prefill_jitter)
                 pos += max(step, 10.0)
         return count
+
+    def _randomize_signal_phase(self):
+        """각 신호를 주기 안의 무작위 시점에서 시작시킨다.
+
+        매 에피소드 같은 위상으로 시작하면 ego가 신호에 도착하는 시점의
+        신호색이 거의 고정되어, 신호를 "보는" 대신 외워서 통과하게 된다.
+        """
+        for tl_id in traci.trafficlight.getIDList():
+            program = traci.trafficlight.getProgram(tl_id)
+            logic = next(l for l in traci.trafficlight.getAllProgramLogics(tl_id)
+                         if l.programID == program)
+            durations = [p.duration for p in logic.phases]
+            t = np.random.uniform(0.0, sum(durations))
+            for idx, d in enumerate(durations):
+                if t < d:
+                    break
+                t -= d
+            traci.trafficlight.setPhase(tl_id, idx)
+            traci.trafficlight.setPhaseDuration(tl_id, durations[idx] - t)
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
@@ -263,6 +316,7 @@ class SumoHighwayEnv(gym.Env):
             traci.close()
             self._started = False
         self._start_sumo()
+        self._randomize_signal_phase()
 
         # 도로 전 구간에 배경차를 미리 배치 (첫 스텝부터 실제 교통류 상태)
         if self.prefill_enabled:
@@ -318,6 +372,9 @@ class SumoHighwayEnv(gym.Env):
                 pass
 
         self.step_count = 0
+        # 진행 보상용: 직전 스텝까지의 주행거리 (getDistance = 출발 후 누적 m)
+        self._prev_dist = (traci.vehicle.getDistance(self.ego_id)
+                           if self.ego_id in traci.vehicle.getIDList() else 0.0)
         return self._get_obs(), {}
 
     # ==================================================================
@@ -498,6 +555,40 @@ class SumoHighwayEnv(gym.Env):
             pass
         return out
 
+    # 신호색 → 정지 필요도 (관측 [32])
+    _SIGNAL_STOP_LEVEL = {"r": 1.0, "u": 1.0, "s": 1.0,   # 적색 계열
+                          "y": 0.5,                        # 황색
+                          "G": 0.0, "g": 0.0, "o": 0.0, "O": 0.0}
+
+    def _next_signal(self):
+        """ego 경로상 다음 신호를 (신호 id, 정지선까지 거리 m, 신호색, 남은 시간 s)로 반환.
+
+        traci getNextTLS는 ego가 앞으로 지날 신호들을 가까운 순으로 돌려준다
+        (거리는 ego 앞범퍼 → 정지선). 신호를 이미 지났거나 ego가 없으면 None.
+        """
+        if self.ego_id not in traci.vehicle.getIDList():
+            return None
+        try:
+            upcoming = traci.vehicle.getNextTLS(self.ego_id)
+            if not upcoming:
+                return None
+            tl_id, _, dist, state = upcoming[0]
+            remaining = (traci.trafficlight.getNextSwitch(tl_id)
+                         - traci.simulation.getTime())
+            return tl_id, float(dist), state, float(max(remaining, 0.0))
+        except traci.TraCIException:
+            return None
+
+    def _signal_obs(self):
+        """관측 [31..33]: 정지선 거리 / 정지 필요도 / 남은 시간 (mdp_config 참고)."""
+        nxt = self._next_signal()
+        if nxt is None or nxt[1] > self.signal_visibility:
+            return [1.0, 0.0, 1.0]                 # 신호 없음/멀리: 제약 없음
+        _, dist, state, remaining = nxt
+        return [float(np.clip(dist / self.signal_visibility, 0.0, 1.0)),
+                self._SIGNAL_STOP_LEVEL.get(state, 1.0),
+                float(np.clip(remaining / self.signal_time_scale, 0.0, 1.0))]
+
     def _get_obs(self):
         # ego가 이미 사라졌다면(충돌/도착) 0벡터 반환 — 종료 직전 마지막 관측용
         if self.ego_id not in traci.vehicle.getIDList():
@@ -531,6 +622,10 @@ class SumoHighwayEnv(gym.Env):
         # ----- 5개 차선의 전방 차량 밀도 (같은 순서) -----
         for offset in self.obs_offsets:
             obs.append(self._lane_density(offset))
+
+        # ----- 전방 신호 (OBSERVATION["signal"] 사용 시) -----
+        if self.signal_obs:
+            obs += self._signal_obs()
 
         return np.clip(np.array(obs, dtype=np.float32), -1.0, 1.0)
 
@@ -601,6 +696,13 @@ class SumoHighwayEnv(gym.Env):
         my_pos = traci.vehicle.getLanePosition(self.ego_id)
         if my_pos < self.lc_spawn_protect:
             return False
+        # 신호 정지선 앞 구간: 차선변경 금지 (교차로 앞 실선).
+        # 엣지 경계 너머(교차로 건너편) 차량은 차선 스캔에 안 잡히므로
+        # 사각지대 보완 효과도 있다. 교차로 직후 구간은 위의 spawn_protect가
+        # 엣지 내 위치 기준이라 이미 막혀 있다.
+        nxt = self._next_signal()
+        if nxt is not None and nxt[1] < self.lc_signal_zone:
+            return False
 
         v = traci.vehicle.getSpeed(self.ego_id)
         scan_front, scan_rear = self._scan_lane_neighbors(direction)
@@ -659,6 +761,19 @@ class SumoHighwayEnv(gym.Env):
         except traci.TraCIException:
             return False
 
+    def _signal_states(self) -> list:
+        """도로 위 모든 신호의 상태 (privileged state용)."""
+        out = []
+        now = traci.simulation.getTime()
+        for tl_id in traci.trafficlight.getIDList():
+            out.append({
+                "id": tl_id,
+                "state": traci.trafficlight.getRedYellowGreenState(tl_id),
+                "phase": int(traci.trafficlight.getPhase(tl_id)),
+                "time_to_switch": float(traci.trafficlight.getNextSwitch(tl_id) - now),
+            })
+        return out
+
     def get_privileged_state(self) -> dict:
         """POMDP 데이터셋용 simulator-side state.
 
@@ -695,6 +810,7 @@ class SumoHighwayEnv(gym.Env):
                 "ego_road_id": traci.vehicle.getRoadID(self.ego_id),
                 "ego_lane_pos": float(traci.vehicle.getLanePosition(self.ego_id)),
                 "vehicles": vehicles,
+                "signals": self._signal_states(),
             }
         except traci.TraCIException:
             return {"ego_alive": False}
@@ -711,6 +827,9 @@ class SumoHighwayEnv(gym.Env):
         lane_change = self._quantize_lane_change(lane_raw)
         lane_change_applied = False
         lane_before = None
+
+        # 행동 결정 시점의 전방 신호 (신호 위반 판정 기준 — 정책이 본 관측과 같은 시점)
+        signal_before = self._next_signal()
 
         # ----- (1) 종방향 + 횡방향 행동 적용 -----
         if self.ego_id in traci.vehicle.getIDList():
@@ -739,9 +858,22 @@ class SumoHighwayEnv(gym.Env):
         terminated, truncated = False, False
         ego_speed, ego_gap = None, None
 
+        # ---- 신호 위반: 결정 시점에 적색이던 신호의 정지선을 이번 스텝에 넘음 ----
+        # 넘었는지는 "다음 신호 목록에서 그 신호가 사라졌는지"로 본다.
+        # 황색 진입은 위반으로 보지 않는다. (ego는 speedMode=0이라 SUMO가
+        # 대신 멈춰주지 않으므로, 이 판정과 보상으로 신호 준수를 학습한다)
+        signal_after = self._next_signal() if alive else None
+        red_violation = bool(
+            alive and signal_before is not None
+            and self._SIGNAL_STOP_LEVEL.get(signal_before[2], 1.0) >= 1.0
+            and (signal_after is None or signal_after[0] != signal_before[0]))
+
         # ----- (4) 기존 보상 유지 -----
         if collided:
             reward = -float(self.rw["collision_penalty"])
+            terminated = True
+        elif red_violation and self.rw.get("red_light_terminate", True):
+            reward = -float(self.rw.get("red_light_penalty", 0.0))
             terminated = True
         elif arrived:
             reward = float(self.rw["arrival_bonus"])
@@ -763,12 +895,32 @@ class SumoHighwayEnv(gym.Env):
             # "차선을 유지한 채 막혀 있기"와 "변경으로 탈출하기" 사이에
             # 즉각적인 보상 차등을 만들어 추월 학습 신호를 조밀하게 한다.
             # (자세한 설계 이유는 env/mdp_config.py의 REWARD 주석 참고)
+            # 단, 전방 신호가 적/황색이면 앞차가 신호 대기 중인 것이므로
+            # 막힘으로 보지 않는다 (합법적 대기를 벌주면 대기열을 피하려는
+            # 차선변경을 배우게 된다).
+            waiting_for_signal = (
+                signal_after is not None
+                and signal_after[1] <= self.signal_visibility
+                and self._SIGNAL_STOP_LEVEL.get(signal_after[2], 1.0) > 0.0)
+            # blocked_gap=None이면 거리 조건 없이 "느리면 감점" (앞차와 거리를
+            # 벌려 감점을 피하는 캠핑 정책 차단).
             bp = float(self.rw.get("blocked_penalty", 0.0))
-            if (bp > 0.0 and ego_gap is not None
-                    and ego_gap < float(self.rw.get("blocked_gap", 20.0))
+            blocked_gap = self.rw.get("blocked_gap", 20.0)
+            near_leader = blocked_gap is None or (
+                ego_gap is not None and ego_gap < float(blocked_gap))
+            if (bp > 0.0 and not waiting_for_signal and near_leader
                     and ego_speed < float(self.rw.get("blocked_speed_frac", 0.7))
                         * self.vmax):
                 reward -= bp
+
+            # ---- 진행 보상: 이번 스텝 이동거리 / 도로 길이 × progress_weight ----
+            # 완주까지 누적하면 정확히 progress_weight. 속도 보상과 달리 상한이
+            # 고정이라 "빨리 완주해서 남은 스텝을 잃는" 손해가 없다.
+            dist = traci.vehicle.getDistance(self.ego_id)
+            pw = float(self.rw.get("progress_weight", 0.0))
+            if pw > 0.0:
+                reward += pw * max(dist - self._prev_dist, 0.0) / self.road_length
+            self._prev_dist = dist
 
             # ---- 차선변경 보상 항 ----
             # lane_change        : 이번 스텝에 policy가 낸 양자화 명령 (-1/0/+1)
@@ -786,6 +938,10 @@ class SumoHighwayEnv(gym.Env):
                 # → 의미 없는 행동 출력을 줄이는 정칙화 (rl_action_penalty 대응)
                 reward -= float(self.rw.get("invalid_action_penalty", 0.0))
 
+            # 종료하지 않는 설정(red_light_terminate=False)이면 감점만 하고 계속 주행
+            if red_violation:
+                reward -= float(self.rw.get("red_light_penalty", 0.0))
+
         if self.step_count >= self.max_steps:
             truncated = True
 
@@ -800,6 +956,10 @@ class SumoHighwayEnv(gym.Env):
             "lane_change_applied": lane_change_applied,
             "lane_before": lane_before,
             "lane_after": lane_after,
+            "red_violation": red_violation,
+            # 결정 시점의 전방 신호 (없으면 None)
+            "signal_state": signal_before[2] if signal_before else None,
+            "signal_dist": signal_before[1] if signal_before else None,
         }
         return obs, float(reward), terminated, truncated, info
 

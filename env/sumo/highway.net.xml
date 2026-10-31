@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<!-- generated on 2026-09-03 10:47:07 by Eclipse SUMO netconvert Version 1.18.0
+<!-- generated on 2026-10-30 18:18:57 by Eclipse SUMO netconvert Version 1.18.0
 <configuration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/netconvertConfiguration.xsd">
 
     <input>
-        <node-files value="env/sumo/highway.nod.xml"/>
-        <edge-files value="env/sumo/highway.edg.xml"/>
+        <node-files value="/home/min-gi/Desktop/2026_2/Artificial-Intelligence-and-Control-for-Autonomous-Driving/env/sumo/highway.nod.xml"/>
+        <edge-files value="/home/min-gi/Desktop/2026_2/Artificial-Intelligence-and-Control-for-Autonomous-Driving/env/sumo/highway.edg.xml"/>
     </input>
 
     <output>
-        <output-file value="env/sumo/highway.net.xml"/>
+        <output-file value="/home/min-gi/Desktop/2026_2/Artificial-Intelligence-and-Control-for-Autonomous-Driving/env/sumo/highway.net.xml"/>
     </output>
 
 </configuration>
@@ -19,13 +19,43 @@
 
     <location netOffset="0.00,0.00" convBoundary="0.00,0.00,12000.00,0.00" origBoundary="0.00,0.00,12000.00,0.00" projParameter="!"/>
 
-    <edge id="e0" from="n0" to="n1" priority="-1">
-        <lane id="e0_0" index="0" speed="33.33" length="12000.00" shape="0.00,-8.00 12000.00,-8.00"/>
-        <lane id="e0_1" index="1" speed="33.33" length="12000.00" shape="0.00,-4.80 12000.00,-4.80"/>
-        <lane id="e0_2" index="2" speed="33.33" length="12000.00" shape="0.00,-1.60 12000.00,-1.60"/>
+    <edge id=":n_tl_0" function="internal">
+        <lane id=":n_tl_0_0" index="0" speed="33.33" length="0.10" shape="6000.00,-8.00 6000.00,-8.00"/>
+        <lane id=":n_tl_0_1" index="1" speed="33.33" length="0.10" shape="6000.00,-4.80 6000.00,-4.80"/>
+        <lane id=":n_tl_0_2" index="2" speed="33.33" length="0.10" shape="6000.00,-1.60 6000.00,-1.60"/>
     </edge>
 
+    <edge id="e0" from="n0" to="n_tl" priority="-1">
+        <lane id="e0_0" index="0" speed="33.33" length="6000.00" shape="0.00,-8.00 6000.00,-8.00"/>
+        <lane id="e0_1" index="1" speed="33.33" length="6000.00" shape="0.00,-4.80 6000.00,-4.80"/>
+        <lane id="e0_2" index="2" speed="33.33" length="6000.00" shape="0.00,-1.60 6000.00,-1.60"/>
+    </edge>
+    <edge id="e1" from="n_tl" to="n1" priority="-1">
+        <lane id="e1_0" index="0" speed="33.33" length="6000.00" shape="6000.00,-8.00 12000.00,-8.00"/>
+        <lane id="e1_1" index="1" speed="33.33" length="6000.00" shape="6000.00,-4.80 12000.00,-4.80"/>
+        <lane id="e1_2" index="2" speed="33.33" length="6000.00" shape="6000.00,-1.60 12000.00,-1.60"/>
+    </edge>
+
+    <tlLogic id="n_tl" type="static" programID="0" offset="0">
+        <phase duration="78" state="GGG"/>
+        <phase duration="7"  state="yyy"/>
+        <phase duration="5"  state="rrr"/>
+    </tlLogic>
+
     <junction id="n0" type="dead_end" x="0.00" y="0.00" incLanes="" intLanes="" shape="0.00,0.00 0.00,-9.60"/>
-    <junction id="n1" type="dead_end" x="12000.00" y="0.00" incLanes="e0_0 e0_1 e0_2" intLanes="" shape="12000.00,-9.60 12000.00,0.00"/>
+    <junction id="n1" type="dead_end" x="12000.00" y="0.00" incLanes="e1_0 e1_1 e1_2" intLanes="" shape="12000.00,-9.60 12000.00,0.00"/>
+    <junction id="n_tl" type="traffic_light" x="6000.00" y="0.00" incLanes="e0_0 e0_1 e0_2" intLanes=":n_tl_0_0 :n_tl_0_1 :n_tl_0_2" shape="6000.00,0.00 6000.00,-9.60 6000.00,0.00">
+        <request index="0" response="000" foes="000" cont="0"/>
+        <request index="1" response="000" foes="000" cont="0"/>
+        <request index="2" response="000" foes="000" cont="0"/>
+    </junction>
+
+    <connection from="e0" to="e1" fromLane="0" toLane="0" via=":n_tl_0_0" tl="n_tl" linkIndex="0" dir="s" state="O"/>
+    <connection from="e0" to="e1" fromLane="1" toLane="1" via=":n_tl_0_1" tl="n_tl" linkIndex="1" dir="s" state="O"/>
+    <connection from="e0" to="e1" fromLane="2" toLane="2" via=":n_tl_0_2" tl="n_tl" linkIndex="2" dir="s" state="O"/>
+
+    <connection from=":n_tl_0" to="e1" fromLane="0" toLane="0" dir="s" state="M"/>
+    <connection from=":n_tl_0" to="e1" fromLane="1" toLane="1" dir="s" state="M"/>
+    <connection from=":n_tl_0" to="e1" fromLane="2" toLane="2" dir="s" state="M"/>
 
 </net>

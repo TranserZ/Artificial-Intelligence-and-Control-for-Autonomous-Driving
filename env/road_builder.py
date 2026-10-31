@@ -20,6 +20,22 @@ try:
     from env.road_config import SCENERY
 except ImportError:      # 구버전 설정 하위호환
     SCENERY = {"trees": False}
+try:
+    from env.road_config import TRAFFIC_LIGHT
+except ImportError:      # 신호등 설정이 없는 구버전 설정 하위호환
+    TRAFFIC_LIGHT = {"enabled": False}
+
+TL_ID = "n_tl"   # 신호 노드 id = SUMO 신호(tlLogic) id. sumo_env.py도 이 값을 쓴다.
+
+
+def tl_enabled(tl: dict = None) -> bool:
+    tl = TRAFFIC_LIGHT if tl is None else tl
+    return bool(tl and tl.get("enabled", False))
+
+
+def route_edges(road: dict, tl: dict = None) -> list:
+    """ego/배경차 route r0이 지나가는 엣지 순서."""
+    return ["e0", "e1"] if tl_enabled(tl) else ["e0"]
 
 
 def build(road: dict, ego: dict, traffic: dict, out_dir: str) -> str:
@@ -30,28 +46,46 @@ def build(road: dict, ego: dict, traffic: dict, out_dir: str) -> str:
         ego:     configs.road_config.EGO     (RL 차량 속성)
         traffic: configs.road_config.TRAFFIC (배경 교통류)
         out_dir: 생성 위치 (보통 프로젝트의 sumo/ 폴더)
+    신호등 설정은 configs.road_config.TRAFFIC_LIGHT 에서 읽는다.
     """
     os.makedirs(out_dir, exist_ok=True)
+    use_tl = tl_enabled()
+    if use_tl:
+        tl_pos = float(TRAFFIC_LIGHT["position"])
+        if not 0.0 < tl_pos < float(road["length"]):
+            raise ValueError(
+                f"TRAFFIC_LIGHT['position']={tl_pos}는 0과 도로 길이"
+                f"({road['length']}) 사이여야 합니다.")
 
     # ──────────────────────────────────────────────────────
     # 1) 노드 파일: 직선 도로의 양 끝점 2개
     #    n0 = 원점(출발), n1 = length만큼 떨어진 지점(도착)
+    #    신호등 사용 시 position 지점에 신호 노드 n_tl 추가.
+    #    type="traffic_light" 노드에 netconvert가 신호(tlLogic)를 만든다.
     # ──────────────────────────────────────────────────────
+    tl_node = (f'    <node id="{TL_ID}" x="{tl_pos}" y="0" type="traffic_light"/>\n'
+               if use_tl else "")
     with open(os.path.join(out_dir, "highway.nod.xml"), "w") as f:
         f.write(f"""<nodes>
     <node id="n0" x="0" y="0"/>
-    <node id="n1" x="{road['length']}" y="0"/>
+{tl_node}    <node id="n1" x="{road['length']}" y="0"/>
 </nodes>
 """)
 
     # ──────────────────────────────────────────────────────
     # 2) 엣지 파일: n0 → n1 을 잇는 도로 구간 하나
     #    numLanes = 차선 수, speed = 제한속도(m/s)
+    #    신호등 사용 시 n0 → n_tl (e0) / n_tl → n1 (e1) 두 구간으로 분할
     # ──────────────────────────────────────────────────────
+    lane_attrs = f'numLanes="{road["num_lanes"]}" speed="{road["speed_limit"]}"'
+    if use_tl:
+        edge_lines = (f'    <edge id="e0" from="n0" to="{TL_ID}" {lane_attrs}/>\n'
+                      f'    <edge id="e1" from="{TL_ID}" to="n1" {lane_attrs}/>\n')
+    else:
+        edge_lines = f'    <edge id="e0" from="n0" to="n1" {lane_attrs}/>\n'
     with open(os.path.join(out_dir, "highway.edg.xml"), "w") as f:
         f.write(f"""<edges>
-    <edge id="e0" from="n0" to="n1" numLanes="{road['num_lanes']}" speed="{road['speed_limit']}"/>
-</edges>
+{edge_lines}</edges>
 """)
 
     # ──────────────────────────────────────────────────────
@@ -127,7 +161,7 @@ def build(road: dict, ego: dict, traffic: dict, out_dir: str) -> str:
         f.write(f"""<routes>
     <vType id="ego_type" accel="{ego['accel']}" decel="{ego['decel']}" maxSpeed="{ego['max_speed']}" color="1,0,0" vClass="passenger" guiShape="passenger/sedan"/>
 {vtypes_block}
-    <route id="r0" edges="e0"/>
+    <route id="r0" edges="{' '.join(route_edges(road))}"/>
     <flow id="traffic" type="{flow_type}" route="r0" begin="0" end="100000"
           period="{3600.0 / traffic['vehs_per_hour']:.2f}"
           departLane="{traffic['depart_lane']}" departSpeed="{traffic['depart_speed']}"/>
@@ -175,14 +209,16 @@ def build(road: dict, ego: dict, traffic: dict, out_dir: str) -> str:
 
     # ──────────────────────────────────────────────────────
     # 5) sumocfg: "이 net 파일과 이 route 파일로 시뮬레이션해라"
+    #    신호등 사용 시 highway.tll.xml(신호 주기)도 additional로 로드
     # ──────────────────────────────────────────────────────
+    additional = "highway.scenery.xml" + (",highway.tll.xml" if use_tl else "")
     cfg_path = os.path.join(out_dir, "highway.sumocfg")
     with open(cfg_path, "w") as f:
-        f.write("""<configuration>
+        f.write(f"""<configuration>
     <input>
         <net-file value="highway.net.xml"/>
         <route-files value="highway.rou.xml"/>
-        <additional-files value="highway.scenery.xml"/>
+        <additional-files value="{additional}"/>
     </input>
     <gui_only>
         <gui-settings-file value="highway.gui.xml"/>
@@ -203,7 +239,37 @@ def build(road: dict, ego: dict, traffic: dict, out_dir: str) -> str:
         check=True,           # 실패하면 예외를 던져서 바로 알 수 있게
         capture_output=True,  # 출력은 조용히 삼킴
     )
+
+    # ──────────────────────────────────────────────────────
+    # 7) 신호 주기 파일 (highway.tll.xml)
+    #    netconvert가 만든 기본 신호 대신 TRAFFIC_LIGHT["phases"]의 고정 주기를
+    #    쓴다. 신호 state 문자열 길이(= 신호가 제어하는 연결 수)는 net.xml에서
+    #    읽어 맞추므로 차선 수를 바꿔도 어긋나지 않는다.
+    #    같은 신호 id에 새 programID를 additional로 로드하면 SUMO는 마지막에
+    #    로드된 프로그램을 사용한다.
+    # ──────────────────────────────────────────────────────
+    if use_tl:
+        _write_tll(out_dir)
     return cfg_path
+
+
+def _write_tll(out_dir: str):
+    import xml.etree.ElementTree as ET
+    net = ET.parse(os.path.join(out_dir, "highway.net.xml")).getroot()
+    logic = net.find(f"tlLogic[@id='{TL_ID}']")
+    if logic is None:
+        raise RuntimeError(f"net.xml에 신호 '{TL_ID}'가 생성되지 않았습니다.")
+    n_links = len(logic.find("phase").get("state"))
+
+    phases = TRAFFIC_LIGHT.get("phases") or [("G", 40), ("y", 4), ("r", 25)]
+    lines = [f'    <tlLogic id="{TL_ID}" type="static" programID="custom" offset="0">']
+    for signal, duration in phases:
+        if signal not in ("G", "g", "y", "r"):
+            raise ValueError(f"TRAFFIC_LIGHT phase 신호는 G/g/y/r 중 하나여야 합니다: {signal}")
+        lines.append(f'        <phase duration="{float(duration)}" state="{signal * n_links}"/>')
+    lines.append("    </tlLogic>")
+    with open(os.path.join(out_dir, "highway.tll.xml"), "w") as f:
+        f.write("<additional>\n" + "\n".join(lines) + "\n</additional>\n")
 
 
 def _blob(cx: float, cy: float, r: float, rng, n: int = 14,

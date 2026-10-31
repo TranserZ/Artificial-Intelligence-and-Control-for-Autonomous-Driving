@@ -329,12 +329,17 @@ class PPO:
     # ==================================================================
     def learn(self, env, total_timesteps: int, logger=None,
               log_interval: int = 1, eval_interval: int = 0,
-              eval_episodes: int = 5):
+              eval_episodes: int = 5, checkpoint_interval: int = 0,
+              checkpoint_fn=None, eval_fn=None):
         """학습 실행.
 
         Args:
             logger: utils.logger.RunLogger (없으면 콘솔 출력만)
             eval_interval: 몇 번의 업데이트마다 평가할지 (0이면 평가 안 함)
+            checkpoint_interval: 몇 번의 업데이트마다 checkpoint_fn()을 부를지.
+                학습이 중간에 강제 종료돼도(프로세스 kill 등) 마지막
+                체크포인트까지의 모델이 남는다. (0이면 안 함)
+            eval_fn: 평가마다 eval_fn(metrics)를 부른다 (best 모델 저장용).
         """
         obs, _ = env.reset()
         ep_stats = [0.0, 0]                    # [현재 에피소드 보상, 길이]
@@ -373,10 +378,17 @@ class PPO:
                 if logger is not None:
                     logger.log_eval(self.num_timesteps, m.as_dict(),
                                     m.summary(), eval_episodes)
+                if eval_fn is not None:
+                    eval_fn(m)
                 # 평가가 학습 중이던 에피소드를 끊었으므로 리셋.
                 # (끊긴 경험은 이미 버퍼에 반영됐고 GAE가 부트스트랩하므로 무해)
                 obs, _ = env.reset()
                 ep_stats[0], ep_stats[1] = 0.0, 0
+
+            # 5) 주기적 체크포인트
+            if (checkpoint_fn is not None and checkpoint_interval > 0
+                    and n_updates % checkpoint_interval == 0):
+                checkpoint_fn()
 
     # ==================================================================
     def save(self, path: str):

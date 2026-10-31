@@ -122,6 +122,7 @@ if __name__ == "__main__":
     print(f"  충돌률       : {metrics.collision_rate:.0%}")
     print(f"  완주율       : {metrics.success_rate:.0%}")
     print(f"  시간초과율   : {metrics.timeout_rate:.0%}")
+    print(f"  신호위반율   : {metrics.red_violation_rate:.0%}")
     print(f"  평균 속도    : {metrics.mean_speed:.2f} m/s "
           f"({metrics.mean_speed * 3.6:.1f} km/h)")
     print(f"  평균 차간거리: {metrics.mean_gap:.2f} m")

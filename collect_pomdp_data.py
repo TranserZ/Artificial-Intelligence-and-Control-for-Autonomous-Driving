@@ -195,6 +195,7 @@ def collect(args, sumocfg, episodes, worker_id, jsonl_path, npz_path, tag=""):
     obs_buf, next_obs_buf, action_raw_buf = [], [], []
     lane_cmd_buf, reward_buf = [], []
     term_buf, trunc_buf, episode_buf, step_buf = [], [], [], []
+    red_buf = []
     # 스텝별 감지 차량 (x,y)는 한 줄로 이어 붙이고, 스텝 경계는 offsets로 기록한다.
     detected_xy_buf, detected_offsets = [], [0]
 
@@ -241,8 +242,15 @@ def collect(args, sumocfg, episodes, worker_id, jsonl_path, npz_path, tag=""):
                         "event": {
                             "collided": bool(info["collided"]),
                             "arrived": bool(info["arrived"]),
+                            "red_violation": bool(info["red_violation"]),
                             "lane_before": info["lane_before"],
                             "lane_after": info["lane_after"],
+                        },
+                        # 행동 결정 시점의 전방 신호 (없으면 None)
+                        "signal": {
+                            "state": info["signal_state"],
+                            "dist": (None if info["signal_dist"] is None
+                                     else round(float(info["signal_dist"]), args.ndigits)),
                         },
                     }
                     if done:
@@ -260,6 +268,7 @@ def collect(args, sumocfg, episodes, worker_id, jsonl_path, npz_path, tag=""):
                     reward_buf.append(float(reward))
                     term_buf.append(bool(terminated))
                     trunc_buf.append(bool(truncated))
+                    red_buf.append(bool(info["red_violation"]))
                     episode_buf.append(int(ep))
                     step_buf.append(t)
                     detected_xy_buf.extend((d["x"], d["y"]) for d in detected)
@@ -285,6 +294,7 @@ def collect(args, sumocfg, episodes, worker_id, jsonl_path, npz_path, tag=""):
         next_observation=np.asarray(next_obs_buf, dtype=np.float32).reshape(total, -1),
         terminated=np.asarray(term_buf, dtype=np.bool_),
         truncated=np.asarray(trunc_buf, dtype=np.bool_),
+        red_violation=np.asarray(red_buf, dtype=np.bool_),
         episode=np.asarray(episode_buf, dtype=np.int32),
         t=np.asarray(step_buf, dtype=np.int32),
         # 감지 차량 (x,y)를 전 스텝에 걸쳐 이어 붙인 (M, 2) float32.
