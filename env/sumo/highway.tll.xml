@@ -1,13 +1,13 @@
 <additional>
     <!-- 천호사거리 신호 계획, 주기 200 s. 링크 순서: 0:NS_R 1:NS_S 2:NS_S 3:NS_L 4:EW_R 5:EW_S 6:EW_S 7:EW_S 8:EW_L 9:NS_R 10:NS_S 11:NS_S 12:NS_L 13:EW_R 14:EW_S 15:EW_S 16:EW_S 17:EW_L 18:보행(EW) 19:보행(NS) 20:보행(EW) 21:보행(NS) -->
     <tlLogic id="n_tl" type="static" programID="plan" offset="0">
-        <phase duration="52" state="srrrgGGGrsrrrgGGGrGrGr"/>  <!-- 1현시 EW_S 녹색 (보행 녹색) -->
-        <phase duration="13" state="srrrgGGGrsrrrgGGGrrrrr"/>  <!-- 1현시 EW_S 녹색 (보행 점멸) -->
+        <phase duration="49" state="srrrgGGGrsrrrgGGGrGrGr"/>  <!-- 1현시 EW_S 녹색 (보행 녹색) -->
+        <phase duration="16" state="srrrgGGGrsrrrgGGGrrrrr"/>  <!-- 1현시 EW_S 녹색 (보행 점멸) -->
         <phase duration="4" state="srrrgyyyrsrrrgyyyrrrrr"/>  <!-- 1현시 EW_S 황색 -->
         <phase duration="34" state="srrrsrrrGsrrrsrrrGrrrr"/>  <!-- 2현시 EW_L 녹색 -->
         <phase duration="4" state="srrrsrrrysrrrsrrryrrrr"/>  <!-- 2현시 EW_L 황색 -->
-        <phase duration="26" state="gGGrsrrrrgGGrsrrrrrGrG"/>  <!-- 3현시 NS_S 녹색 (보행 녹색) -->
-        <phase duration="20" state="gGGrsrrrrgGGrsrrrrrrrr"/>  <!-- 3현시 NS_S 녹색 (보행 점멸) -->
+        <phase duration="23" state="gGGrsrrrrgGGrsrrrrrGrG"/>  <!-- 3현시 NS_S 녹색 (보행 녹색) -->
+        <phase duration="23" state="gGGrsrrrrgGGrsrrrrrrrr"/>  <!-- 3현시 NS_S 녹색 (보행 점멸) -->
         <phase duration="4" state="gyyrsrrrrgyyrsrrrrrrrr"/>  <!-- 3현시 NS_S 황색 -->
         <phase duration="39" state="srrGsrrrrsrrGsrrrrrrrr"/>  <!-- 4현시 NS_L 녹색 -->
         <phase duration="4" state="srrysrrrrsrrysrrrrrrrr"/>  <!-- 4현시 NS_L 황색 -->

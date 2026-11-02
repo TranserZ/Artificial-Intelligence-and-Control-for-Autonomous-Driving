@@ -34,6 +34,7 @@ except ImportError:      # 실제 교차로 신호 계획이 없는 구버전 �
     SIGNAL_PLAN = {}
 
 TL_ID = "n_tl"   # 신호 노드 id = SUMO 신호(tlLogic) id. sumo_env.py도 이 값을 쓴다.
+LANE_WIDTH = 3.2  # SUMO 기본 차로 폭 (m)
 
 
 def tl_enabled(tl: dict = None) -> bool:
@@ -45,9 +46,16 @@ def is_intersection(road: dict) -> bool:
     return road.get("layout", "straight") == "intersection"
 
 
+def _left_bay(road: dict) -> float:
+    """교차로 앞 좌회전 전용차로(포켓) 길이 m. 0이면 포켓 없음 (좌회전은 맨 왼쪽 직진 차로 공용)."""
+    return float(INTERSECTION.get("left_bay_length", 0.0)) if is_intersection(road) else 0.0
+
+
 def route_edges(road: dict, tl: dict = None) -> list:
     """ego/배경차 route r0이 지나가는 엣지 순서."""
-    if is_intersection(road) or tl_enabled(tl):
+    if is_intersection(road):
+        return ["e0", "e0b", "e1"] if _left_bay(road) > 0 else ["e0", "e1"]
+    if tl_enabled(tl):
         return ["e0", "e1"]
     return ["e0"]
 
@@ -200,7 +208,7 @@ def build(road: dict, ego: dict, traffic: dict, out_dir: str) -> str:
     <flow id="traffic" type="{flow_type}" route="r0" begin="0" end="100000"
           period="{3600.0 / traffic['vehs_per_hour']:.2f}"
           departLane="{traffic['depart_lane']}" departSpeed="{traffic['depart_speed']}"/>
-{_intersection_demand(traffic) if cross else ""}</routes>
+{_intersection_demand(traffic, road) if cross else ""}</routes>
 """)
 
     # ──────────────────────────────────────────────────────
@@ -271,7 +279,7 @@ def build(road: dict, ego: dict, traffic: dict, out_dir: str) -> str:
          "--node-files", os.path.join(out_dir, "highway.nod.xml"),
          "--edge-files", os.path.join(out_dir, "highway.edg.xml"),
          "-o", os.path.join(out_dir, "highway.net.xml")]
-        + (_intersection_netconvert_args(road) if cross else []),
+        + (_intersection_netconvert_args(road, out_dir) if cross else []),
         check=True,           # 실패하면 예외를 던져서 바로 알 수 있게
         capture_output=True,  # 출력은 조용히 삼킴
     )
@@ -320,41 +328,117 @@ def _write_intersection_geometry(road: dict, out_dir: str, use_tl: bool):
     if not 0.0 < pos < length:
         raise ValueError(f"INTERSECTION['position']={pos}는 0과 도로 길이({length}) 사이여야 합니다.")
     arm = float(INTERSECTION.get("side_length", 150.0))
+    bay = _left_bay(road)
+    if bay and not (0 < bay < min(pos, length - pos, arm) - 10):
+        raise ValueError(f"INTERSECTION['left_bay_length']={bay}는 교차로 팔 길이보다 짧아야 합니다.")
     node_type = "traffic_light" if use_tl else "priority"
+    lanes = _approach_lanes(road)
+    speed = {"main": road["speed_limit"],
+             "side": INTERSECTION.get("side_speed", road["speed_limit"])}
+
+    # 진출 엣지와 (포켓이 없을 때의) 진입 엣지
+    nodes = [("n0", 0, 0), (TL_ID, pos, 0), ("n1", length, 0), ("n_n", pos, arm), ("n_s", pos, -arm)]
+    edges = [("e1", TL_ID, "n1", lanes["e1"], "main"), ("e0_r", TL_ID, "n0", lanes["e0_r"], "main"),
+             ("n_out", TL_ID, "n_n", lanes["n_out"], "side"), ("s_out", TL_ID, "n_s", lanes["s_out"], "side")]
+    # 진입 엣지: 포켓이 있으면 교차로 앞 bay m 구간을 "<id>b" 엣지로 떼어내고
+    # 그 구간에만 왼쪽에 좌회전 전용차로 1개를 더한다.
+    approach = {"e0": ("n0", (pos - bay, 0)), "e1_r": ("n1", (pos + bay, 0)),
+                "n_in": ("n_n", (pos, bay)), "s_in": ("n_s", (pos, -bay))}
+    for eid, (start, (bx, by)) in approach.items():
+        kind = "main" if eid in ("e0", "e1_r") else "side"
+        if bay:
+            nodes.append((f"{eid}_bay", bx, by))
+            edges.append((eid, start, f"{eid}_bay", lanes[eid], kind))
+            edges.append((f"{eid}b", f"{eid}_bay", TL_ID, lanes[eid] + 1, kind))
+        else:
+            edges.append((eid, start, TL_ID, lanes[eid], kind))
+
+    # 포켓이 있으면 양방향 사이에 차로 1개 폭의 중앙분리대를 두고, 포켓 구간에서만
+    # 그 자리를 좌회전 차로로 쓴다 (실제 도로처럼 직진 차로는 꺾이지 않고 곧게 이어짐).
+    # SUMO는 차로를 엣지 중심선의 오른쪽에 쌓으므로
+    #   일반 엣지: 진행 방향 오른쪽으로 median/2 이동 → 양방향 사이에 median 폭의 틈
+    #   포켓 엣지: 진행 방향 왼쪽으로 median/2 이동 → 늘어난 차로 1개가 틈을 채움
+    median = LANE_WIDTH if bay else 0.0
+    xy = {nid: (x, y) for nid, x, y in nodes}
+
+    def shape(eid, a, b):
+        if not median:
+            return ""
+        (x1, y1), (x2, y2) = xy[a], xy[b]
+        d = ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
+        rx, ry = (y2 - y1) / d, -(x2 - x1) / d          # 진행 방향 오른쪽 단위벡터
+        k = (-1 if eid.endswith("b") else 1) * median / 2
+        return (f' shape="{x1 + k * rx:.2f},{y1 + k * ry:.2f} '
+                f'{x2 + k * rx:.2f},{y2 + k * ry:.2f}"')
+
     with open(os.path.join(out_dir, "highway.nod.xml"), "w") as f:
-        f.write(f"""<nodes>
-    <node id="n0" x="0" y="0"/>
-    <node id="{TL_ID}" x="{pos}" y="0" type="{node_type}"/>
-    <node id="n1" x="{length}" y="0"/>
-    <node id="n_n" x="{pos}" y="{arm}"/>
-    <node id="n_s" x="{pos}" y="{-arm}"/>
-</nodes>
-""")
-    main = f'numLanes="{road["num_lanes"]}" speed="{road["speed_limit"]}"'
-    opp = (f'numLanes="{INTERSECTION.get("opposite_lanes", road["num_lanes"])}" '
-           f'speed="{road["speed_limit"]}"')
-    side = (f'numLanes="{INTERSECTION.get("side_lanes", 2)}" '
-            f'speed="{INTERSECTION.get("side_speed", road["speed_limit"])}"')
+        f.write("<nodes>\n" + "".join(
+            f'    <node id="{nid}" x="{x}" y="{y}"'
+            + (f' type="{node_type}"' if nid == TL_ID else "") + "/>\n"
+            for nid, x, y in nodes) + "</nodes>\n")
     with open(os.path.join(out_dir, "highway.edg.xml"), "w") as f:
-        f.write(f"""<edges>
-    <edge id="e0" from="n0" to="{TL_ID}" {main}/>
-    <edge id="e1" from="{TL_ID}" to="n1" {main}/>
-    <edge id="e1_r" from="n1" to="{TL_ID}" {opp}/>
-    <edge id="e0_r" from="{TL_ID}" to="n0" {opp}/>
-    <edge id="n_in" from="n_n" to="{TL_ID}" {side}/>
-    <edge id="n_out" from="{TL_ID}" to="n_n" {side}/>
-    <edge id="s_in" from="n_s" to="{TL_ID}" {side}/>
-    <edge id="s_out" from="{TL_ID}" to="n_s" {side}/>
-</edges>
-""")
+        f.write("<edges>\n" + "".join(
+            f'    <edge id="{eid}" from="{a}" to="{b}" numLanes="{n}" speed="{speed[kind]}"'
+            f'{shape(eid, a, b)}/>\n'
+            for eid, a, b, n, kind in edges) + "</edges>\n")
+    _write_intersection_connections(out_dir, lanes, bay)
 
 
-def _intersection_netconvert_args(road: dict) -> list:
+def _approach_lanes(road: dict) -> dict:
+    """엣지별 차로 수 (보도 제외, 포켓 구간 제외)."""
+    main = int(road["num_lanes"])
+    opp = int(INTERSECTION.get("opposite_lanes", main))
+    side = int(INTERSECTION.get("side_lanes", 2))
+    return {"e0": main, "e1": main, "e1_r": opp, "e0_r": opp,
+            "n_in": side, "n_out": side, "s_in": side, "s_out": side}
+
+
+# 교차로 진입 엣지 → (우회전, 직진, 좌회전) 진출 엣지
+_TURNS = {"e0": ("s_out", "e1", "n_out"), "e1_r": ("n_out", "e0_r", "s_out"),
+          "n_in": ("e0_r", "s_out", "e1"), "s_in": ("e1", "n_out", "e0_r")}
+
+
+def _write_intersection_connections(out_dir: str, lanes: dict, bay: float):
+    """좌회전 포켓이 있을 때 차로별 진행 방향을 고정한다 (highway.con.xml).
+
+    포켓 시작점: 직진 차로는 그대로 이어지고, 맨 왼쪽 차로에서 포켓으로 진입 가능.
+    교차로     : 맨 오른쪽 차로 = 직진+우회전, 나머지 = 직진, 포켓 = 좌회전 전용.
+    차로 번호는 보도(0번)를 뺀 번호이며, netconvert가 보도를 넣으면서 1씩 밀린다.
+    """
+    path = os.path.join(out_dir, "highway.con.xml")
+    if not bay:
+        if os.path.exists(path):
+            os.remove(path)
+        return
+    lines = ["<connections>"]
+    for eid, (right, straight, left) in _TURNS.items():
+        n = lanes[eid]
+        for i in range(n):
+            lines.append(f'    <connection from="{eid}" to="{eid}b" fromLane="{i}" toLane="{i}"/>')
+        lines.append(f'    <connection from="{eid}" to="{eid}b" fromLane="{n - 1}" toLane="{n}"/>')
+        out_n = lanes[straight]
+        for i in range(n):
+            lines.append(f'    <connection from="{eid}b" to="{straight}" fromLane="{i}" '
+                         f'toLane="{min(i, out_n - 1)}"/>')
+        lines.append(f'    <connection from="{eid}b" to="{right}" fromLane="0" toLane="0"/>')
+        lines.append(f'    <connection from="{eid}b" to="{left}" fromLane="{n}" '
+                     f'toLane="{lanes[left] - 1}"/>')
+    lines.append("</connections>")
+    with open(path, "w") as f:
+        f.write("\n".join(lines) + "\n")
+
+
+def _intersection_netconvert_args(road: dict, out_dir: str) -> list:
     # 보도·횡단보도 자동 생성은 기본적으로 13.89 m/s(50 km/h) 이하 도로에만
     # 적용되므로, 기준을 이 도로의 최고 제한속도에 맞춰 둔다.
     vmax = max(float(road["speed_limit"]),
                float(INTERSECTION.get("side_speed", road["speed_limit"]))) + 0.1
-    args = ["--no-turnarounds"]
+    # 교차 도로가 y<0까지 내려가므로 netconvert가 좌표를 원점 기준으로 옮기는데(netOffset),
+    # 그러면 원래 좌표로 그린 도로변 나무·GUI 시점이 어긋난다 → 좌표 이동을 끈다.
+    args = ["--no-turnarounds", "--offset.disable-normalization", "true"]
+    con = os.path.join(out_dir, "highway.con.xml")
+    if os.path.exists(con):
+        args += ["--connection-files", con]
     if INTERSECTION.get("crosswalks", True):
         # SUMO는 보도를 각 엣지의 차선 0번으로 넣는다 → 본선 차로는 1번부터.
         # (본선에 보도가 없으면 본선 횡단보도가 생성되지 않는다.)
@@ -364,25 +448,35 @@ def _intersection_netconvert_args(road: dict) -> list:
     return args
 
 
-def _intersection_demand(traffic: dict) -> str:
-    """반대 방향 본선 / 교차 도로 차량 flow + 보행자 personFlow."""
+def _intersection_demand(traffic: dict, road: dict) -> str:
+    """반대 방향 본선 / 본선 회전 / 교차 도로 차량 flow + 보행자 personFlow."""
+    # 포켓이 있으면 진입 엣지 뒤에 포켓 엣지("<id>b")를 끼운다
+    b = {e: (f"{e} {e}b" if _left_bay(road) > 0 else e) for e in _TURNS}
     lines = []
     opp_vph = float(INTERSECTION.get("opposite_vehs_per_hour", 0))
     if opp_vph > 0:
         lines.append(f'    <flow id="opp" type="carDist" route="r_opp" begin="0" end="100000" '
                      f'period="{3600.0 / opp_vph:.2f}" departLane="random" '
                      f'departSpeed="{traffic["depart_speed"]}"/>')
-        lines.insert(0, '    <route id="r_opp" edges="e1_r e0_r"/>')
-    # 교차 도로: 남북 직진 + 본선으로 좌/우회전 (회전 차량은 차선변경 가능한 분포)
-    side_vph = float(INTERSECTION.get("side_vehs_per_hour", 0))
-    if side_vph > 0:
-        side_routes = {"ns": "n_in s_out", "sn": "s_in n_out",
-                       "ne": "n_in e1", "nw": "n_in e0_r",
-                       "se": "s_in e1", "sw": "s_in e0_r"}
-        per = 3600.0 / (side_vph / len(side_routes))
-        for rid, edges in side_routes.items():
+        lines.insert(0, f'    <route id="r_opp" edges="{b["e1_r"]} e0_r"/>')
+    # 회전 차량은 차선변경 가능한 분포(carDistFree)로 포켓/우측 차로로 들어간다
+    turn_routes = {}
+    # 본선 좌/우회전 (ego 방향 + 반대 방향)
+    if float(INTERSECTION.get("main_turn_vehs_per_hour", 0)) > 0:
+        turn_routes["main"] = (float(INTERSECTION["main_turn_vehs_per_hour"]), {
+            "er": f'{b["e0"]} s_out', "el": f'{b["e0"]} n_out',
+            "wr": f'{b["e1_r"]} n_out', "wl": f'{b["e1_r"]} s_out'})
+    # 교차 도로: 남북 직진 + 본선으로 좌/우회전
+    if float(INTERSECTION.get("side_vehs_per_hour", 0)) > 0:
+        turn_routes["side"] = (float(INTERSECTION["side_vehs_per_hour"]), {
+            "ns": f'{b["n_in"]} s_out', "sn": f'{b["s_in"]} n_out',
+            "ne": f'{b["n_in"]} e1', "nw": f'{b["n_in"]} e0_r',
+            "se": f'{b["s_in"]} e1', "sw": f'{b["s_in"]} e0_r'})
+    for group, (vph, routes) in turn_routes.items():
+        per = 3600.0 / (vph / len(routes))
+        for rid, edges in routes.items():
             lines.append(f'    <route id="r_{rid}" edges="{edges}"/>')
-            lines.append(f'    <flow id="side_{rid}" type="carDistFree" route="r_{rid}" '
+            lines.append(f'    <flow id="{group}_{rid}" type="carDistFree" route="r_{rid}" '
                          f'begin="0" end="100000" period="{per:.2f}" departLane="best" '
                          f'departSpeed="{traffic["depart_speed"]}"/>')
     # 보행자: 남북으로 오가며 본선 횡단보도를 건넌다 (ego와 상호작용하는 쪽)
@@ -445,8 +539,9 @@ def _write_tll(out_dir: str, full_state: bool = False):
 
 
 # 접근 엣지 → 축 (본선 = 동서, 교차 도로 = 남북)
-_APPROACH_AXIS = {"e0": "EW", "e1_r": "EW", "n_in": "NS", "s_in": "NS"}
-_MAIN_EDGES = {"e0", "e1", "e0_r", "e1_r"}
+_APPROACH_AXIS = {"e0": "EW", "e1_r": "EW", "n_in": "NS", "s_in": "NS",
+                  "e0b": "EW", "e1_rb": "EW", "n_inb": "NS", "s_inb": "NS"}   # 포켓 엣지
+_MAIN_EDGES = {"e0", "e1", "e0_r", "e1_r", "e0b", "e1_rb"}
 # SUMO 연결 방향 → 이동류 (s 직진 / l·L·t 좌회전·유턴 / r·R 우회전)
 _DIR_MOVE = {"s": "S", "l": "L", "L": "L", "t": "L", "r": "R", "R": "R"}
 

@@ -36,7 +36,11 @@ INTERSECTION = {
     "side_speed": 13.89,          # 교차 도로 제한속도 (m/s)
     "opposite_lanes": 3,          # 반대 방향 본선 차선 수
     "crosswalks": True,           # 보도 + 4개 팔 횡단보도 자동 생성
-    "opposite_vehs_per_hour": 600,  # 반대 방향 본선 교통량
+    "left_bay_length": 60.0,      # 교차로 앞 좌회전 전용차로(포켓) 길이 (m). 0이면 포켓 없음
+                                  # (맨 왼쪽 직진 차로가 좌회전 공용). 포켓 구간은 진입 엣지
+                                  # 뒤의 "<id>b" 엣지 (예: e0 → e0b → 교차로)
+    "opposite_vehs_per_hour": 600,  # 반대 방향 본선 직진 교통량
+    "main_turn_vehs_per_hour": 240, # 본선 좌/우회전 교통량 (양방향 × 좌/우 균등)
     "side_vehs_per_hour": 400,      # 교차 도로 교통량 (직진/좌회전/우회전 균등)
 }
 

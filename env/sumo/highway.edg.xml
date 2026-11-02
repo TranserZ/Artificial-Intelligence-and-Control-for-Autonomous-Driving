@@ -1,10 +1,14 @@
 <edges>
-    <edge id="e0" from="n0" to="n_tl" numLanes="3" speed="13.89"/>
-    <edge id="e1" from="n_tl" to="n1" numLanes="3" speed="13.89"/>
-    <edge id="e1_r" from="n1" to="n_tl" numLanes="3" speed="13.89"/>
-    <edge id="e0_r" from="n_tl" to="n0" numLanes="3" speed="13.89"/>
-    <edge id="n_in" from="n_n" to="n_tl" numLanes="2" speed="13.89"/>
-    <edge id="n_out" from="n_tl" to="n_n" numLanes="2" speed="13.89"/>
-    <edge id="s_in" from="n_s" to="n_tl" numLanes="2" speed="13.89"/>
-    <edge id="s_out" from="n_tl" to="n_s" numLanes="2" speed="13.89"/>
+    <edge id="e1" from="n_tl" to="n1" numLanes="3" speed="13.89" shape="600.00,-1.60 1000.00,-1.60"/>
+    <edge id="e0_r" from="n_tl" to="n0" numLanes="3" speed="13.89" shape="600.00,1.60 0.00,1.60"/>
+    <edge id="n_out" from="n_tl" to="n_n" numLanes="2" speed="13.89" shape="601.60,0.00 601.60,150.00"/>
+    <edge id="s_out" from="n_tl" to="n_s" numLanes="2" speed="13.89" shape="598.40,0.00 598.40,-150.00"/>
+    <edge id="e0" from="n0" to="e0_bay" numLanes="3" speed="13.89" shape="0.00,-1.60 540.00,-1.60"/>
+    <edge id="e0b" from="e0_bay" to="n_tl" numLanes="4" speed="13.89" shape="540.00,1.60 600.00,1.60"/>
+    <edge id="e1_r" from="n1" to="e1_r_bay" numLanes="3" speed="13.89" shape="1000.00,1.60 660.00,1.60"/>
+    <edge id="e1_rb" from="e1_r_bay" to="n_tl" numLanes="4" speed="13.89" shape="660.00,-1.60 600.00,-1.60"/>
+    <edge id="n_in" from="n_n" to="n_in_bay" numLanes="2" speed="13.89" shape="598.40,150.00 598.40,60.00"/>
+    <edge id="n_inb" from="n_in_bay" to="n_tl" numLanes="3" speed="13.89" shape="601.60,60.00 601.60,0.00"/>
+    <edge id="s_in" from="n_s" to="s_in_bay" numLanes="2" speed="13.89" shape="601.60,-150.00 601.60,-60.00"/>
+    <edge id="s_inb" from="s_in_bay" to="n_tl" numLanes="3" speed="13.89" shape="598.40,-60.00 598.40,0.00"/>
 </edges>

@@ -1,0 +1,34 @@
+<connections>
+    <connection from="e0" to="e0b" fromLane="0" toLane="0"/>
+    <connection from="e0" to="e0b" fromLane="1" toLane="1"/>
+    <connection from="e0" to="e0b" fromLane="2" toLane="2"/>
+    <connection from="e0" to="e0b" fromLane="2" toLane="3"/>
+    <connection from="e0b" to="e1" fromLane="0" toLane="0"/>
+    <connection from="e0b" to="e1" fromLane="1" toLane="1"/>
+    <connection from="e0b" to="e1" fromLane="2" toLane="2"/>
+    <connection from="e0b" to="s_out" fromLane="0" toLane="0"/>
+    <connection from="e0b" to="n_out" fromLane="3" toLane="1"/>
+    <connection from="e1_r" to="e1_rb" fromLane="0" toLane="0"/>
+    <connection from="e1_r" to="e1_rb" fromLane="1" toLane="1"/>
+    <connection from="e1_r" to="e1_rb" fromLane="2" toLane="2"/>
+    <connection from="e1_r" to="e1_rb" fromLane="2" toLane="3"/>
+    <connection from="e1_rb" to="e0_r" fromLane="0" toLane="0"/>
+    <connection from="e1_rb" to="e0_r" fromLane="1" toLane="1"/>
+    <connection from="e1_rb" to="e0_r" fromLane="2" toLane="2"/>
+    <connection from="e1_rb" to="n_out" fromLane="0" toLane="0"/>
+    <connection from="e1_rb" to="s_out" fromLane="3" toLane="1"/>
+    <connection from="n_in" to="n_inb" fromLane="0" toLane="0"/>
+    <connection from="n_in" to="n_inb" fromLane="1" toLane="1"/>
+    <connection from="n_in" to="n_inb" fromLane="1" toLane="2"/>
+    <connection from="n_inb" to="s_out" fromLane="0" toLane="0"/>
+    <connection from="n_inb" to="s_out" fromLane="1" toLane="1"/>
+    <connection from="n_inb" to="e0_r" fromLane="0" toLane="0"/>
+    <connection from="n_inb" to="e1" fromLane="2" toLane="2"/>
+    <connection from="s_in" to="s_inb" fromLane="0" toLane="0"/>
+    <connection from="s_in" to="s_inb" fromLane="1" toLane="1"/>
+    <connection from="s_in" to="s_inb" fromLane="1" toLane="2"/>
+    <connection from="s_inb" to="n_out" fromLane="0" toLane="0"/>
+    <connection from="s_inb" to="n_out" fromLane="1" toLane="1"/>
+    <connection from="s_inb" to="e1" fromLane="0" toLane="0"/>
+    <connection from="s_inb" to="e0_r" fromLane="2" toLane="2"/>
+</connections>

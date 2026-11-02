@@ -468,6 +468,23 @@ class SumoHighwayEnv(gym.Env):
             return None
         return float(gap), traci.vehicle.getSpeed(vid)
 
+    def _lane_leads_on_route(self, edge: str, lane_index: int) -> bool:
+        """그 차선이 ego route의 다음 엣지로 이어지는가 (마지막 엣지면 True).
+
+        교차로 앞 좌회전 포켓처럼 다른 방향으로만 이어지는 차선은 ego에게는
+        "끝나는 차선"이다. 들어가면 route를 따라갈 수 없으므로 관측과
+        차선변경 판단에서 이어지지 않는 차선으로 취급한다.
+        """
+        try:
+            route = traci.vehicle.getRoute(self.ego_id)
+            if edge not in route or route.index(edge) == len(route) - 1:
+                return True
+            nxt = route[route.index(edge) + 1]
+            return any(link[0].rsplit("_", 1)[0] == nxt
+                       for link in traci.lane.getLinks(f"{edge}_{lane_index}"))
+        except traci.TraCIException:
+            return True
+
     def _lane_connectivity(self, offset: int) -> float:
         """오프셋 차선의 '끊김 정도'를 반환.
 
@@ -492,8 +509,8 @@ class SumoHighwayEnv(gym.Env):
                          - traci.vehicle.getLanePosition(self.ego_id))
             if remaining > self.visibility:
                 return 1.0                    # 시야 내에선 계속 이어짐
-            if traci.lane.getLinks(lane_id):
-                return 1.0                    # edge가 끝나도 다음으로 연결됨
+            if self._lane_leads_on_route(edge, lane_index):
+                return 1.0                    # edge가 끝나도 route의 다음 엣지로 연결됨
             return float(np.clip(remaining / self.visibility, 0.0, 1.0))
         except traci.TraCIException:
             return 1.0                        # 조회 실패 시 중립값
@@ -798,6 +815,9 @@ class SumoHighwayEnv(gym.Env):
             current = traci.vehicle.getLaneIndex(self.ego_id)
             target = current + lane_change
             if not self._is_car_lane(edge, target):
+                return False
+            # route로 이어지지 않는 차선(좌회전 포켓 등)으로는 들어가지 않는다
+            if lane_change != 0 and not self._lane_leads_on_route(edge, target):
                 return False
             # ★ 측면충돌 방지: 실제 이동 명령(0이 아닌 변경)에만 안전 검사
             if (lane_change != 0 and self.lc_safety_enabled

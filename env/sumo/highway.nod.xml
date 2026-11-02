@@ -4,4 +4,8 @@
     <node id="n1" x="1000.0" y="0"/>
     <node id="n_n" x="600.0" y="150.0"/>
     <node id="n_s" x="600.0" y="-150.0"/>
+    <node id="e0_bay" x="540.0" y="0"/>
+    <node id="e1_r_bay" x="660.0" y="0"/>
+    <node id="n_in_bay" x="600.0" y="60.0"/>
+    <node id="s_in_bay" x="600.0" y="-60.0"/>
 </nodes>
