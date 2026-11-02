@@ -28,6 +28,10 @@ try:
     from env.road_config import INTERSECTION, PEDESTRIANS
 except ImportError:      # 교차로 설정이 없는 구버전 설정 하위호환
     INTERSECTION, PEDESTRIANS = {}, {"enabled": False}
+try:
+    from env.road_config import SIGNAL_PLAN
+except ImportError:      # 실제 교차로 신호 계획이 없는 구버전 설정 하위호환
+    SIGNAL_PLAN = {}
 
 TL_ID = "n_tl"   # 신호 노드 id = SUMO 신호(tlLogic) id. sumo_env.py도 이 값을 쓴다.
 
@@ -49,9 +53,9 @@ def route_edges(road: dict, tl: dict = None) -> list:
 
 
 def _custom_program(tl: dict = None) -> bool:
-    """True면 TRAFFIC_LIGHT["phases"]로 신호를 덮어쓰고, False면 netconvert 기본 신호."""
+    """True면 highway.tll.xml로 신호를 덮어쓰고 ("custom"/"plan"), False면 netconvert 기본 신호."""
     tl = TRAFFIC_LIGHT if tl is None else tl
-    return tl_enabled(tl) and tl.get("program", "custom") == "custom"
+    return tl_enabled(tl) and tl.get("program", "custom") in ("custom", "plan")
 
 
 def build(road: dict, ego: dict, traffic: dict, out_dir: str) -> str:
@@ -281,9 +285,12 @@ def build(road: dict, ego: dict, traffic: dict, out_dir: str) -> str:
     #    로드된 프로그램을 사용한다.
     # ──────────────────────────────────────────────────────
     if _custom_program():
-        if cross:
-            raise ValueError("교차로 layout에서는 아직 TRAFFIC_LIGHT['program']='default'만 지원합니다.")
-        _write_tll(out_dir)
+        if TRAFFIC_LIGHT.get("program") == "plan":
+            if not cross:
+                raise ValueError("TRAFFIC_LIGHT['program']='plan'은 교차로 layout 전용입니다.")
+            _write_plan_tll(out_dir)
+        else:
+            _write_tll(out_dir, full_state=cross)
     elif os.path.exists(os.path.join(out_dir, "highway.tll.xml")):
         os.remove(os.path.join(out_dir, "highway.tll.xml"))   # 이전 custom 신호 잔재 제거
     return cfg_path
@@ -302,7 +309,10 @@ def build(road: dict, ego: dict, traffic: dict, out_dir: str) -> str:
 #                 n_s
 #
 #  보도/횡단보도는 netconvert가 자동 생성(--sidewalks.guess --crossings.guess)하고,
-#  신호는 netconvert 기본 프로그램(차량 + 보행 신호)을 그대로 쓴다.
+#  신호는 TRAFFIC_LIGHT["program"]에 따라
+#    "default": netconvert 기본 프로그램 / "plan": SIGNAL_PLAN(실제 교차로 현시) /
+#    "custom" : TRAFFIC_LIGHT["phases"]의 전체 state 문자열
+#  을 쓴다.
 # ══════════════════════════════════════════════════════════════════
 def _write_intersection_geometry(road: dict, out_dir: str, use_tl: bool):
     length = float(road["length"])
@@ -388,23 +398,127 @@ def _intersection_demand(traffic: dict) -> str:
     return "\n".join(lines) + ("\n" if lines else "")
 
 
-def _write_tll(out_dir: str):
+_STATE_CHARS = set("GgyrsuoO")
+
+
+def _load_net_tl(out_dir: str):
+    """(net.xml 루트, 신호 링크 수)."""
     import xml.etree.ElementTree as ET
     net = ET.parse(os.path.join(out_dir, "highway.net.xml")).getroot()
     logic = net.find(f"tlLogic[@id='{TL_ID}']")
     if logic is None:
         raise RuntimeError(f"net.xml에 신호 '{TL_ID}'가 생성되지 않았습니다.")
-    n_links = len(logic.find("phase").get("state"))
+    return net, len(logic.find("phase").get("state"))
 
-    phases = TRAFFIC_LIGHT.get("phases") or [("G", 40), ("y", 4), ("r", 25)]
-    lines = [f'    <tlLogic id="{TL_ID}" type="static" programID="custom" offset="0">']
-    for signal, duration in phases:
-        if signal not in ("G", "g", "y", "r"):
-            raise ValueError(f"TRAFFIC_LIGHT phase 신호는 G/g/y/r 중 하나여야 합니다: {signal}")
-        lines.append(f'        <phase duration="{float(duration)}" state="{signal * n_links}"/>')
-    lines.append("    </tlLogic>")
+
+def _save_tll(out_dir: str, program_id: str, phases: list, header: str = ""):
+    """phases: [(지속시간 s, state 문자열, 주석)] → highway.tll.xml."""
+    lines = [f"<additional>{header}",
+             f'    <tlLogic id="{TL_ID}" type="static" programID="{program_id}" offset="0">']
+    for duration, state, note in phases:
+        comment = f"  <!-- {note} -->" if note else ""
+        lines.append(f'        <phase duration="{float(duration):g}" state="{state}"/>{comment}')
+    lines += ["    </tlLogic>", "</additional>"]
     with open(os.path.join(out_dir, "highway.tll.xml"), "w") as f:
-        f.write("<additional>\n" + "\n".join(lines) + "\n</additional>\n")
+        f.write("\n".join(lines) + "\n")
+
+
+def _write_tll(out_dir: str, full_state: bool = False):
+    """TRAFFIC_LIGHT["phases"] 고정 주기.
+    full_state=False: 한 글자 신호를 모든 링크에 적용 (straight layout)
+    full_state=True : 링크 수만큼의 state 문자열을 그대로 사용 (교차로 layout)
+    """
+    _, n_links = _load_net_tl(out_dir)
+    phases = TRAFFIC_LIGHT.get("phases") or [("G", 40), ("y", 4), ("r", 25)]
+    out = []
+    for signal, duration in phases:
+        if full_state:
+            if len(signal) != n_links or set(signal) - _STATE_CHARS:
+                raise ValueError(f"교차로 phase state는 {n_links}글자({''.join(sorted(_STATE_CHARS))})"
+                                 f"여야 합니다: {signal!r}")
+            out.append((duration, signal, ""))
+        else:
+            if signal not in ("G", "g", "y", "r"):
+                raise ValueError(f"TRAFFIC_LIGHT phase 신호는 G/g/y/r 중 하나여야 합니다: {signal}")
+            out.append((duration, signal * n_links, ""))
+    _save_tll(out_dir, "custom", out)
+
+
+# 접근 엣지 → 축 (본선 = 동서, 교차 도로 = 남북)
+_APPROACH_AXIS = {"e0": "EW", "e1_r": "EW", "n_in": "NS", "s_in": "NS"}
+_MAIN_EDGES = {"e0", "e1", "e0_r", "e1_r"}
+# SUMO 연결 방향 → 이동류 (s 직진 / l·L·t 좌회전·유턴 / r·R 우회전)
+_DIR_MOVE = {"s": "S", "l": "L", "L": "L", "t": "L", "r": "R", "R": "R"}
+
+
+def _tl_links(net) -> dict:
+    """신호 링크 번호 → ("veh", 축, 이동류) 또는 ("ped", 나란한 직진 축, 횡단보도 길이 m)."""
+    crossings = {}
+    for e in net.findall("edge[@function='crossing']"):
+        crossed = set(e.get("crossingEdges", "").split())
+        # 본선을 건너는 횡단보도는 남북 직진과 나란하다 (그 반대도 마찬가지)
+        axis = "NS" if crossed & _MAIN_EDGES else "EW"
+        crossings[e.get("id")] = (axis, float(e.find("lane").get("length")))
+    links = {}
+    for c in net.findall(f"connection[@tl='{TL_ID}']"):
+        idx = int(c.get("linkIndex"))
+        if c.get("to") in crossings:
+            links[idx] = ("ped",) + crossings[c.get("to")]
+        else:
+            links[idx] = ("veh", _APPROACH_AXIS[c.get("from")], _DIR_MOVE[c.get("dir")])
+    return links
+
+
+def _write_plan_tll(out_dir: str):
+    """SIGNAL_PLAN(현시별 녹색 이동류·녹색·황색 시간) → 링크별 state 문자열.
+
+    각 현시는 최대 3단계로 펼친다:
+      보행 녹색 → 보행 점멸(보행 적색, 차량은 녹색 유지) → 황색
+    """
+    import math
+    if not SIGNAL_PLAN.get("phases"):
+        raise ValueError("TRAFFIC_LIGHT['program']='plan'에는 SIGNAL_PLAN['phases']가 필요합니다.")
+    net, n_links = _load_net_tl(out_dir)
+    links = _tl_links(net)
+    if sorted(links) != list(range(n_links)):
+        raise RuntimeError(f"신호 링크 해석 실패: {len(links)}개 해석 / {n_links}개 링크")
+    walk_speed = float(SIGNAL_PLAN.get("ped_check_speed", 1.0))
+    min_walk = float(SIGNAL_PLAN.get("ped_min_walk", 7))
+
+    def state(moves: set, stage: str) -> str:
+        s = []
+        for i in range(n_links):
+            kind, axis, x = links[i]
+            if kind == "ped":
+                s.append("G" if stage == "walk" and f"{axis}_S" in moves else "r")
+            elif x == "R":   # 우회전: 같은 축 직진 녹색이면 양보 진행, 아니면 일시정지 후 진행
+                s.append("g" if f"{axis}_S" in moves else "s")
+            elif f"{axis}_{x}" in moves:
+                s.append("y" if stage == "yellow" else "G")
+            else:
+                s.append("r")
+        return "".join(s)
+
+    out = []
+    for k, (moves, green, yellow) in enumerate(SIGNAL_PLAN["phases"], 1):
+        moves = set(moves)
+        name = f"{k}현시 {'+'.join(sorted(moves))}"
+        flash = max((math.ceil(length / walk_speed) for kind, axis, length in links.values()
+                     if kind == "ped" and f"{axis}_S" in moves), default=0)
+        flash = min(flash, max(green - min_walk, 0))
+        if flash > 0:
+            out.append((green - flash, state(moves, "walk"), f"{name} 녹색 (보행 녹색)"))
+            out.append((flash, state(moves, "flash"), f"{name} 녹색 (보행 점멸)"))
+        else:
+            out.append((green, state(moves, "walk"), f"{name} 녹색"))
+        out.append((yellow, state(moves, "yellow"), f"{name} 황색"))
+    cycle = sum(d for d, _, _ in out)
+    header = (f"\n    <!-- {SIGNAL_PLAN.get('name', '실제 교차로')} 신호 계획, 주기 {cycle:g} s. "
+              f"링크 순서: "
+              + " ".join(f"{i}:{a}_{x}" if kind == "veh" else f"{i}:보행({a})"
+                         for i, (kind, a, x) in sorted(links.items()))
+              + " -->")
+    _save_tll(out_dir, "plan", out, header)
 
 
 def _blob(cx: float, cy: float, r: float, rng, n: int = 14,
