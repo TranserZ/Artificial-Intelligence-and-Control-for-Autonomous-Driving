@@ -479,16 +479,27 @@ def _intersection_demand(traffic: dict, road: dict) -> str:
             lines.append(f'    <flow id="{group}_{rid}" type="carDistFree" route="r_{rid}" '
                          f'begin="0" end="100000" period="{per:.2f}" departLane="best" '
                          f'departSpeed="{traffic["depart_speed"]}"/>')
-    # 보행자: 남북으로 오가며 본선 횡단보도를 건넌다 (ego와 상호작용하는 쪽)
+    # ego 우회전 경로 (서→남). sumo_env가 EGO["routes"] 확률로 r0과 섞어 고른다
+    lines.append(f'    <route id="r_ego_right" edges="{b["e0"]} s_out"/>')
+    # 보행자: 남북 보행자는 본선 횡단보도(서·동), 동서 보행자는 교차 도로
+    # 횡단보도(북·남)를 건넌다. 동서는 포켓 엣지에서 출발해 교차로 근처에서만 걷는다
     if PEDESTRIANS.get("enabled", False):
-        pph = float(PEDESTRIANS.get("persons_per_hour", 300))
         lines.append(f'    <vType id="ped" vClass="pedestrian" '
                      f'speed="{PEDESTRIANS.get("speed", 1.3)}" color="0,0.4,1"/>')
-        for pid, (frm, to) in {"ns": ("n_in", "s_out"), "sn": ("s_in", "n_out")}.items():
-            lines.append(f'    <personFlow id="ped_{pid}" type="ped" begin="0" end="100000" '
-                         f'period="{3600.0 / (pph / 2):.2f}" departPos="random">\n'
-                         f'        <walk from="{frm}" to="{to}" arrivalPos="random"/>\n'
-                         f'    </personFlow>')
+        e0_last = b["e0"].split()[-1]
+        e1r_last = b["e1_r"].split()[-1]
+        groups = [(float(PEDESTRIANS.get("persons_per_hour", 300)),
+                   {"ns": ("n_in", "s_out"), "sn": ("s_in", "n_out")}),
+                  (float(PEDESTRIANS.get("ew_persons_per_hour", 0)),
+                   {"we": (e0_last, "e1"), "ew": (e1r_last, "e0_r")})]
+        for pph, walks in groups:
+            if pph <= 0:
+                continue
+            for pid, (frm, to) in walks.items():
+                lines.append(f'    <personFlow id="ped_{pid}" type="ped" begin="0" end="100000" '
+                             f'period="{3600.0 / (pph / 2):.2f}" departPos="random">\n'
+                             f'        <walk from="{frm}" to="{to}" arrivalPos="random"/>\n'
+                             f'    </personFlow>')
     return "\n".join(lines) + ("\n" if lines else "")
 
 

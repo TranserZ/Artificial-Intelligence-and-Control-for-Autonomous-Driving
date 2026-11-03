@@ -33,7 +33,7 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 # ══════════════════════════════════════════════════════════════════
 #  하이퍼파라미터 — 실험은 여기서
 # ══════════════════════════════════════════════════════════════════
-TOTAL_TIMESTEPS = 500_000   # 총 학습 스텝 수 (신호등 추가로 200k → 500k)
+TOTAL_TIMESTEPS = 1_000_000  # 총 학습 스텝 수 (신호등 200k → 500k, 보행자·우회전 추가로 1M)
 
 # ══════════════════════════════════════════════════════════════════
 #  보상 튜닝 — env/mdp_config.py 의 기본값을 여기서 덮어쓴다.
@@ -59,6 +59,11 @@ REWARD_OVERRIDES = dict(
     invalid_action_penalty=0.0,
     red_light_penalty=5.0,     # 적색 신호 위반 시 감점
     red_light_terminate=True,  #   위반 즉시 에피소드 종료
+    yield_violation_penalty=20.0,  # 보행자가 있는데 횡단보도 진입 시 감점 (충돌과 같은 크기,
+                                   #   종료하지 않음)
+    timeout_penalty=10.0,          # 시간초과 감점 (0일 땐 "끝까지 서 있기"로 수렴)
+    turn_overspeed_penalty=0.5,    # 교차로 안 회전 제한속도 초과 스텝당 감점
+                                   #   (best 모델이 9~14 m/s로 우회전하며 양보위반 32%)
 )
 REWARD = {**REWARD_DEFAULTS, **REWARD_OVERRIDES}
 
@@ -201,14 +206,14 @@ if __name__ == "__main__":
         print(f"    [checkpoint @{agent.num_timesteps}] {model_path}", flush=True)
 
     def on_eval(m):
-        # 평가 기준이 충돌률과 완주율이므로 (완주율 - 충돌률)이 높은 모델을
+        # 평가 기준이 충돌률과 완주율이므로 (완주율 - 충돌률 - 양보위반율)이 높은 모델을
         # 따로 저장한다. 동점이면 평균 보상으로 비교. 후반에 정책이
         # 무너져도(지난 run: 300k 근처가 최선) 최선의 시점이 남는다.
-        score = (m.success_rate - m.collision_rate, m.ep_return)
+        score = (m.success_rate - m.collision_rate - m.yield_violation_rate, m.ep_return)
         if best["score"] is None or score > best["score"]:
             best["score"] = score
             agent.save(best_path)
-            print(f"    [best @{agent.num_timesteps}] 완주-충돌={score[0]:+.2f} "
+            print(f"    [best @{agent.num_timesteps}] 완주-충돌-양보위반={score[0]:+.2f} "
                   f"보상={score[1]:.1f} → {best_path}", flush=True)
 
     try:

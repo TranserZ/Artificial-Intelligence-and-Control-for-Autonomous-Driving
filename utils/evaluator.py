@@ -31,6 +31,10 @@ class DrivingMetrics:
     lane_changes: float     # 에피소드당 평균 "실행된" 차선변경 횟수
                             # (추월 시나리오에서 정책이 실제로 차선을
                             #  활용하는지 보는 핵심 지표)
+    ped_collision_rate: float = 0.0    # 보행자와 충돌한 에피소드 비율 (충돌률에 포함됨)
+    yield_violation_rate: float = 0.0  # 횡단보도 양보 위반이 1번이라도 있었던 에피소드 비율
+    straight_success_rate: float = float("nan")  # 직진(r0) 에피소드 중 완주 비율
+    right_success_rate: float = float("nan")     # 그 외(우회전) 에피소드 중 완주 비율
 
     def as_dict(self) -> dict:
         return asdict(self)
@@ -40,6 +44,8 @@ class DrivingMetrics:
         return (f"충돌률={self.collision_rate:.0%}  "
                 f"완주율={self.success_rate:.0%}  "
                 f"신호위반={self.red_violation_rate:.0%}  "
+                f"보행자충돌={self.ped_collision_rate:.0%}  "
+                f"양보위반={self.yield_violation_rate:.0%}  "
                 f"평균속도={self.mean_speed:.1f}m/s  "
                 f"평균차간={self.mean_gap:.1f}m  "
                 f"최소차간={self.min_gap:.1f}m  "
@@ -63,6 +69,8 @@ def evaluate_policy(policy, env, n_episodes: int = 5,
         관측(obs) 벡터의 구성과 무관하므로, 관측을 바꿔도 이 코드는 안 깨진다.
     """
     n_collide, n_arrive, n_timeout, n_red = 0, 0, 0, 0
+    n_ped, n_yield = 0, 0
+    route_runs = {"straight": [0, 0], "right": [0, 0]}   # [완주, 에피소드]
     speeds, gaps, returns, lengths, lane_changes = [], [], [], [], []
 
     for _ in range(n_episodes):
@@ -70,7 +78,9 @@ def evaluate_policy(policy, env, n_episodes: int = 5,
         done, ep_ret, ep_len = False, 0.0, 0
         ep_lc = 0
         ep_red = False
+        ep_ped, ep_yield = False, False
         ended_by = None
+        route = None
 
         while not done:
             action = policy.predict(obs, deterministic=deterministic)
@@ -85,6 +95,9 @@ def evaluate_policy(policy, env, n_episodes: int = 5,
 
             if info.get("red_violation"):
                 ep_red = True
+            ep_ped = ep_ped or bool(info.get("ped_collision"))
+            ep_yield = ep_yield or bool(info.get("yield_violation"))
+            route = info.get("route", route)
 
             if info.get("collided"):
                 ended_by = "collision"
@@ -102,6 +115,11 @@ def evaluate_policy(policy, env, n_episodes: int = 5,
                 gaps.append(float(info["gap"]))
 
         n_red += int(ep_red)
+        n_ped += int(ep_ped)
+        n_yield += int(ep_yield)
+        runs = route_runs["straight" if route in (None, "r0") else "right"]
+        runs[0] += int(ended_by == "arrival")
+        runs[1] += 1
         if ended_by == "collision":
             n_collide += 1
         elif ended_by == "arrival":
@@ -124,4 +142,10 @@ def evaluate_policy(policy, env, n_episodes: int = 5,
         ep_return=float(np.mean(returns)),
         ep_length=float(np.mean(lengths)),
         lane_changes=float(np.mean(lane_changes)),
+        ped_collision_rate=n_ped / n_episodes,
+        yield_violation_rate=n_yield / n_episodes,
+        straight_success_rate=(route_runs["straight"][0] / route_runs["straight"][1]
+                               if route_runs["straight"][1] else float("nan")),
+        right_success_rate=(route_runs["right"][0] / route_runs["right"][1]
+                            if route_runs["right"][1] else float("nan")),
     )

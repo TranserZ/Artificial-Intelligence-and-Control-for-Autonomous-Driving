@@ -123,6 +123,10 @@ if __name__ == "__main__":
     print(f"  완주율       : {metrics.success_rate:.0%}")
     print(f"  시간초과율   : {metrics.timeout_rate:.0%}")
     print(f"  신호위반율   : {metrics.red_violation_rate:.0%}")
+    print(f"  보행자충돌률 : {metrics.ped_collision_rate:.0%}  (충돌률에 포함)")
+    print(f"  양보위반율   : {metrics.yield_violation_rate:.0%}")
+    print(f"  직진 완주율  : {metrics.straight_success_rate:.0%}")
+    print(f"  우회전 완주율: {metrics.right_success_rate:.0%}")
     print(f"  평균 속도    : {metrics.mean_speed:.2f} m/s "
           f"({metrics.mean_speed * 3.6:.1f} km/h)")
     print(f"  평균 차간거리: {metrics.mean_gap:.2f} m")

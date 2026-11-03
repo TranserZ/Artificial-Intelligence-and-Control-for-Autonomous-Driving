@@ -38,11 +38,18 @@
     <flow id="side_se" type="carDistFree" route="r_se" begin="0" end="100000" period="54.00" departLane="best" departSpeed="8.0"/>
     <route id="r_sw" edges="s_in s_inb e0_r"/>
     <flow id="side_sw" type="carDistFree" route="r_sw" begin="0" end="100000" period="54.00" departLane="best" departSpeed="8.0"/>
+    <route id="r_ego_right" edges="e0 e0b s_out"/>
     <vType id="ped" vClass="pedestrian" speed="1.3" color="0,0.4,1"/>
     <personFlow id="ped_ns" type="ped" begin="0" end="100000" period="12.00" departPos="random">
         <walk from="n_in" to="s_out" arrivalPos="random"/>
     </personFlow>
     <personFlow id="ped_sn" type="ped" begin="0" end="100000" period="12.00" departPos="random">
         <walk from="s_in" to="n_out" arrivalPos="random"/>
+    </personFlow>
+    <personFlow id="ped_we" type="ped" begin="0" end="100000" period="12.00" departPos="random">
+        <walk from="e0b" to="e1" arrivalPos="random"/>
+    </personFlow>
+    <personFlow id="ped_ew" type="ped" begin="0" end="100000" period="12.00" departPos="random">
+        <walk from="e1_rb" to="e0_r" arrivalPos="random"/>
     </personFlow>
 </routes>
