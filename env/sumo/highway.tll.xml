@@ -3,12 +3,12 @@
     <tlLogic id="n_tl" type="static" programID="plan" offset="0">
         <phase duration="49" state="srrrgGGGrsrrrgGGGrGrGr"/>  <!-- 1현시 EW_S 녹색 (보행 녹색) -->
         <phase duration="16" state="srrrgGGGrsrrrgGGGrrrrr"/>  <!-- 1현시 EW_S 녹색 (보행 점멸) -->
-        <phase duration="4" state="srrrgyyyrsrrrgyyyrrrrr"/>  <!-- 1현시 EW_S 황색 -->
+        <phase duration="4" state="srrryyyyrsrrryyyyrrrrr"/>  <!-- 1현시 EW_S 황색 -->
         <phase duration="34" state="srrrsrrrGsrrrsrrrGrrrr"/>  <!-- 2현시 EW_L 녹색 -->
         <phase duration="4" state="srrrsrrrysrrrsrrryrrrr"/>  <!-- 2현시 EW_L 황색 -->
         <phase duration="23" state="gGGrsrrrrgGGrsrrrrrGrG"/>  <!-- 3현시 NS_S 녹색 (보행 녹색) -->
         <phase duration="23" state="gGGrsrrrrgGGrsrrrrrrrr"/>  <!-- 3현시 NS_S 녹색 (보행 점멸) -->
-        <phase duration="4" state="gyyrsrrrrgyyrsrrrrrrrr"/>  <!-- 3현시 NS_S 황색 -->
+        <phase duration="4" state="yyyrsrrrryyyrsrrrrrrrr"/>  <!-- 3현시 NS_S 황색 -->
         <phase duration="39" state="srrGsrrrrsrrGsrrrrrrrr"/>  <!-- 4현시 NS_L 녹색 -->
         <phase duration="4" state="srrysrrrrsrrysrrrrrrrr"/>  <!-- 4현시 NS_L 황색 -->
     </tlLogic>

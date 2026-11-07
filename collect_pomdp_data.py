@@ -243,6 +243,7 @@ def collect(args, sumocfg, episodes, worker_id, jsonl_path, npz_path, tag=""):
                             "collided": bool(info["collided"]),
                             "arrived": bool(info["arrived"]),
                             "red_violation": bool(info["red_violation"]),
+                            "filter_active": bool(info["filter_active"]),
                             "lane_before": info["lane_before"],
                             "lane_after": info["lane_after"],
                         },
@@ -405,4 +406,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main()

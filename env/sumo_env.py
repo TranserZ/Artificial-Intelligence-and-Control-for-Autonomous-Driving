@@ -57,6 +57,8 @@ sys.path.append(os.path.join(os.environ["SUMO_HOME"], "tools"))
 import traci
 from sumolib import checkBinary
 
+from env.safety_filter import PedSafetyFilter
+
 
 class SumoHighwayEnv(gym.Env):
     metadata = {"render_modes": ["human"]}
@@ -145,6 +147,7 @@ class SumoHighwayEnv(gym.Env):
         self.step_length = float(mdp_sim["step_length"])
         self.max_steps = int(mdp_sim["max_steps"])
         self.warmup_steps = int(mdp_sim["warmup_steps"])
+        self.ped_filter = PedSafetyFilter(self) if mdp_sim.get("ped_filter") else None
         self.visibility = float(mdp_obs["visibility"])   # 관측 거리 W
         # 밀도 정규화용 "차량 1대가 점유하는 길이" (차체 + 최소 간격)
         self.density_veh_len = float(mdp_obs.get("density_veh_length", 7.5))
@@ -369,6 +372,13 @@ class SumoHighwayEnv(gym.Env):
             # 교차로 내부(다른 방향 차량·횡단보도 보행자)와의 충돌도 검사한다.
             # 기본값 false면 교차로 안에서는 차량이 겹쳐도 충돌로 안 잡힌다.
             "--collision.check-junctions", "true",
+            # 보행자가 차와 유지하는 안전거리 (기본 0.25 m). 기본값이면 보행 녹색에
+            # 우회전 차가 횡단보도 입구에 있어도 걸어 들어와 배경 충돌이 시간당 ~7건.
+            # 1.5 m로 ~1.5건 (2 m는 서 있는 보행자와 충돌이 생김)
+            "--pedestrian.striping.mingap-to-vehicle", "1.5",
+            # 300초(기본값) 서 있는 차를 앞으로 순간이동시키지 않는다. ego가 정지선을
+            # 건너뛰어 신호위반으로 잘못 기록되고, 평가 기준(Teleport 없음)에도 어긋난다
+            "--time-to-teleport", "-1",
             "--no-warnings", "true",   # 콘솔 경고 끄기
             "--no-step-log", "true",   # 스텝 로그 끄기
             # 매 에피소드 다른 시드 → 배경 교통 패턴이 달라져서 과적합 방지
@@ -662,6 +672,22 @@ class SumoHighwayEnv(gym.Env):
         except traci.TraCIException:
             return True
 
+    def _lane_route_link(self, lane_id: str):
+        """그 차선에서 ego route의 다음 엣지로 가는 링크 (getLinks 항목), 없으면 None.
+
+        항목: (다음 차선, 우선, 열림, 접근 차량, 교차로 내부 차선, 상태, 방향, 길이)
+        """
+        try:
+            route = traci.vehicle.getRoute(self.ego_id)
+            edge = lane_id.rsplit("_", 1)[0]
+            if edge not in route or route.index(edge) == len(route) - 1:
+                return None
+            nxt = route[route.index(edge) + 1]
+            return next((link for link in traci.lane.getLinks(lane_id)
+                         if link[0].rsplit("_", 1)[0] == nxt), None)
+        except traci.TraCIException:
+            return None
+
     def _lane_connectivity(self, offset: int) -> float:
         """오프셋 차선의 '끊김 정도'를 반환.
 
@@ -832,9 +858,14 @@ class SumoHighwayEnv(gym.Env):
         nxt = self._next_signal()
         if nxt is None or nxt[1] > self.signal_visibility:
             return [1.0, 0.0, 1.0]                 # 신호 없음/멀리: 제약 없음
-        _, dist, state, remaining = nxt
+        tl_id, dist, state, remaining = nxt
+        level = self._SIGNAL_STOP_LEVEL.get(state, 1.0)
+        # 일시정지(s): 정지선 앞에서 멈추기 전엔 적색, 멈춘 뒤엔 녹색으로 보인다.
+        # (0.75 하나로만 보여주면 대기열에서 멈춘 것과 구분하지 못해 그냥 통과했다)
+        if state == "s":
+            level = 0.0 if self._stopped_at == tl_id else 1.0
         return [float(np.clip(dist / self.signal_visibility, 0.0, 1.0)),
-                self._SIGNAL_STOP_LEVEL.get(state, 1.0),
+                level,
                 float(np.clip(remaining / self.signal_time_scale, 0.0, 1.0))]
 
     def _get_obs(self):
@@ -1093,6 +1124,7 @@ class SumoHighwayEnv(gym.Env):
         lane_raw = float(np.clip(action_arr[self.lane_change_index], -1.0, 1.0))
         lane_change = self._quantize_lane_change(lane_raw)
         lane_change_applied = False
+        filter_active = False
         lane_before = None
         odo_before = None
 
@@ -1104,6 +1136,10 @@ class SumoHighwayEnv(gym.Env):
             v = traci.vehicle.getSpeed(self.ego_id)
             lane_before = self._car_lane_index(self.ego_id)
             odo_before = traci.vehicle.getDistance(self.ego_id)
+
+            # 보행자 안전 필터: 부딪힐 것 같으면 PPO 명령을 제동으로 바꾼다
+            if self.ped_filter is not None:
+                accel_raw, filter_active = self.ped_filter.apply(accel_raw, self.ego_id)
 
             accel_cmd = (accel_raw * self.max_accel
                          if accel_raw >= 0.0 else accel_raw * self.max_decel)
@@ -1128,7 +1164,6 @@ class SumoHighwayEnv(gym.Env):
         alive = self.ego_id in traci.vehicle.getIDList()
         lane_after = self._car_lane_index(self.ego_id) if alive else None
 
-        obs = self._get_obs()
         terminated, truncated = False, False
         ego_speed, ego_gap = None, None
 
@@ -1149,9 +1184,22 @@ class SumoHighwayEnv(gym.Env):
             if (signal_after[1] <= self._STOP_ZONE
                     and traci.vehicle.getSpeed(self.ego_id) < 0.1):
                 self._stopped_at = signal_after[0]
+        # 일시정지 완료가 이번 스텝 관측에 바로 반영되도록 _stopped_at 갱신 뒤에 만든다
+        obs = self._get_obs()
         # ---- 횡단보도 양보 위반: 보행자가 있는데 앞범퍼가 횡단보도에 들어섬 ----
         yield_violation = bool(alive and odo_before is not None and self._check_yield(
             odo_before, traci.vehicle.getDistance(self.ego_id)))
+        # ---- 차로 오류: 경로로 이어지지 않는 차로 끝에서 멈춤 (갇혀서 못 나감) ----
+        wrong_lane = False
+        if alive and not arrived:
+            edge = traci.vehicle.getRoadID(self.ego_id)
+            if not edge.startswith(":"):
+                lane_index = traci.vehicle.getLaneIndex(self.ego_id)
+                remaining = (traci.lane.getLength(f"{edge}_{lane_index}")
+                             - traci.vehicle.getLanePosition(self.ego_id))
+                wrong_lane = (remaining <= self._STOP_ZONE
+                              and traci.vehicle.getSpeed(self.ego_id) < 0.1
+                              and not self._lane_leads_on_route(edge, lane_index))
 
         # ----- (4) 기존 보상 유지 -----
         if collided:
@@ -1159,6 +1207,9 @@ class SumoHighwayEnv(gym.Env):
             terminated = True
         elif red_violation and self.rw.get("red_light_terminate", True):
             reward = -float(self.rw.get("red_light_penalty", 0.0))
+            terminated = True
+        elif wrong_lane:
+            reward = -float(self.rw.get("wrong_lane_penalty", 0.0))
             terminated = True
         elif arrived:
             reward = float(self.rw["arrival_bonus"])
@@ -1235,6 +1286,24 @@ class SumoHighwayEnv(gym.Env):
                     and ego_speed > traci.lane.getMaxSpeed(lane_id) + 0.1):
                 reward -= float(self.rw.get("turn_overspeed_penalty", 0.0))
 
+            # ---- 초록불 멈춤: 멈춰야 할 이유가 없는데 서 있으면 스텝당 감점 ----
+            # (막힘 감점을 끄니 초록불에도 2~3분씩 서 있다 시간초과 나는 판이 생겼다)
+            # 멈춰야 할 이유 = 정지 신호, 가까운 앞차, 보행자
+            gsp = float(self.rw.get("green_stop_penalty", 0.0))
+            if gsp > 0.0 and ego_speed < 0.5:
+                stop_signal = (
+                    signal_after is not None
+                    and signal_after[1] <= self.signal_visibility
+                    and self._SIGNAL_STOP_LEVEL.get(signal_after[2], 1.0) > 0.0
+                    and not (signal_after[2] == "s"
+                             and self._stopped_at == signal_after[0]))
+                near_leader = (ego_gap is not None
+                               and ego_gap < float(self.rw.get("green_stop_gap", 15.0)))
+                ped_ahead = (self._waiting_for_ped()
+                             or (self.ped_filter is not None and self.ped_filter.conflict_now))
+                if not (stop_signal or near_leader or ped_ahead):
+                    reward -= gsp
+
         # 양보 위반은 종료하지 않고 감점만 (충돌·완주와 같은 스텝이어도 적용)
         if yield_violation:
             reward -= float(self.rw.get("yield_violation_penalty", 0.0))
@@ -1249,7 +1318,8 @@ class SumoHighwayEnv(gym.Env):
             "arrived": arrived,
             "speed": ego_speed,
             "gap": ego_gap,
-            "accel_raw": accel_raw,
+            "accel_raw": accel_raw,          # 실제 적용 값 (필터가 바꿨으면 바뀐 값)
+            "filter_active": filter_active,
             "lane_change_raw": lane_raw,
             "lane_change": lane_change,
             "lane_change_applied": lane_change_applied,
@@ -1258,6 +1328,7 @@ class SumoHighwayEnv(gym.Env):
             "red_violation": red_violation,
             "ped_collision": ped_collision,
             "yield_violation": yield_violation,
+            "wrong_lane": wrong_lane,
             "route": self.ego_route,
             # 결정 시점의 전방 신호 (없으면 None)
             "signal_state": signal_before[2] if signal_before else None,

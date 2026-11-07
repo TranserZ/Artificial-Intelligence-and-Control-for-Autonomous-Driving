@@ -20,7 +20,7 @@ class DrivingMetrics:
     """평가 1회(n_episodes 평균)의 주행 지표."""
     collision_rate: float   # 충돌로 끝난 에피소드 비율 (0~1, 낮을수록 좋음)
     success_rate: float     # 도로 끝까지 완주한 비율 (0~1, 높을수록 좋음)
-    timeout_rate: float     # 시간초과로 끝난 비율 (= 1 - 충돌 - 신호위반 종료 - 완주)
+    timeout_rate: float     # 시간초과로 끝난 비율 (= 1 - 충돌 - 신호위반 종료 - 차로오류 - 완주)
     red_violation_rate: float  # 적색 신호 위반이 1번이라도 있었던 에피소드 비율
                                # (red_light_terminate=True면 위반 = 종료)
     mean_speed: float       # 전 스텝 평균 주행속도 (m/s)
@@ -33,6 +33,8 @@ class DrivingMetrics:
                             #  활용하는지 보는 핵심 지표)
     ped_collision_rate: float = 0.0    # 보행자와 충돌한 에피소드 비율 (충돌률에 포함됨)
     yield_violation_rate: float = 0.0  # 횡단보도 양보 위반이 1번이라도 있었던 에피소드 비율
+    wrong_lane_rate: float = 0.0       # 경로 밖 차로 끝에 갇혀 종료된 에피소드 비율
+    filter_rate: float = 0.0           # 안전 필터가 PPO 명령을 바꾼 스텝 비율
     straight_success_rate: float = float("nan")  # 직진(r0) 에피소드 중 완주 비율
     right_success_rate: float = float("nan")     # 그 외(우회전) 에피소드 중 완주 비율
 
@@ -46,6 +48,8 @@ class DrivingMetrics:
                 f"신호위반={self.red_violation_rate:.0%}  "
                 f"보행자충돌={self.ped_collision_rate:.0%}  "
                 f"양보위반={self.yield_violation_rate:.0%}  "
+                f"차로오류={self.wrong_lane_rate:.0%}  "
+                f"필터개입={self.filter_rate:.1%}  "
                 f"평균속도={self.mean_speed:.1f}m/s  "
                 f"평균차간={self.mean_gap:.1f}m  "
                 f"최소차간={self.min_gap:.1f}m  "
@@ -69,7 +73,7 @@ def evaluate_policy(policy, env, n_episodes: int = 5,
         관측(obs) 벡터의 구성과 무관하므로, 관측을 바꿔도 이 코드는 안 깨진다.
     """
     n_collide, n_arrive, n_timeout, n_red = 0, 0, 0, 0
-    n_ped, n_yield = 0, 0
+    n_ped, n_yield, n_wrong, n_filter = 0, 0, 0, 0
     route_runs = {"straight": [0, 0], "right": [0, 0]}   # [완주, 에피소드]
     speeds, gaps, returns, lengths, lane_changes = [], [], [], [], []
 
@@ -97,12 +101,15 @@ def evaluate_policy(policy, env, n_episodes: int = 5,
                 ep_red = True
             ep_ped = ep_ped or bool(info.get("ped_collision"))
             ep_yield = ep_yield or bool(info.get("yield_violation"))
+            n_filter += int(bool(info.get("filter_active")))
             route = info.get("route", route)
 
             if info.get("collided"):
                 ended_by = "collision"
             elif info.get("red_violation") and terminated:
                 ended_by = "red_violation"
+            elif info.get("wrong_lane"):
+                ended_by = "wrong_lane"
             elif info.get("arrived"):
                 ended_by = "arrival"
 
@@ -124,6 +131,8 @@ def evaluate_policy(policy, env, n_episodes: int = 5,
             n_collide += 1
         elif ended_by == "arrival":
             n_arrive += 1
+        elif ended_by == "wrong_lane":
+            n_wrong += 1
         elif ended_by != "red_violation":
             n_timeout += 1
 
@@ -144,6 +153,8 @@ def evaluate_policy(policy, env, n_episodes: int = 5,
         lane_changes=float(np.mean(lane_changes)),
         ped_collision_rate=n_ped / n_episodes,
         yield_violation_rate=n_yield / n_episodes,
+        wrong_lane_rate=n_wrong / n_episodes,
+        filter_rate=n_filter / max(sum(lengths), 1),
         straight_success_rate=(route_runs["straight"][0] / route_runs["straight"][1]
                                if route_runs["straight"][1] else float("nan")),
         right_success_rate=(route_runs["right"][0] / route_runs["right"][1]

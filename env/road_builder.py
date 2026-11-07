@@ -598,7 +598,12 @@ def _write_plan_tll(out_dir: str):
             if kind == "ped":
                 s.append("G" if stage == "walk" and f"{axis}_S" in moves else "r")
             elif x == "R":   # 우회전: 같은 축 직진 녹색이면 양보 진행, 아니면 일시정지 후 진행
-                s.append("g" if f"{axis}_S" in moves else "s")
+                # 직진 황색 동안은 우회전도 황색 (없으면 g→s가 예고 없이 바뀌어
+                # 정지선 바로 앞에서 멈출 수 없는 신호위반이 생겼다)
+                if f"{axis}_S" in moves:
+                    s.append("y" if stage == "yellow" else "g")
+                else:
+                    s.append("s")
             elif f"{axis}_{x}" in moves:
                 s.append("y" if stage == "yellow" else "G")
             else:

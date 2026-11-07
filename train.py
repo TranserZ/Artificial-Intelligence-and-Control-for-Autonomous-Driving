@@ -13,6 +13,7 @@
 
 실행:  python train.py
 """
+import argparse
 import os
 import shutil
 from datetime import datetime
@@ -33,7 +34,9 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 # ══════════════════════════════════════════════════════════════════
 #  하이퍼파라미터 — 실험은 여기서
 # ══════════════════════════════════════════════════════════════════
-TOTAL_TIMESTEPS = 1_000_000  # 총 학습 스텝 수 (신호등 200k → 500k, 보행자·우회전 추가로 1M)
+TOTAL_TIMESTEPS = 1_500_000  # 총 학습 스텝 수 (신호등 200k → 500k, 보행자·우회전 추가로 1M,
+                             #   신호위반을 더 줄이려고 1.5M)
+MIDPOINT_TIMESTEPS = 1_000_000  # 이 시점의 모델을 model_1M.pt로 따로 저장 (학습 길이 효과 비교용)
 
 # ══════════════════════════════════════════════════════════════════
 #  보상 튜닝 — env/mdp_config.py 의 기본값을 여기서 덮어쓴다.
@@ -49,7 +52,9 @@ REWARD_OVERRIDES = dict(
     progress_weight=10.0,      # 진행 보상 (완주까지 누적 +10)
     close_gap_threshold=6.0,   # 이 거리(m) 미만 접근 시
     close_gap_penalty=0.1,     #   → 스텝당 감점
-    blocked_penalty=0.05,      # "느린 앞차에 막힘" 스텝당 감점 (추월 학습 핵심)
+    blocked_penalty=0.0,       # "느린 앞차에 막힘" 스텝당 감점 (고속도로 추월 학습용 0.05→0:
+                               #   교차로에선 배경차 대부분이 기준 속도보다 느려 앞차를
+                               #   따라가도 감점 → 감속 없이 들이받는 직진 충돌 2.5%)
     blocked_gap=None,          #   막힘 판정 거리 조건 없음 (35m일 때 48m 거리로
                                #   14.5 m/s 추종하는 "캠핑" 정책으로 수렴했음)
     blocked_speed_frac=0.85,   #   그리고 내 속도 < vmax × 이 값 (0.7→0.85 ≈ 28 m/s:
@@ -57,13 +62,19 @@ REWARD_OVERRIDES = dict(
     lane_change_penalty=0.02,  # 변경 실행당 감점 (0→0.02: 추월은 배웠으나
                                #   에피소드당 275회 지그재그 → 재도입)
     invalid_action_penalty=0.0,
-    red_light_penalty=5.0,     # 적색 신호 위반 시 감점
+    red_light_penalty=20.0,    # 적색 신호 위반 시 감점 (5→20: 일시정지(s)가 100~130초라
+                               #   기다리면 할인된 완주 가치가 ~30→2~3으로 줄어 -5 받고
+                               #   통과하는 게 이득이었음. 신호위반 4.5~6%)
     red_light_terminate=True,  #   위반 즉시 에피소드 종료
     yield_violation_penalty=20.0,  # 보행자가 있는데 횡단보도 진입 시 감점 (충돌과 같은 크기,
                                    #   종료하지 않음)
     timeout_penalty=10.0,          # 시간초과 감점 (0일 땐 "끝까지 서 있기"로 수렴)
+    wrong_lane_penalty=20.0,       # 차로 오류(경로 밖 차로 끝에서 갇힘) 종료 감점 (충돌과 같은
+                                   #   크기. 없을 땐 우회전인데 직진 차로 끝에 서서 시간초과)
     turn_overspeed_penalty=0.5,    # 교차로 안 회전 제한속도 초과 스텝당 감점
                                    #   (best 모델이 9~14 m/s로 우회전하며 양보위반 32%)
+    green_stop_penalty=0.05,       # 멈출 이유 없이 서 있으면 스텝당 감점 (막힘 감점 0으로 바꾼 뒤
+                                   #   초록불에 2~3분씩 서 있는 판이 5% 생김)
 )
 REWARD = {**REWARD_DEFAULTS, **REWARD_OVERRIDES}
 
@@ -119,8 +130,9 @@ HPARAMS = dict(
 )
 
 # ---- 평가 / 로깅 ----
-EVAL_INTERVAL = 5       # 몇 번의 업데이트마다 주행 지표를 평가할지 (0이면 안 함)
-EVAL_EPISODES = 5       # 평가 1회당 에피소드 수
+EVAL_INTERVAL = 25      # 몇 번의 업데이트마다 주행 지표를 평가할지 (0이면 안 함)
+EVAL_EPISODES = 20      # 평가 1회당 에피소드 수 (5판은 운이 커서 best_model을 믿을 수 없었음.
+                        #   best_model 성공률 52%). 학습 스텝 대비 평가 비중은 전과 비슷하게 유지
 LOG_INTERVAL = 1        # 몇 번의 업데이트마다 콘솔에 출력할지
 CHECKPOINT_INTERVAL = 10  # 몇 번의 업데이트마다 model.pt/CSV를 중간 저장할지 (0이면 안 함)
 RESULTS_DIR = "results" # 결과 저장 폴더
@@ -155,6 +167,12 @@ def snapshot_configs(run_dir: str):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="PPO 학습")
+    parser.add_argument("--seed", type=int, default=HPARAMS["seed"],
+                        help="시드만 다르게 여러 번 학습해 운의 영향을 본다")
+    args = parser.parse_args()
+    HPARAMS["seed"] = args.seed
+
     # 1) 도로 생성 (env/road_config.py 기준으로 매번 재생성)
     sumocfg = road_builder.build(ROAD, EGO, TRAFFIC,
                                  os.path.join(BASE, "env", "sumo"))
@@ -198,9 +216,13 @@ if __name__ == "__main__":
     model_path = os.path.join(run_dir, "model.pt")
     best_path = os.path.join(run_dir, "best_model.pt")
     best = {"score": None}
+    midpoint_saved = {"done": False}
 
     def checkpoint():
         agent.save(model_path)
+        if not midpoint_saved["done"] and agent.num_timesteps >= MIDPOINT_TIMESTEPS:
+            agent.save(os.path.join(run_dir, "model_1M.pt"))
+            midpoint_saved["done"] = True
         logger.save_csv()
         snapshot_configs(run_dir)
         print(f"    [checkpoint @{agent.num_timesteps}] {model_path}", flush=True)
