@@ -3,8 +3,9 @@
 저장 단위는 POMDP transition 하나다:
     (o_t, a_t, r_t, o_{t+1}, terminated, truncated, s_t, s_{t+1})
 
-- o_t / o_{t+1}: agent가 실제로 보는 부분관측 (19차원)
-- a_t: [가감속 raw, 차선변경 raw]
+- o_t / o_{t+1}: agent가 실제로 보는 부분관측 (40차원, env/mdp_config.py OBSERVATION)
+- a_t: [가감속 raw, 차선변경 raw] (action_raw = 정책 출력 원본,
+  action.accel_raw = 환경에 적용된 값. 보행자 필터가 덮어쓰면 event.filter_active가 True)
 - lane_change: 실제 환경에 적용된 {-1, 0, +1}
 - s_t / s_{t+1}: SUMO 내부의 privileged simulator state.
   정책 입력에는 쓰지 않고 데이터 검증/representation/belief 학습용으로만 저장한다.
@@ -195,7 +196,7 @@ def collect(args, sumocfg, episodes, worker_id, jsonl_path, npz_path, tag=""):
     obs_buf, next_obs_buf, action_raw_buf = [], [], []
     lane_cmd_buf, reward_buf = [], []
     term_buf, trunc_buf, episode_buf, step_buf = [], [], [], []
-    red_buf = []
+    red_buf, ped_col_buf, yield_buf = [], [], []
     # 스텝별 감지 차량 (x,y)는 한 줄로 이어 붙이고, 스텝 경계는 offsets로 기록한다.
     detected_xy_buf, detected_offsets = [], [0]
 
@@ -224,6 +225,7 @@ def collect(args, sumocfg, episodes, worker_id, jsonl_path, npz_path, tag=""):
                     record = {
                         "episode": int(ep),
                         "t": t,
+                        "route": info["route"],   # 자차 경로 (r0 직진 / r_ego_right 우회전)
                         "observation": compact(obs, args.ndigits),
                         # 스칼라 몇 개는 용량에 영향이 없으니 반올림하지 않는다.
                         "action_raw": np.asarray(action, dtype=float).tolist(),
@@ -243,6 +245,8 @@ def collect(args, sumocfg, episodes, worker_id, jsonl_path, npz_path, tag=""):
                             "collided": bool(info["collided"]),
                             "arrived": bool(info["arrived"]),
                             "red_violation": bool(info["red_violation"]),
+                            "ped_collision": bool(info["ped_collision"]),
+                            "yield_violation": bool(info["yield_violation"]),
                             "filter_active": bool(info["filter_active"]),
                             "lane_before": info["lane_before"],
                             "lane_after": info["lane_after"],
@@ -270,6 +274,8 @@ def collect(args, sumocfg, episodes, worker_id, jsonl_path, npz_path, tag=""):
                     term_buf.append(bool(terminated))
                     trunc_buf.append(bool(truncated))
                     red_buf.append(bool(info["red_violation"]))
+                    ped_col_buf.append(bool(info["ped_collision"]))
+                    yield_buf.append(bool(info["yield_violation"]))
                     episode_buf.append(int(ep))
                     step_buf.append(t)
                     detected_xy_buf.extend((d["x"], d["y"]) for d in detected)
@@ -296,6 +302,8 @@ def collect(args, sumocfg, episodes, worker_id, jsonl_path, npz_path, tag=""):
         terminated=np.asarray(term_buf, dtype=np.bool_),
         truncated=np.asarray(trunc_buf, dtype=np.bool_),
         red_violation=np.asarray(red_buf, dtype=np.bool_),
+        ped_collision=np.asarray(ped_col_buf, dtype=np.bool_),
+        yield_violation=np.asarray(yield_buf, dtype=np.bool_),
         episode=np.asarray(episode_buf, dtype=np.int32),
         t=np.asarray(step_buf, dtype=np.int32),
         # 감지 차량 (x,y)를 전 스텝에 걸쳐 이어 붙인 (M, 2) float32.

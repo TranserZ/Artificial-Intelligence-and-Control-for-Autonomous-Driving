@@ -1166,6 +1166,7 @@ class SumoHighwayEnv(gym.Env):
 
         terminated, truncated = False, False
         ego_speed, ego_gap = None, None
+        approach_pen, stop_pen = 0.0, 0.0   # 진단용 (info에 기록)
 
         # ---- 신호 위반: 결정 시점에 적색이던 신호의 정지선을 이번 스텝에 넘음 ----
         # 넘었는지는 "다음 신호 목록에서 그 신호가 사라졌는지"로 본다.
@@ -1286,23 +1287,59 @@ class SumoHighwayEnv(gym.Env):
                     and ego_speed > traci.lane.getMaxSpeed(lane_id) + 0.1):
                 reward -= float(self.rw.get("turn_overspeed_penalty", 0.0))
 
-            # ---- 초록불 멈춤: 멈춰야 할 이유가 없는데 서 있으면 스텝당 감점 ----
-            # (막힘 감점을 끄니 초록불에도 2~3분씩 서 있다 시간초과 나는 판이 생겼다)
-            # 멈춰야 할 이유 = 정지 신호, 가까운 앞차, 보행자
+            # ---- 신호 접근 감속: 정지선에서 멈출 수 있는 속도보다 빠르면 스텝당 감점 ----
+            # 허용 속도 v_ref = sqrt(2 · approach_decel · (정지선 거리 - 1 m)), 즉 편한 감속으로
+            # 정지선 1 m 앞에 멈출 수 있는 속도. 적용 대상: 적색·황색·멈추기 전 일시정지(s),
+            # 그리고 곧 끝나는 녹색(남은 시간 < 지금 속도로 정지선까지 걸리는 시간).
+            # 황색인데 최대 감속으로도 못 멈추면 통과가 맞으므로 감점하지 않는다.
+            # (멀리 서던 이유: 다가가다 못 멈추면 -20이라, 안전한 접근법을 모르고 미리 섰다)
+            ap = float(self.rw.get("approach_overspeed_penalty", 0.0))
+            if ap > 0.0 and signal_after is not None and signal_after[1] <= self.signal_visibility:
+                _, sdist, sstate, sremain = signal_after
+                level = self._SIGNAL_STOP_LEVEL.get(sstate, 1.0)
+                if sstate == "s" and self._stopped_at == signal_after[0]:
+                    level = 0.0
+                ending_green = level == 0.0 and sstate in "Gg" and \
+                    sremain < sdist / max(ego_speed, 1.0)
+                stoppable = ego_speed ** 2 / (2.0 * self.max_decel) <= sdist
+                if (level >= 1.0 or ending_green
+                        or (level > 0.0 and (sstate != "y" or stoppable))):
+                    v_ref = float(np.sqrt(2.0 * float(self.rw.get("approach_decel", 2.0))
+                                          * max(sdist - 1.0, 0.0)))
+                    if ego_speed > v_ref:
+                        approach_pen = min(ap * (ego_speed - v_ref),
+                                           float(self.rw.get("approach_penalty_cap", 0.2)))
+                        reward -= approach_pen
+
+            # ---- 도로 중간 정지: 멈춰야 할 이유 없이 서 있거나 아주 느리면 스텝당 감점 ----
+            # 앞이 빈 거리 F = min(정지 신호의 정지선 거리, 앞차 거리). F가 green_stop_gap
+            # 이하면 정당한 대기. 넘으면 base에서 시작해 F가 멀수록 커진다 (경계 15 m에
+            # 맞춰 16~20 m에 서는 습관을 막으려고 계단 대신 경사). 보행자 대기는 제외.
+            # 정지선 앞에서 양보 신호(g, 또는 이미 멈춘 일시정지 s)를 받고 있으면 교차·대향
+            # 차량 틈을 기다리는 것일 수 있어 base만 준다 (세게 밀면 끼어들기 충돌 위험).
             gsp = float(self.rw.get("green_stop_penalty", 0.0))
-            if gsp > 0.0 and ego_speed < 0.5:
-                stop_signal = (
-                    signal_after is not None
-                    and signal_after[1] <= self.signal_visibility
-                    and self._SIGNAL_STOP_LEVEL.get(signal_after[2], 1.0) > 0.0
-                    and not (signal_after[2] == "s"
-                             and self._stopped_at == signal_after[0]))
-                near_leader = (ego_gap is not None
-                               and ego_gap < float(self.rw.get("green_stop_gap", 15.0)))
+            stop_gap = float(self.rw.get("green_stop_gap", 15.0))
+            if gsp > 0.0 and ego_speed < float(self.rw.get("green_stop_speed", 1.5)):
+                free = np.inf
+                s_done = False
+                if signal_after is not None and signal_after[1] <= self.signal_visibility:
+                    if signal_after[2] == "g" or (signal_after[2] == "s"
+                                                  and self._stopped_at == signal_after[0]):
+                        s_done = signal_after[1] <= stop_gap
+                    elif self._SIGNAL_STOP_LEVEL.get(signal_after[2], 1.0) > 0.0:
+                        free = signal_after[1]
+                if ego_gap is not None:
+                    free = min(free, ego_gap)
                 ped_ahead = (self._waiting_for_ped()
                              or (self.ped_filter is not None and self.ped_filter.conflict_now))
-                if not (stop_signal or near_leader or ped_ahead):
-                    reward -= gsp
+                if not ped_ahead:
+                    if s_done and free > stop_gap:
+                        stop_pen = gsp
+                    elif free > stop_gap:
+                        ramp = float(self.rw.get("green_stop_ramp", 30.0))
+                        extra = float(self.rw.get("green_stop_extra", 0.0))
+                        stop_pen = gsp + extra * min((free - stop_gap) / ramp, 1.0)
+                    reward -= stop_pen
 
         # 양보 위반은 종료하지 않고 감점만 (충돌·완주와 같은 스텝이어도 적용)
         if yield_violation:
@@ -1320,6 +1357,8 @@ class SumoHighwayEnv(gym.Env):
             "gap": ego_gap,
             "accel_raw": accel_raw,          # 실제 적용 값 (필터가 바꿨으면 바뀐 값)
             "filter_active": filter_active,
+            "approach_pen": approach_pen,
+            "stop_pen": stop_pen,
             "lane_change_raw": lane_raw,
             "lane_change": lane_change,
             "lane_change_applied": lane_change_applied,

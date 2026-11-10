@@ -34,9 +34,9 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 # ══════════════════════════════════════════════════════════════════
 #  하이퍼파라미터 — 실험은 여기서
 # ══════════════════════════════════════════════════════════════════
-TOTAL_TIMESTEPS = 1_500_000  # 총 학습 스텝 수 (신호등 200k → 500k, 보행자·우회전 추가로 1M,
-                             #   신호위반을 더 줄이려고 1.5M)
-MIDPOINT_TIMESTEPS = 1_000_000  # 이 시점의 모델을 model_1M.pt로 따로 저장 (학습 길이 효과 비교용)
+TOTAL_TIMESTEPS = 1_000_000  # 총 학습 스텝 수 (신호등 200k → 500k, 보행자·우회전 추가로 1M,
+                             #   1.5M은 1M보다 신호위반이 늘어 다시 1M)
+MIDPOINT_TIMESTEPS = 700_000  # 이 시점의 모델을 model_mid.pt로 따로 저장 (학습 길이 효과 비교용)
 
 # ══════════════════════════════════════════════════════════════════
 #  보상 튜닝 — env/mdp_config.py 의 기본값을 여기서 덮어쓴다.
@@ -75,6 +75,10 @@ REWARD_OVERRIDES = dict(
                                    #   (best 모델이 9~14 m/s로 우회전하며 양보위반 32%)
     green_stop_penalty=0.05,       # 멈출 이유 없이 서 있으면 스텝당 감점 (막힘 감점 0으로 바꾼 뒤
                                    #   초록불에 2~3분씩 서 있는 판이 5% 생김)
+    green_stop_extra=0.10,         #   빈 거리가 15 m를 넘을수록 추가 감점 (45 m 이상이면 총 0.15).
+                                   #   0.05 한 가지일 땐 정지선 30~50 m 앞에서 미리 섰음
+    approach_overspeed_penalty=0.02,  # 정지 신호 접근 시 편한 감속 곡선 초과 1 m/s당 스텝 감점
+                                      #   (없을 땐 가까이 서는 모델일수록 신호위반 5~6%)
 )
 REWARD = {**REWARD_DEFAULTS, **REWARD_OVERRIDES}
 
@@ -221,7 +225,7 @@ if __name__ == "__main__":
     def checkpoint():
         agent.save(model_path)
         if not midpoint_saved["done"] and agent.num_timesteps >= MIDPOINT_TIMESTEPS:
-            agent.save(os.path.join(run_dir, "model_1M.pt"))
+            agent.save(os.path.join(run_dir, "model_mid.pt"))
             midpoint_saved["done"] = True
         logger.save_csv()
         snapshot_configs(run_dir)

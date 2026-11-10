@@ -269,11 +269,21 @@ REWARD = {
     # 넘으면 스텝마다 감점. 천천히 돌아야 출구 횡단보도 앞에서 멈출 수 있다.
     "turn_overspeed_penalty": 0.0,
 
-    # ---- 초록불 멈춤 ----
-    # 멈춰야 할 이유(정지 신호, green_stop_gap 안의 앞차, 보행자)가 없는데 서 있으면
-    # 스텝마다 감점. 평가 기준의 "비정상적 정지 / 무한정 대기" 방지.
+    # ---- 도로 중간 정지 ----
+    # 멈춰야 할 이유(green_stop_gap 안의 정지선·앞차, 보행자)가 없는데 green_stop_speed
+    # 보다 느리면 스텝마다 감점: penalty + extra × min((빈 거리 - gap) / ramp, 1).
+    # 평가 기준의 "비정상적 정지 / 무한정 대기" 방지.
     "green_stop_penalty": 0.0,
     "green_stop_gap": 15.0,
+    "green_stop_speed": 1.5,
+    "green_stop_extra": 0.0,
+    "green_stop_ramp": 30.0,
+    # ---- 신호 접근 감속 ----
+    # 정지 신호(또는 곧 끝나는 녹색)에 다가갈 때 편한 감속(approach_decel)으로 멈출 수
+    # 있는 속도보다 빠르면 초과 1 m/s당 스텝마다 감점 (approach_penalty_cap까지).
+    "approach_overspeed_penalty": 0.0,
+    "approach_decel": 2.0,
+    "approach_penalty_cap": 0.2,
 }
 # 보상 스케일에 대한 메모 (수업에서 다뤄볼 만한 지점):
 #   처음엔 speed_weight=1.0, collision=-10, arrival=+5 였는데,
