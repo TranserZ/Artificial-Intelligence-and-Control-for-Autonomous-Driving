@@ -279,3 +279,24 @@ TRAFFIC = {
     },
 }
 
+
+# ──────────────────────────────────────────────────────────────
+# 4) 청계천로 (팀 프로젝트 도로) — CHEONGGYECHEON["enabled"] = True면 위 설정을 덮어쓴다
+#    도로·교통·보행자·신호는 tools/make_cgc_scenario.py가 OSM 실제 도로로 만든다.
+#    천호사거리(intersection) 설정은 그대로 두고, 여기서 켜고 끈다.
+#    학습된 PPO 모델을 그대로 쓰기 위해 관측 정규화 기준(speed_limit 13.89)과
+#    관측 항목(신호·횡단보도 2개)은 천호사거리와 같게 유지한다.
+# ──────────────────────────────────────────────────────────────
+CHEONGGYECHEON = {
+    "enabled": True,
+    "route_length": 2146,   # 버스 경로 청계광장 → 광장시장 (m). prefill 범위·완주 판정 기준
+}
+
+if CHEONGGYECHEON["enabled"]:
+    ROAD = {**ROAD, "layout": "cheonggyecheon",
+            "length": CHEONGGYECHEON["route_length"],
+            "num_lanes": 2}                 # 청계천 양쪽 일방통행, 각 편도 2차로
+    EGO = {**EGO,
+           "routes": {"r0": 1.0},          # 버스 노선 하나 (우회전 경로 없음)
+           "depart_lane": 0,               # 맨 오른쪽 차로에서 출발 (정류장 쪽)
+           "route_depart_lane": {}}
