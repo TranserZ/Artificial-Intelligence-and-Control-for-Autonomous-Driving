@@ -273,6 +273,13 @@ def build(net_path, out_dir, args):
     L.append('    <vType id="motorcycle" vClass="motorcycle" guiShape="motorcycle" length="2.2" width="0.8" '
              'accel="3.5" decel="5.0" maxSpeed="11" minGap="1.0" lcAssertive="2" lcImpatience="0.5" lcCooperative="0.5" '
              'jmIgnoreFoeProb="0.2" color="0.2,0.2,0.2"/>')
+    # OSM 조사: highway=cycleway 13개는 자동차 도로가 아니라 변환에서 빠진다.
+    # 청계천로 자동차 way 14개에는 cycleway:left=track(천 쪽 분리 자전거도로)이 있으나
+    # 그 태그는 전용 차로로 만들지 않는다. 대신 본선에 저속 자전거 흐름을 둔다.
+    # maxSpeed 5 m/s, speedFactor 0.8 → 대략 3–5 m/s.
+    L.append('    <vType id="bicycle" vClass="bicycle" guiShape="bicycle" length="1.8" width="0.65" '
+             'accel="1.2" decel="3.0" maxSpeed="5.0" speedFactor="0.8" speedDev="0.15" minGap="0.5" '
+             'color="0,0.55,0.25"/>')
     L.append('    <vType id="parked_car" accel="2.0" decel="4.5" maxSpeed="8.3" color="0.5,0.5,0.5" '
              'vClass="passenger" guiShape="passenger/van"/>')
     # 광장시장에 세워 둔 오토바이. 차로를 막지 않는 정식 주차(parking=true).
@@ -298,6 +305,12 @@ def build(net_path, out_dir, args):
     # 오토바이: 본선 전체를 달리며 차선 사이를 파고든다
     L.append(f'    <flow id="moto" type="motorcycle" route="{rid}" begin="0" end="100000" '
              f'vehsPerHour="{args.moto_vph}" departLane="best" departSpeed="max"/>')
+    # 동행·서행 전 구간. 45초에 한 대면 4 m/s 기준으로 약 180 m 간격.
+    L.append(f'    <flow id="bike_e" type="bicycle" route="{rid}" begin="0" end="100000" '
+             f'period="45" departLane="best" departSpeed="max"/>')
+    if west:
+        L.append('    <flow id="bike_w" type="bicycle" route="main_west" begin="0" end="100000" '
+                 'period="45" departLane="best" departSpeed="max"/>')
     # 광장시장 구간: 15 m 간격으로 오토바이를 세워 둔다. 정차금지지대 위치는 뺀다.
     no_stop = load_no_stop_zones()
     moto_n = 0
