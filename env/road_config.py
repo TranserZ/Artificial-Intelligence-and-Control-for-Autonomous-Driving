@@ -270,6 +270,6 @@ if CHEONGGYECHEON["enabled"]:
             "length": CHEONGGYECHEON["route_length"],
             "num_lanes": 2}                 # 청계천 양쪽 일방통행, 각 편도 2차로
     EGO = {**EGO,
-           "routes": {"r0": 1.0},          # 버스 노선 하나 (우회전 경로 없음)
+           "routes": {"r0": 0.0, "r0_loop": 1.0},  # 왕복 route로 학습/평가
            "depart_lane": 0,               # 맨 오른쪽 차로에서 출발 (정류장 쪽)
            "route_depart_lane": {}}

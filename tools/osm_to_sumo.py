@@ -178,14 +178,14 @@ def convert(osm_path, out_dir):
         return r in signals and not (len(spd) <= 2 and max(spd, default=0) > 14.0)
 
     n_drop = sum(1 for r in used_nodes if r in signals and not useful_signal(r))
-    with open(os.path.join(out_dir, "cgc.nod.xml"), "w") as f:
+    with open(os.path.join(out_dir, "cgc.nod.xml"), "w", encoding="utf-8", newline="\n") as f:
         f.write("<nodes>\n")
         for r in sorted(used_nodes):
             x, y = project(*nodes[r])
             kind = "traffic_light" if useful_signal(r) else "priority"
             f.write(f'    <node id="n{r}" x="{x:.2f}" y="{y:.2f}" type="{kind}"/>\n')
         f.write("</nodes>\n")
-    with open(os.path.join(out_dir, "cgc.edg.xml"), "w") as f:
+    with open(os.path.join(out_dir, "cgc.edg.xml"), "w", encoding="utf-8", newline="\n") as f:
         f.write("<edges>\n")
         for eid, a, b, n_lane, speed, pts, tags in edges:
             shape = " ".join(f"{x:.2f},{y:.2f}" for x, y in pts[1:-1])
@@ -210,15 +210,23 @@ if __name__ == "__main__":
     convert(a.osm, a.out)
 
 
+# 청계5가 회차의 짧은 연결. 명시적 <join>에서는 빼 두지만,
+# netconvert --junctions.join 이 주변 교차로를 합치며 id가 사라질 수 있다.
+# 그때는 make_cgc_scenario.resolve_loop_edges 가 그 id를 빼고 이웃 엣지로 잇는다.
+KEEP_SHORT_EDGES = {"e482167259_1a", "e608946832_1a"}
+
+
 def tiny_edge_joins(net_path, nod_path, min_len=2.0):
     """netconvert 결과에서 교차로 영역이 겹쳐 길이가 min_len 미만이 된 엣지를 찾아,
     양 끝 노드를 하나의 교차로로 합치라는 <join>을 nod 파일에 추가한다.
     (예: 청계3가 부근 35 m 간격의 두 교차로 사이 엣지가 0.2 m로 줄어
-     오른쪽 차로가 곧바로 끊기던 문제) 추가한 join 개수를 반환한다."""
+     오른쪽 차로가 곧바로 끊기던 문제) 추가한 join 개수를 반환한다.
+    청계5가 회차 엣지(KEEP_SHORT_EDGES)는 이 함수의 <join> 대상에서 뺀다.
+    주변 교차로가 따로 합쳐지면 id가 없을 수 있고, 그때 왕복 route는 남은 엣지를 쓴다."""
     net = ET.parse(net_path).getroot()
     pairs = set()
     for e in net.findall("edge"):
-        if e.get("function"):
+        if e.get("function") or e.get("id") in KEEP_SHORT_EDGES:
             continue
         lanes = e.findall("lane")
         if lanes and max(float(l.get("length")) for l in lanes) < min_len:
@@ -229,11 +237,43 @@ def tiny_edge_joins(net_path, nod_path, min_len=2.0):
         return 0
     text = open(nod_path, encoding="utf-8").read().replace("</nodes>", "")
     text += "".join(f'    <join nodes="{a} {b}"/>\n' for a, b in sorted(pairs)) + "</nodes>\n"
-    open(nod_path, "w", encoding="utf-8").write(text)
+    open(nod_path, "w", encoding="utf-8", newline="\n").write(text)
     return len(pairs)
 
 
-def route_straight_connections(net_path, rou_path, route_id, con_path):
+def _passenger_lane_indexes(edge_el):
+    """보도를 뺀 승용차 차로 번호. 선행 확인에서 보도는 0, 오른쪽 승용차는 1이었다."""
+    out = []
+    for lane in edge_el.findall("lane"):
+        disallow = lane.get("disallow") or ""
+        allow = lane.get("allow")
+        if "passenger" in disallow.split():
+            continue
+        if allow in (None, "") or "passenger" in allow.split():
+            out.append(int(lane.get("index")))
+    return out
+
+
+def _write_connections(con_path, lines, append):
+    if append and os.path.exists(con_path):
+        text = open(con_path, encoding="utf-8").read().replace("</connections>", "").rstrip() + "\n"
+    else:
+        text = "<connections>\n"
+    fresh = []
+    for line in lines:
+        if line.strip() and line.strip() in text:
+            continue
+        fresh.append(line)
+    body = "\n".join(fresh)
+    if body:
+        text += body + "\n"
+    text += "</connections>\n"
+    with open(con_path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(text)
+    return len(fresh)
+
+
+def route_straight_connections(net_path, rou_path, route_id, con_path, append=False):
     """버스 경로(route_id) 위에서 직진으로 이어지지 않는 차로에 직진 연결을 추가하는
     connection 파일을 만든다. OSM에 차로별 진행 방향(turn:lanes)이 없어 netconvert가
     옆길이 있는 교차로에서 오른쪽 차로를 우회전 전용으로 추측한 곳을 보정한다.
@@ -249,9 +289,7 @@ def route_straight_connections(net_path, rou_path, route_id, con_path):
     for e in net.findall("edge"):
         if e.get("function"):
             continue
-        lanes[e.get("id")] = [int(l.get("index")) for l in e.findall("lane")
-                              if "passenger" not in (l.get("disallow") or "")
-                              and (l.get("allow") in (None, "") or "passenger" in l.get("allow"))]
+        lanes[e.get("id")] = _passenger_lane_indexes(e)
     for c in net.findall("connection"):
         conns.add((c.get("from"), c.get("to"), int(c.get("fromLane"))))
     out = []
@@ -261,6 +299,60 @@ def route_straight_connections(net_path, rou_path, route_id, con_path):
             if (a, b, fl) not in conns and lb:
                 tl = lb[min(i, len(lb) - 1)]
                 out.append(f'    <connection from="{a}" to="{b}" fromLane="{fl}" toLane="{tl}"/>')
-    with open(con_path, "w", encoding="utf-8") as f:
-        f.write("<connections>\n" + "\n".join(out) + ("\n" if out else "") + "</connections>\n")
+    _write_connections(con_path, out, append)
+    return len(out)
+
+
+# 오른쪽 승용차 차로(선행 확인: lane 1)에 좌회전을 명시할 회차 쌍.
+# 짧은 엣지가 남아 있으면 그 쌍을, 교차로에 흡수되면 살아 있는 이웃 쌍을 쓴다.
+# 청계광장 회차도 같은 방식으로 lane 1이 끊겨 있어 함께 잇는다.
+LOOP_LEFT_PAIRS = [
+    ("e1455526426_1", "e482167259_1a"),
+    ("e1455526426_1", "e608946831_1a"),
+    ("e608946832_1a", "e1212424785_1"),
+    ("e608946831_1a", "e1212424785_1"),
+    ("e350127794_6", "e183272596_1"),
+    ("e183272596_1", "e73541403_1"),
+]
+
+
+def loop_left_connections(net_path, con_path, append=True):
+    """r0_loop 회차의 좌회전을 오른쪽 승용차 차로에 붙인다.
+
+    선행 확인: 청계5가 첫 좌회전(e1455526426_1)은 lane 2→다음 lane 1만 있고,
+    둘째 좌회전은 서행 lane 2(왼쪽)로만 들어간다. 버스는 lane 1에서 출발하므로
+    그 차로의 좌회전이 없으면 wrong_lane으로 멈춘다.
+    이미 그 fromLane에서 다른 toLane으로 이어져 있어도, 오른쪽 승용차 차로(가장 작은
+    승용차 lane)로의 연결이 없으면 하나 더 넣는다. 추가한 연결 수를 반환한다.
+    """
+    net = ET.parse(net_path).getroot()
+    edges = {}
+    for e in net.findall("edge"):
+        if not e.get("function"):
+            edges[e.get("id")] = e
+    linked = set()
+    full = set()
+    for c in net.findall("connection"):
+        linked.add((c.get("from"), c.get("to")))
+        full.add((c.get("from"), c.get("to"), int(c.get("fromLane")), int(c.get("toLane"))))
+    # 직진 보정이 같은 파일을 먼저 썼으면 그 연결은 다시 넣지 않는다
+    if append and os.path.exists(con_path):
+        import re
+        for m in re.finditer(
+                r'from="([^"]+)" to="([^"]+)" fromLane="(\d+)" toLane="(\d+)"',
+                open(con_path, encoding="utf-8").read()):
+            full.add((m.group(1), m.group(2), int(m.group(3)), int(m.group(4))))
+    out = []
+    for a, b in LOOP_LEFT_PAIRS:
+        if (a, b) not in linked or a not in edges or b not in edges:
+            continue
+        la, lb = _passenger_lane_indexes(edges[a]), _passenger_lane_indexes(edges[b])
+        if not la or not lb:
+            continue
+        fl, tl = la[0], lb[0]
+        if (a, b, fl, tl) in full:
+            continue
+        out.append(f'    <connection from="{a}" to="{b}" fromLane="{fl}" toLane="{tl}"/>')
+        full.add((a, b, fl, tl))
+    _write_connections(con_path, out, append)
     return len(out)

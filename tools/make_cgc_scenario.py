@@ -35,6 +35,51 @@ BAD_SIDE = {"e506246961_1b", "e329995230_2a", "e329995230_2b", "e228795468_3a"} 
 EAST_WAYS = ["73541403", "1536659790", "908646367", "218924602", "1212424783"]  # 청계광장→광장시장
 WEST_WAYS = ["1212424785", "732213463", "1212424791", "908694578", "350127794"]  # 광장시장→청계광장
 
+# 청계광장 회차(e183272596_1) + 청계5가 좌회전 두 번으로 도는 왕복.
+# OSM 중심선 기준 63개. netconvert가 교차로에 삼킨 id는 resolve_loop_edges가 뺀다.
+LOOP_EDGE_IDS = (
+    "e73541403_1 e73541403_2 e73541403_3 e73541403_4 e73541403_5 e73541403_6 "
+    "e73541403_7 e73541403_8 "
+    "e1536659790_1 e1536659790_2 e1536659790_3 e1536659790_4 e1536659790_5 e1536659790_6 "
+    "e908646367_1 e908646367_2 e908646367_3 e908646367_4 e908646367_5 e908646367_6 "
+    "e218924602_1 e218924602_2 e218924602_3 e218924602_4 e218924602_5 e218924602_6 "
+    "e1212424783_1 e1212424783_2 e1212424783_3 e1212424783_4 "
+    "e1455526426_1 e482167259_1a e608946831_1a e608946832_1a "
+    "e1212424785_1 e1212424785_2 "
+    "e732213463_1 e732213463_2 e732213463_3 e732213463_4 e732213463_5 "
+    "e1212424791_1 e1212424791_2 e1212424791_3 e1212424791_4 e1212424791_5 "
+    "e1212424791_6 e1212424791_7 e1212424791_8 "
+    "e908694578_1 e908694578_2 e908694578_3 e908694578_4 e908694578_5 e908694578_6 "
+    "e908694578_7 "
+    "e350127794_1 e350127794_2 e350127794_3 e350127794_4 e350127794_5 e350127794_6 "
+    "e183272596_1"
+).split()
+
+
+def resolve_loop_edges(net, edge_ids):
+    """왕복 edge 목록을 현재 net.xml에 맞게 고친다.
+
+    청계5가 짧은 연결(e482167259_1a, e608946832_1a)은 선행 확인에서 id가 살아 있었다.
+    그보다 앞선 본선에서 netconvert가 없앤 e73541403_7, e1212424791_8처럼
+    목록에만 있고 네트워크에 없는 id는 빼고, 앞뒤가 직접 이어지는지 본다.
+    """
+    present, missing = [], []
+    for eid in edge_ids:
+        try:
+            present.append(net.getEdge(eid))
+        except Exception:
+            missing.append(eid)
+    if missing:
+        print("왕복 route에서 제외 (net.xml에 없음):", " ".join(missing))
+    out = []
+    for edge in present:
+        if out and edge not in out[-1].getOutgoing():
+            raise RuntimeError(
+                f"왕복 경로가 끊김: {out[-1].getID()} → {edge.getID()} "
+                f"(제외된 엣지: {' '.join(missing) or '없음'})")
+        out.append(edge)
+    return out
+
 
 def chain_route(net, way_ids):
     """OSM way 순서대로 엣지를 이어 붙인다. 끊기면 그 구간만 최단경로로 잇는다.
@@ -151,6 +196,9 @@ def build(net_path, out_dir, args):
     L.append('    <vType id="parked_car" accel="2.0" decel="4.5" maxSpeed="8.3" color="0.5,0.5,0.5" '
              'vClass="passenger" guiShape="passenger/van"/>')
     L.append(f'    <route id="{rid}" edges="{ids}"/>')
+    loop = resolve_loop_edges(net, LOOP_EDGE_IDS)
+    loop_ids = " ".join(e.getID() for e in loop)
+    L.append(f'    <route id="{args.loop_route_id}" edges="{loop_ids}"/>')
     if west:
         L.append(f'    <route id="main_west" edges="{" ".join(e.getID() for e in west)}"/>')
     # 본선 통과 교통 (동행/서행)
@@ -196,20 +244,21 @@ def build(net_path, out_dir, args):
                  f'<stop lane="{e.getID()}_{first_car_lane}" endPos="{pos:.1f}" duration="{rng.randint(25, 50)}" parking="false"/>'
                  f'</flow>')
     L.append("</routes>")
-    with open(os.path.join(out_dir, "cgc.rou.xml"), "w") as f:
+    with open(os.path.join(out_dir, "cgc.rou.xml"), "w", encoding="utf-8", newline="\n") as f:
         f.write("\n".join(L) + "\n")
 
     # GUI: 전체 도로가 한 화면에 보이도록 (x 0~2275, y -280~210)
-    with open(os.path.join(out_dir, "cgc.gui.xml"), "w") as f:
+    with open(os.path.join(out_dir, "cgc.gui.xml"), "w", encoding="utf-8", newline="\n") as f:
         f.write('<viewsettings>\n    <scheme name="real world"/>\n'
                 f'    <viewport zoom="{args.zoom}" x="{args.view_x}" y="{args.view_y}" angle="0"/>\n'
                 '    <delay value="100"/>\n</viewsettings>\n')
-    with open(os.path.join(out_dir, "cgc.sumocfg"), "w") as f:
+    with open(os.path.join(out_dir, "cgc.sumocfg"), "w", encoding="utf-8", newline="\n") as f:
         f.write('<configuration>\n    <input>\n        <net-file value="cgc.net.xml"/>\n'
                 '        <route-files value="cgc.rou.xml"/>\n    </input>\n'
                 '    <gui_only>\n        <gui-settings-file value="cgc.gui.xml"/>\n    </gui_only>\n'
                 '</configuration>\n')
-    print(f"경로 {len(route)}개 엣지, 측면 합류 {len(srcs)}곳, 불법주정차 {len(stop_edges)}곳")
+    print(f"경로 {len(route)}개 엣지, 왕복 {args.loop_route_id} {len(loop)}개 엣지, "
+          f"측면 합류 {len(srcs)}곳, 불법주정차 {len(stop_edges)}곳")
     print("측면 합류 엣지:", [e.getID() for e in srcs])
 
 
@@ -218,6 +267,8 @@ def parse_args(argv=None):
     ap.add_argument("--net", default="env/cheonggyecheon/cgc.net.xml")
     ap.add_argument("--out", default="env/cheonggyecheon")
     ap.add_argument("--route-id", default="main_east")
+    ap.add_argument("--loop-route-id", default="r0_loop",
+                    help="청계광장·청계5가에서 되돌아오는 왕복 route id")
     ap.add_argument("--shuttle-kmh", type=float, default=20.0)
     ap.add_argument("--ego-accel", type=float, default=None)
     ap.add_argument("--ego-decel", type=float, default=None)
