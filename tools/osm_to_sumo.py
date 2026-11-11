@@ -11,6 +11,7 @@
 OSM에 없는 값은 아래 DEFAULT_*에서 채우며, 어떤 값이 가정인지 NOTES에 기록한다.
 """
 import argparse
+import csv
 import math
 import os
 import xml.etree.ElementTree as ET
@@ -42,6 +43,19 @@ def project(lon, lat):
 
 def inside(lon, lat):
     return BBOX[0] <= lon <= BBOX[2] and BBOX[1] <= lat <= BBOX[3]
+
+
+def load_school_speeds():
+    """어린이보호구역 edge id → 제한속도 m/s. 파일이 없으면 빈 dict."""
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "data", "road_data", "school_zones.csv")
+    speeds = {}
+    if not os.path.exists(path):
+        return speeds
+    with open(path, encoding="utf-8-sig", newline="") as f:
+        for row in csv.DictReader(f):
+            speeds[row["edge_id"].strip()] = float(row["speed_limit_ms"])
+    return speeds
 
 
 def kmh_of(tags):
@@ -185,6 +199,8 @@ def convert(osm_path, out_dir):
             kind = "traffic_light" if useful_signal(r) else "priority"
             f.write(f'    <node id="n{r}" x="{x:.2f}" y="{y:.2f}" type="{kind}"/>\n')
         f.write("</nodes>\n")
+    school_speeds = load_school_speeds()
+    n_school = 0
     with open(os.path.join(out_dir, "cgc.edg.xml"), "w", encoding="utf-8", newline="\n") as f:
         f.write("<edges>\n")
         for eid, a, b, n_lane, speed, pts, tags in edges:
@@ -192,13 +208,18 @@ def convert(osm_path, out_dir):
             attr = f' shape="{shape}"' if shape else ""
             name = (tags.get("name") or "").replace('"', "").replace("&", "")
             name_attr = f' name="{name}"' if name else ""
-            f.write(f'    <edge id="e{eid}" from="n{a}" to="n{b}" numLanes="{n_lane}" '
+            full_id = f"e{eid}"
+            if full_id in school_speeds:
+                speed = school_speeds[full_id]
+                n_school += 1
+            f.write(f'    <edge id="{full_id}" from="n{a}" to="n{b}" numLanes="{n_lane}" '
                     f'speed="{speed:.2f}" priority="{ {"primary":4,"secondary":3,"tertiary":2}.get(tags.get("highway"),1) }" '
                     f'{name_attr}{attr}/>\n')
         f.write("</edges>\n")
 
     n_tl = sum(1 for r in used_nodes if useful_signal(r))
-    print(f"노드 {len(used_nodes)}개 (신호등 {n_tl}, 빠른 도로 중간 신호 {n_drop}개 제외), 엣지 {len(edges)}개 → {out_dir}")
+    print(f"노드 {len(used_nodes)}개 (신호등 {n_tl}, 빠른 도로 중간 신호 {n_drop}개 제외), "
+          f"엣지 {len(edges)}개, 어린이보호구역 속도 {n_school}개 → {out_dir}")
     return edges
 
 

@@ -206,6 +206,11 @@ class SumoHighwayEnv(gym.Env):
         # 정차금지지대 (edge, 시작 m, 끝 m). 파일은 data/road_data/no_stop_zones.csv
         self._no_stop_zones = _load_zone_rows(
             "no_stop_zones.csv", ("edge_id", "start_pos", "end_pos"))
+        # 어린이보호구역 edge → 제한속도 m/s
+        self._school_limits = {
+            edge: speed for edge, speed in _load_zone_rows(
+                "school_zones.csv", ("edge_id", "speed_limit_ms"))
+        }
 
         # GUI는 ego를 따라가며 가까이 보이도록 기본값을 둔다.
         self.gui_zoom = float(mdp_sim.get("gui_zoom", 1200.0))
@@ -1412,13 +1417,19 @@ class SumoHighwayEnv(gym.Env):
             "signal_state": signal_before[2] if signal_before else None,
             "signal_dist": signal_before[1] if signal_before else None,
         }
-        # 정차금지지대 안에서 거의 서 있으면 스텝마다 감점
+        # 정차금지지대 안에서 거의 서 있으면 스텝마다 감점.
+        # 어린이보호구역은 제한을 넘긴 1 m/s당 감점, 상한 0.5.
         if alive and not traci.vehicle.getRoadID(self.ego_id).startswith(":"):
             edge = traci.vehicle.getRoadID(self.ego_id)
             pos = traci.vehicle.getLanePosition(self.ego_id)
-            if traci.vehicle.getSpeed(self.ego_id) < 0.5 and any(
+            spd = traci.vehicle.getSpeed(self.ego_id)
+            if spd < 0.5 and any(
                     z[0] == edge and z[1] <= pos <= z[2] for z in self._no_stop_zones):
                 reward -= float(self.rw.get("no_stop_zone_penalty", 0.0))
+            limit = self._school_limits.get(edge)
+            if limit is not None and spd > limit:
+                rate = float(self.rw.get("school_zone_speeding_penalty", 0.0))
+                reward -= min(rate * (spd - limit), 0.5)
         return obs, float(reward), terminated, truncated, info
 
     # ==================================================================
