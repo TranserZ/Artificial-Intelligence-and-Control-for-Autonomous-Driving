@@ -75,7 +75,9 @@ class PedSafetyFilter:
             off += length
             if stopline is None and not l.startswith(":"):
                 nxt = self.env._lane_route_link(l)
-                if nxt is not None and nxt[4].startswith(":"):
+                # 정지선 = 신호 교차로나 횡단보도가 있는 노드 앞. 엣지를 나누기만 한 지점
+                # (좌회전 포켓 시작, 어린이 보호구역 경계)도 내부 차로가 있지만 정지선이 아니다.
+                if nxt is not None and nxt[4].startswith(":") and self.env.is_stop_junction(nxt[4]):
                     stopline = off
             if off > LOOKAHEAD:
                 break

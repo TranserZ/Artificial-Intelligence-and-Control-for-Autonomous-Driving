@@ -53,6 +53,10 @@ def print_summary():
     print(f"  배경 교통량    : {TRAFFIC['vehs_per_hour']} 대/시간")
     print(f"  배경차 최고속도: {TRAFFIC['max_speed']} m/s")
     print(f"  ego 가속/감속  : +{EGO['accel']} / -{EGO['decel']} m/s²")
+    sz = road_builder.school_layout(ROAD)
+    if sz:
+        print(f"  어린이 보호구역: x {sz['lo']:.0f}~{sz['hi']:.0f} m (정문 {sz['gate']:.0f} m), "
+              f"{sz['limit'] * 3.6:.0f} km/h, 지그재그 {sz['zz']:.0f} m 차로변경 금지")
     print("─" * 46)
 
 

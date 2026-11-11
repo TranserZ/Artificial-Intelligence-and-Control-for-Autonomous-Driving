@@ -37,6 +37,9 @@ class DrivingMetrics:
     filter_rate: float = 0.0           # 안전 필터가 PPO 명령을 바꾼 스텝 비율
     straight_success_rate: float = float("nan")  # 직진(r0) 에피소드 중 완주 비율
     right_success_rate: float = float("nan")     # 그 외(우회전) 에피소드 중 완주 비율
+    zone_overspeed_rate: float = 0.0   # 어린이 보호구역에서 제한속도+3 km/h를 1초 넘게 넘긴 에피소드 비율
+    zone_mean_speed: float = float("nan")  # 보호구역 안 평균 속도 (m/s)
+    zone_p85_speed: float = float("nan")   # 보호구역 안 85퍼센타일 속도 (m/s)
 
     def as_dict(self) -> dict:
         return asdict(self)
@@ -48,6 +51,7 @@ class DrivingMetrics:
                 f"신호위반={self.red_violation_rate:.0%}  "
                 f"보행자충돌={self.ped_collision_rate:.0%}  "
                 f"양보위반={self.yield_violation_rate:.0%}  "
+                f"구역과속={self.zone_overspeed_rate:.0%}  "
                 f"차로오류={self.wrong_lane_rate:.0%}  "
                 f"필터개입={self.filter_rate:.1%}  "
                 f"평균속도={self.mean_speed:.1f}m/s  "
@@ -76,6 +80,8 @@ def evaluate_policy(policy, env, n_episodes: int = 5,
     n_ped, n_yield, n_wrong, n_filter = 0, 0, 0, 0
     route_runs = {"straight": [0, 0], "right": [0, 0]}   # [완주, 에피소드]
     speeds, gaps, returns, lengths, lane_changes = [], [], [], [], []
+    zone_speeds, n_zone_over = [], 0
+    ZONE_TOL, ZONE_STEPS = 3.0 / 3.6, 2   # +3 km/h를 연속 2스텝(1초) 넘으면 과속
 
     for _ in range(n_episodes):
         obs, _ = env.reset()
@@ -85,6 +91,7 @@ def evaluate_policy(policy, env, n_episodes: int = 5,
         ep_ped, ep_yield = False, False
         ended_by = None
         route = None
+        zone_run, ep_zone_over = 0, False
 
         while not done:
             action = policy.predict(obs, deterministic=deterministic)
@@ -103,6 +110,13 @@ def evaluate_policy(policy, env, n_episodes: int = 5,
             ep_yield = ep_yield or bool(info.get("yield_violation"))
             n_filter += int(bool(info.get("filter_active")))
             route = info.get("route", route)
+            if info.get("in_school_zone") and info.get("speed") is not None:
+                zone_speeds.append(float(info["speed"]))
+                over = info["speed"] > (info.get("zone_limit") or 0.0) + ZONE_TOL
+                zone_run = zone_run + 1 if over else 0
+                ep_zone_over = ep_zone_over or zone_run >= ZONE_STEPS
+            else:
+                zone_run = 0
 
             if info.get("collided"):
                 ended_by = "collision"
@@ -124,6 +138,7 @@ def evaluate_policy(policy, env, n_episodes: int = 5,
         n_red += int(ep_red)
         n_ped += int(ep_ped)
         n_yield += int(ep_yield)
+        n_zone_over += int(ep_zone_over)
         runs = route_runs["straight" if route in (None, "r0") else "right"]
         runs[0] += int(ended_by == "arrival")
         runs[1] += 1
@@ -159,4 +174,7 @@ def evaluate_policy(policy, env, n_episodes: int = 5,
                                if route_runs["straight"][1] else float("nan")),
         right_success_rate=(route_runs["right"][0] / route_runs["right"][1]
                             if route_runs["right"][1] else float("nan")),
+        zone_overspeed_rate=n_zone_over / n_episodes,
+        zone_mean_speed=float(np.mean(zone_speeds)) if zone_speeds else float("nan"),
+        zone_p85_speed=float(np.percentile(zone_speeds, 85)) if zone_speeds else float("nan"),
     )

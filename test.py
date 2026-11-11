@@ -131,6 +131,9 @@ if __name__ == "__main__":
     print(f"  필터 개입    : {metrics.filter_rate:.1%} (전체 스텝 중)")
     print(f"  직진 완주율  : {metrics.straight_success_rate:.0%}")
     print(f"  우회전 완주율: {metrics.right_success_rate:.0%}")
+    print(f"  보호구역 과속: {metrics.zone_overspeed_rate:.0%}  (+3 km/h를 1초 넘게)")
+    print(f"  보호구역 속도: 평균 {metrics.zone_mean_speed * 3.6:.1f} km/h, "
+          f"85% {metrics.zone_p85_speed * 3.6:.1f} km/h")
     print(f"  평균 속도    : {metrics.mean_speed:.2f} m/s "
           f"({metrics.mean_speed * 3.6:.1f} km/h)")
     print(f"  평균 차간거리: {metrics.mean_gap:.2f} m")

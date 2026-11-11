@@ -100,6 +100,12 @@ SIMULATION = {
 #            (구간 안에 있거나, 보행 녹색에 진입 대기 중인 경우 포함)
 #     · "내 경로 구간" = 횡단보도 중 내 진행 방향 차로들 위의 부분
 #     · 대상 보행자 = 그 횡단보도 위 + (보행 녹색일 때) 진입 대기 중인 보행자
+#
+#   어린이 보호구역 × 2  (OBSERVATION["school_zone"]["enabled"]일 때만 → 총 42차원)
+#   노면 색으로 인식한다: 내 진행 방향 차로 위의 적색 포장(시점부) = 시작,
+#   노란 이중 가장자리선 = 범위. 제한속도는 노면 (30) 표시와 같은 값.
+#   [40]     보호구역 입구까지 거리 / school_zone.visibility (0~1, 안이면 0, 없거나 멀면 1)
+#   [41]     적용 제한속도 / vmax (안이거나 visibility 안에 있으면 0.6(30 km/h), 아니면 1)
 # ──────────────────────────────────────────────────────────────
 OBSERVATION = {
     "visibility": 50.0,          # 관측 가능 거리 W (m). 앞뒤 차량 감지와
@@ -116,6 +122,10 @@ OBSERVATION = {
         "enabled": True,         # False면 보행자 항목 없이 34차원 (보행자 없는 도로/기존 모델용)
         "visibility": 50.0,      # 횡단보도 관측 거리 (m)
         "num_crossings": 2,      # 경로상 앞으로 볼 횡단보도 수
+    },
+    "school_zone": {
+        "enabled": True,         # False면 보호구역 항목 없이 40차원 (보호구역 없는 기존 모델용)
+        "visibility": 100.0,     # 보호구역 관측 거리 (m). 50→30 km/h를 2 m/s²로 줄이는 데 ~31 m
     },
 }
 
@@ -284,6 +294,18 @@ REWARD = {
     "approach_overspeed_penalty": 0.0,
     "approach_decel": 2.0,
     "approach_penalty_cap": 0.2,
+
+    # ---- 어린이 보호구역 ----
+    # 안: (속도 - 제한속도 - tol) 1 m/s당 스텝 감점, 최대 cap
+    # 앞: 편한 감속(zone_approach_decel)으로 입구에서 제한속도가 될 수 있는 속도보다
+    #     빠르면 초과 1 m/s당 스텝 감점, 최대 cap (신호 접근 감속과 같은 방식)
+    # 지그재그 구간 차로변경 금지는 감점이 아니라 환경이 막는다 (invalid_action_penalty).
+    "zone_overspeed_penalty": 0.0,
+    "zone_overspeed_tol": 0.3,
+    "zone_overspeed_cap": 0.5,
+    "zone_approach_penalty": 0.0,
+    "zone_approach_decel": 2.0,
+    "zone_approach_cap": 0.2,
 }
 # 보상 스케일에 대한 메모 (수업에서 다뤄볼 만한 지점):
 #   처음엔 speed_weight=1.0, collision=-10, arrival=+5 였는데,

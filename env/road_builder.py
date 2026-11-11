@@ -32,6 +32,10 @@ try:
     from env.road_config import SIGNAL_PLAN
 except ImportError:      # 실제 교차로 신호 계획이 없는 구버전 설정 하위호환
     SIGNAL_PLAN = {}
+try:
+    from env.road_config import SCHOOL
+except ImportError:      # 학교/어린이 보호구역 설정이 없는 구버전 설정 하위호환
+    SCHOOL = {"enabled": False}
 
 TL_ID = "n_tl"   # 신호 노드 id = SUMO 신호(tlLogic) id. sumo_env.py도 이 값을 쓴다.
 LANE_WIDTH = 3.2  # SUMO 기본 차로 폭 (m)
@@ -51,10 +55,58 @@ def _left_bay(road: dict) -> float:
     return float(INTERSECTION.get("left_bay_length", 0.0)) if is_intersection(road) else 0.0
 
 
+def school_layout(road: dict):
+    """어린이 보호구역 배치 (본선 x 좌표, m). 학교가 꺼져 있으면 None.
+
+    lo/hi   : 보호구역 시작/끝 (정문 중심 반경 원 ∩ 본선, 하한·포켓 앞으로 자름)
+    gate    : 정문 = 횡단보도 중심
+    zw / ze : 동쪽/서쪽 방향 지그재그 구간이 시작하는 노드 (횡단보도에서 zigzag + 여유만큼)
+    """
+    import math
+    if not (SCHOOL.get("enabled", False) and is_intersection(road)):
+        return None
+    bay = _left_bay(road)
+    median = LANE_WIDTH if bay else 0.0
+    curb = median / 2 + LANE_WIDTH * int(road["num_lanes"]) + 2.0   # 남쪽 보도 바깥 (|y|)
+    gate = float(SCHOOL["gate_x"])
+    radius = float(SCHOOL.get("radius", 200.0))
+    gate_y = curb + 1.0                                               # 정문은 보도 바로 뒤
+    if radius <= gate_y:
+        raise ValueError(f"SCHOOL radius {radius} m가 너무 작습니다.")
+    half = math.sqrt(radius ** 2 - gate_y ** 2)
+    pos = float(INTERSECTION.get("position", float(road["length"]) / 2))
+    lo = max(gate - half, float(SCHOOL.get("zone_min_x", 50.0)))
+    hi = min(gate + half, pos - bay - float(SCHOOL.get("zone_bay_margin", 20.0)))
+    if (lo, hi) != (gate - half, gate + half):
+        print(f"[school] 보호구역 반경 {radius:g} m 범위 {gate - half:.0f}~{gate + half:.0f} m를 "
+              f"{lo:.0f}~{hi:.0f} m로 자름 (시작 하한·좌회전 포켓)")
+    cw = float(SCHOOL.get("crosswalk_width", 4.0))
+    zz = float(SCHOOL.get("zigzag_length", 20.0))
+    reach = cw / 2 + 2.0 + zz        # 횡단보도 중심 → 지그재그 시작 (정지선 여유 2 m)
+    zw, ze = gate - reach, gate + reach
+    if not (lo + 30.0 < zw and ze < hi - 30.0):
+        raise ValueError(f"보호구역({lo:.0f}~{hi:.0f} m)이 정문({gate:g} m) 앞뒤 지그재그 구간을 "
+                         f"담기에 너무 짧습니다. gate_x / radius를 조정하세요.")
+    return {"lo": lo, "hi": hi, "gate": gate, "zw": zw, "ze": ze, "curb": curb,
+            "limit": float(SCHOOL.get("speed_limit", 8.33)), "cw": cw, "zz": zz}
+
+
+def main_chains(road: dict):
+    """본선 (동쪽 진입 엣지들, 서쪽 진출 엣지들). 보호구역이 있으면 구간마다 엣지를 나눈다.
+
+    동쪽: n0 → (포켓 노드 또는 교차로), 서쪽: 교차로 → n0. 포켓 엣지(e0b)는 포함하지 않는다.
+    """
+    if school_layout(road) is None:
+        return ["e0"], ["e0_r"]
+    return (["e0", "e0_sz1", "e0_szz", "e0_sz2", "e0_sz3", "e0_a"],
+            ["e0_r", "e0_r_sz3", "e0_r_szz", "e0_r_sz2", "e0_r_sz1", "e0_r_out"])
+
+
 def route_edges(road: dict, tl: dict = None) -> list:
     """ego/배경차 route r0이 지나가는 엣지 순서."""
     if is_intersection(road):
-        return ["e0", "e0b", "e1"] if _left_bay(road) > 0 else ["e0", "e1"]
+        east = main_chains(road)[0]
+        return east + (["e0b", "e1"] if _left_bay(road) > 0 else ["e1"])
     if tl_enabled(tl):
         return ["e0", "e1"]
     return ["e0"]
@@ -254,7 +306,10 @@ def build(road: dict, ego: dict, traffic: dict, out_dir: str) -> str:
     # 5) sumocfg: "이 net 파일과 이 route 파일로 시뮬레이션해라"
     #    신호등 사용 시 highway.tll.xml(신호 주기)도 additional로 로드
     # ──────────────────────────────────────────────────────
-    additional = "highway.scenery.xml" + (",highway.tll.xml" if _custom_program() else "")
+    use_school = school_layout(road) is not None
+    additional = ("highway.scenery.xml"
+                  + (",highway.school.xml" if use_school else "")
+                  + (",highway.tll.xml" if _custom_program() else ""))
     cfg_path = os.path.join(out_dir, "highway.sumocfg")
     with open(cfg_path, "w") as f:
         f.write(f"""<configuration>
@@ -301,6 +356,20 @@ def build(road: dict, ego: dict, traffic: dict, out_dir: str) -> str:
             _write_tll(out_dir, full_state=cross)
     elif os.path.exists(os.path.join(out_dir, "highway.tll.xml")):
         os.remove(os.path.join(out_dir, "highway.tll.xml"))   # 이전 custom 신호 잔재 제거
+
+    # ──────────────────────────────────────────────────────
+    # 8) 학교 + 어린이 보호구역 노면 (highway.school.xml)
+    #    차로 좌표가 필요하므로 netconvert 뒤에 net.xml을 읽어 만든다.
+    # ──────────────────────────────────────────────────────
+    school_path = os.path.join(out_dir, "highway.school.xml")
+    if use_school:
+        from env.school_assets import make_assets
+        layout = school_layout(road)
+        make_assets(SCHOOL.get("name", "학교"), int(round(layout["limit"] * 3.6)),
+                    SCHOOL.get("line_color", "255,200,0"))
+        _write_school(out_dir, road, layout)
+    elif os.path.exists(school_path):
+        os.remove(school_path)
     return cfg_path
 
 
@@ -353,6 +422,28 @@ def _write_intersection_geometry(road: dict, out_dir: str, use_tl: bool):
         else:
             edges.append((eid, start, TL_ID, lanes[eid], kind))
 
+    # 어린이 보호구역: 본선 양방향을 시점·지그재그 시작·횡단보도(정문)·지그재그 시작·종점에서
+    # 나눈다. 제한속도와 차로변경 금지는 엣지(차로) 단위로만 걸 수 있기 때문이다.
+    #   동쪽 e0 → e0_sz1 → e0_szz(지그재그) → [횡단보도] → e0_sz2 → e0_sz3 → e0_a
+    #   서쪽 e0_r → e0_r_sz3 → e0_r_szz(지그재그) → [횡단보도] → e0_r_sz2 → e0_r_sz1 → e0_r_out
+    sz = school_layout(road)
+    if sz:
+        speed["zone"] = speed["zone_nolc"] = sz["limit"]
+        cuts = [("sz_s", sz["lo"]), ("sz_zw", sz["zw"]), ("sz_c", sz["gate"]),
+                ("sz_ze", sz["ze"]), ("sz_e", sz["hi"])]
+        nodes += [(nid, x, 0) for nid, x in cuts]
+        kinds = ["main", "zone", "zone_nolc", "zone", "zone", "main"]
+        east, west = main_chains(road)
+
+        def split(eid, chain, order):
+            i = next(k for k, e in enumerate(edges) if e[0] == eid)
+            _, a, b, n, _ = edges[i]
+            seq = [a] + order + [b]
+            edges[i:i + 1] = [(chain[k], seq[k], seq[k + 1], n, kinds[k]) for k in range(len(chain))]
+
+        split("e0", east, [nid for nid, _ in cuts])
+        split("e0_r", west, [nid for nid, _ in reversed(cuts)])
+
     # 포켓이 있으면 양방향 사이에 차로 1개 폭의 중앙분리대를 두고, 포켓 구간에서만
     # 그 자리를 좌회전 차로로 쓴다 (실제 도로처럼 직진 차로는 꺾이지 않고 곧게 이어짐).
     # SUMO는 차로를 엣지 중심선의 오른쪽에 쌓으므로
@@ -376,12 +467,19 @@ def _write_intersection_geometry(road: dict, out_dir: str, use_tl: bool):
             f'    <node id="{nid}" x="{x}" y="{y}"'
             + (f' type="{node_type}"' if nid == TL_ID else "") + "/>\n"
             for nid, x, y in nodes) + "</nodes>\n")
+    def edge_xml(eid, a, b, n, kind):
+        head = (f'    <edge id="{eid}" from="{a}" to="{b}" numLanes="{n}" speed="{speed[kind]}"'
+                f'{shape(eid, a, b)}')
+        if kind != "zone_nolc":
+            return head + "/>\n"
+        # 지그재그 구간: 차로변경 금지 (긴급차량만 허용)
+        return (head + ">\n" + "".join(
+            f'        <lane index="{i}" changeLeft="emergency" changeRight="emergency"/>\n'
+            for i in range(n)) + "    </edge>\n")
+
     with open(os.path.join(out_dir, "highway.edg.xml"), "w") as f:
-        f.write("<edges>\n" + "".join(
-            f'    <edge id="{eid}" from="{a}" to="{b}" numLanes="{n}" speed="{speed[kind]}"'
-            f'{shape(eid, a, b)}/>\n'
-            for eid, a, b, n, kind in edges) + "</edges>\n")
-    _write_intersection_connections(out_dir, lanes, bay)
+        f.write("<edges>\n" + "".join(edge_xml(*e) for e in edges) + "</edges>\n")
+    _write_intersection_connections(out_dir, lanes, bay, road)
 
 
 def _approach_lanes(road: dict) -> dict:
@@ -398,24 +496,40 @@ _TURNS = {"e0": ("s_out", "e1", "n_out"), "e1_r": ("n_out", "e0_r", "s_out"),
           "n_in": ("e0_r", "s_out", "e1"), "s_in": ("e1", "n_out", "e0_r")}
 
 
-def _write_intersection_connections(out_dir: str, lanes: dict, bay: float):
-    """좌회전 포켓이 있을 때 차로별 진행 방향을 고정한다 (highway.con.xml).
+def _write_intersection_connections(out_dir: str, lanes: dict, bay: float, road: dict):
+    """좌회전 포켓 차로 연결과 어린이 보호구역 횡단보도를 정의한다 (highway.con.xml).
 
     포켓 시작점: 직진 차로는 그대로 이어지고, 맨 왼쪽 차로에서 포켓으로 진입 가능.
     교차로     : 맨 오른쪽 차로 = 직진+우회전, 나머지 = 직진, 포켓 = 좌회전 전용.
     차로 번호는 보도(0번)를 뺀 번호이며, netconvert가 보도를 넣으면서 1씩 밀린다.
+    보호구역   : 정문 노드(sz_c)에 본선 전체를 건너는 보행자 우선 횡단보도.
     """
     path = os.path.join(out_dir, "highway.con.xml")
-    if not bay:
+    sz = school_layout(road)
+    if not bay and not sz:
         if os.path.exists(path):
             os.remove(path)
         return
     lines = ["<connections>"]
-    for eid, (right, straight, left) in _TURNS.items():
+    east, west = main_chains(road)
+    if sz:
+        # 보호구역이 있으면 횡단보도 자동 생성(--crossings.guess)을 끈다. 켜 두면 본선을 나눈
+        # 모든 지점에 횡단보도가 생긴다. 대신 교차로 4개 + 정문 1개를 직접 정의한다.
+        # 교차로 횡단보도 순서(c0 북, c1 동, c2 남, c3 서)는 자동 생성 때와 같다.
+        if INTERSECTION.get("crosswalks", True):
+            arm = lambda e: f"{e}b" if bay else e
+            for out_e, in_e in (("n_out", arm("n_in")), ("e1", arm("e1_r")),
+                                ("s_out", arm("s_in")), (west[0], "e0b" if bay else east[-1])):
+                lines.append(f'    <crossing node="{TL_ID}" edges="{out_e} {in_e}"/>')
+        # 정문 횡단보도 (보행자 우선, 신호 없음): 노드 서쪽에 붙은 양방향 엣지를 건넌다
+        lines.append(f'    <crossing node="sz_c" edges="{east[2]} {west[3]}" '
+                     f'priority="true" width="{sz["cw"]:g}"/>')
+    for eid, (right, straight, left) in (_TURNS.items() if bay else ()):
         n = lanes[eid]
+        src = east[-1] if eid == "e0" else eid      # 포켓 바로 앞 엣지
         for i in range(n):
-            lines.append(f'    <connection from="{eid}" to="{eid}b" fromLane="{i}" toLane="{i}"/>')
-        lines.append(f'    <connection from="{eid}" to="{eid}b" fromLane="{n - 1}" toLane="{n}"/>')
+            lines.append(f'    <connection from="{src}" to="{eid}b" fromLane="{i}" toLane="{i}"/>')
+        lines.append(f'    <connection from="{src}" to="{eid}b" fromLane="{n - 1}" toLane="{n}"/>')
         out_n = lanes[straight]
         for i in range(n):
             lines.append(f'    <connection from="{eid}b" to="{straight}" fromLane="{i}" '
@@ -443,22 +557,29 @@ def _intersection_netconvert_args(road: dict, out_dir: str) -> list:
         # SUMO는 보도를 각 엣지의 차선 0번으로 넣는다 → 본선 차로는 1번부터.
         # (본선에 보도가 없으면 본선 횡단보도가 생성되지 않는다.)
         # env(sumo_env.py)는 차로 번호를 "보도를 뺀 번호"로 보정해서 쓴다.
-        args += ["--sidewalks.guess", "--sidewalks.guess.max-speed", f"{vmax:.2f}",
-                 "--crossings.guess", "--crossings.guess.speed-threshold", f"{vmax:.2f}"]
+        args += ["--sidewalks.guess", "--sidewalks.guess.max-speed", f"{vmax:.2f}"]
+        if school_layout(road) is None:   # 보호구역이 있으면 횡단보도는 con.xml에 직접 정의
+            args += ["--crossings.guess", "--crossings.guess.speed-threshold", f"{vmax:.2f}"]
+    elif school_layout(road) is not None:
+        raise ValueError("SCHOOL은 보도가 필요합니다: INTERSECTION['crosswalks']=True로 두세요.")
     return args
 
 
 def _intersection_demand(traffic: dict, road: dict) -> str:
     """반대 방향 본선 / 본선 회전 / 교차 도로 차량 flow + 보행자 personFlow."""
-    # 포켓이 있으면 진입 엣지 뒤에 포켓 엣지("<id>b")를 끼운다
+    # 포켓이 있으면 진입 엣지 뒤에 포켓 엣지("<id>b")를 끼운다.
+    # 본선은 보호구역 때문에 여러 엣지로 나뉠 수 있다 → 동쪽 진입 / 서쪽 진출 엣지 묶음.
+    east, west = main_chains(road)
     b = {e: (f"{e} {e}b" if _left_bay(road) > 0 else e) for e in _TURNS}
+    b["e0"] = " ".join(east) + (" e0b" if _left_bay(road) > 0 else "")
+    w_out = " ".join(west)   # 교차로 → n0
     lines = []
     opp_vph = float(INTERSECTION.get("opposite_vehs_per_hour", 0))
     if opp_vph > 0:
         lines.append(f'    <flow id="opp" type="carDist" route="r_opp" begin="0" end="100000" '
                      f'period="{3600.0 / opp_vph:.2f}" departLane="random" '
                      f'departSpeed="{traffic["depart_speed"]}"/>')
-        lines.insert(0, f'    <route id="r_opp" edges="{b["e1_r"]} e0_r"/>')
+        lines.insert(0, f'    <route id="r_opp" edges="{b["e1_r"]} {w_out}"/>')
     # 회전 차량은 차선변경 가능한 분포(carDistFree)로 포켓/우측 차로로 들어간다
     turn_routes = {}
     # 본선 좌/우회전 (ego 방향 + 반대 방향)
@@ -470,8 +591,8 @@ def _intersection_demand(traffic: dict, road: dict) -> str:
     if float(INTERSECTION.get("side_vehs_per_hour", 0)) > 0:
         turn_routes["side"] = (float(INTERSECTION["side_vehs_per_hour"]), {
             "ns": f'{b["n_in"]} s_out', "sn": f'{b["s_in"]} n_out',
-            "ne": f'{b["n_in"]} e1', "nw": f'{b["n_in"]} e0_r',
-            "se": f'{b["s_in"]} e1', "sw": f'{b["s_in"]} e0_r'})
+            "ne": f'{b["n_in"]} e1', "nw": f'{b["n_in"]} {w_out}',
+            "se": f'{b["s_in"]} e1', "sw": f'{b["s_in"]} {w_out}'})
     for group, (vph, routes) in turn_routes.items():
         per = 3600.0 / (vph / len(routes))
         for rid, edges in routes.items():
@@ -500,6 +621,25 @@ def _intersection_demand(traffic: dict, road: dict) -> str:
                              f'period="{3600.0 / (pph / 2):.2f}" departPos="random">\n'
                              f'        <walk from="{frm}" to="{to}" arrivalPos="random"/>\n'
                              f'    </personFlow>')
+    # 어린이: 북쪽 보도(서쪽 방향 엣지의 보도)의 동네 ↔ 남쪽 정문. 정문 앞 노란 횡단보도를 건넌다.
+    #   등교: 북쪽 보도 양옆(정문 서쪽·동쪽 구간)에서 출발해 정문(e0_sz2 시작 = 횡단보도 바로 옆) 도착
+    #   하교: 정문에서 출발해 북쪽 보도 양옆으로
+    cph = float(SCHOOL.get("children_per_hour", 0)) if school_layout(road) else 0.0
+    if cph > 0:
+        lines.append(f'    <vType id="child" vClass="pedestrian" speed="{SCHOOL.get("child_speed", 1.1)}" '
+                     f'width="0.4" length="0.2" color="255,200,0"/>')
+        gate_edge = east[3]                       # e0_sz2: 남쪽 보도, 정문 바로 동쪽
+        homes = [west[4], west[1]]                # e0_r_sz1(정문 서쪽) / e0_r_sz3(정문 동쪽) 북쪽 보도
+        per = 3600.0 / (cph / 4)
+        for k, home in enumerate(homes):
+            lines.append(f'    <personFlow id="child_in{k}" type="child" begin="0" end="100000" '
+                         f'period="{per:.2f}" departPos="random">\n'
+                         f'        <walk from="{home}" to="{gate_edge}" arrivalPos="1"/>\n'
+                         f'    </personFlow>')
+            lines.append(f'    <personFlow id="child_out{k}" type="child" begin="0" end="100000" '
+                         f'period="{per:.2f}" departPos="1">\n'
+                         f'        <walk from="{gate_edge}" to="{home}" arrivalPos="random"/>\n'
+                         f'    </personFlow>')
     return "\n".join(lines) + ("\n" if lines else "")
 
 
@@ -632,6 +772,245 @@ def _write_plan_tll(out_dir: str):
     _save_tll(out_dir, "plan", out, header)
 
 
+# ══════════════════════════════════════════════════════════════════
+#  학교 + 어린이 보호구역 노면 (SCHOOL)  →  highway.school.xml
+#
+#  한국 법정 표준형을 "멀리서 보면 그대로" 수준으로 단순화해 그린다.
+#  진행 방향마다 (입구부터):
+#    적색 미끄럼방지포장 10 m × 2줄 (10 m 간격) → "어린이/보호구역" 글자 → (30)
+#    → ◇ 횡단보도 예고 → (30) → 적색포장 + 노란 지그재그 (zigzag_length) → 정지선
+#    → 노란 횡단보도 (정문 앞)
+#  구간 전체: 오른쪽 가장자리에 노란 이중선 (주정차 금지). 시점/종점 길가에 표지판.
+#  ego 인식용: 적색 포장 = type "school_zone"(제한속도 param), 노란 이중선 =
+#  type "school_zone_line". sumo_env가 이 두 노면 색으로 보호구역 시작·범위를 읽는다.
+#
+#  층(layer): sumo-gui는 차로 면을 낮은 layer의 다각형 위에 그려서, 도로 위 표시는
+#  20 이상이어야 보인다 (실측: 0.5·2는 가려짐). 차량은 그보다 위에 그려진다.
+# ══════════════════════════════════════════════════════════════════
+SCHOOL_ZONE_TYPE = "school_zone"         # 적색 포장 (인식: 보호구역 시작)
+SCHOOL_LINE_TYPE = "school_zone_line"    # 노란 이중 가장자리선 (인식: 보호구역 범위)
+SCHOOL_MARK_TYPE = "school_zone_mark"    # 그 밖의 노면표시 (보기용)
+SCHOOL_SITE = (140.0, 90.0)              # 학교 부지 (본선 방향 폭, 깊이) m
+_ROAD_LAYER = 20.0                       # 도로 위 표시의 기본 층
+# 엣지 분할 지점의 정지선·화살표(SUMO link rule)는 그보다 훨씬 위에 그려져서, 덮개는 300에
+# 둔다 (실측: 100은 정지선이 보이고 300은 가려짐, 차량은 300보다 위). 덮개 위로 이어져야 하는
+# 점선·노란 이중선은 _COVER_LAYER + 0.1.
+_COVER_LAYER = 300.0
+_ASSET_REL = "../assets"                 # highway.school.xml(env/sumo) 기준 그림 경로
+
+
+def _school_site(sz: dict):
+    """학교 부지 (x0, x1, 위쪽 y(도로 쪽), 아래쪽 y)."""
+    w, depth = SCHOOL_SITE
+    top = -(sz["curb"] + 4.0)
+    return sz["gate"] - w / 2, sz["gate"] + w / 2, top, top - depth
+
+
+def _write_school(out_dir: str, road: dict, sz: dict):
+    import math
+    import xml.etree.ElementTree as ET
+    from env.school_assets import FILES, SIZE
+
+    pave = SCHOOL.get("pave_color", "150,35,35")
+    yellow = SCHOOL.get("line_color", "255,200,0")
+    white = "255,255,255"
+    limit_param = f'        <param key="speed_limit" value="{sz["limit"]:g}"/>\n'
+    net = ET.parse(os.path.join(out_dir, "highway.net.xml")).getroot()
+    lines = ["<additional>",
+             f'    <!-- {SCHOOL.get("name", "학교")} 어린이 보호구역 x {sz["lo"]:.0f}~{sz["hi"]:.0f} m, '
+             f'제한 {sz["limit"] * 3.6:.0f} km/h -->']
+    count = [0]
+
+    def nid(prefix):
+        count[0] += 1
+        return f"{prefix}_{count[0]}"
+
+    def poly(ptype, color, layer, pts, fill=True, width=None, extra=""):
+        shape = " ".join(f"{x:.2f},{y:.2f}" for x, y in pts)
+        attrs = (f'id="{nid(ptype)}" type="{ptype}" color="{color}" fill="{int(fill)}" '
+                 f'layer="{layer}" shape="{shape}"' + (f' lineWidth="{width}"' if width else ""))
+        lines.append(f"    <poly {attrs}" + (f">\n{extra}    </poly>" if extra else "/>"))
+
+    def rect(ptype, color, layer, x0, x1, y0, y1, extra=""):
+        poly(ptype, color, layer, [(x0, y0), (x1, y0), (x1, y1), (x0, y1)], extra=extra)
+
+    def image(key, x, y, angle, layer, ptype=SCHOOL_MARK_TYPE):
+        w, h = SIZE[key]
+        lines.append(f'    <poi id="{nid("szi")}" type="{ptype}" x="{x:.2f}" y="{y:.2f}" '
+                     f'width="{w}" height="{h}" angle="{angle:g}" layer="{layer}" '
+                     f'imgFile="{_ASSET_REL}/{FILES[key]}"/>')
+
+    # ---- net.xml에서 본선 차로 읽기: 엣지 → [(차로 중심 y, 폭/2, x 시작, x 끝)] (오른쪽 차로부터) ----
+    lanes = {}
+    for edge in net.iter("edge"):
+        if edge.get("function"):
+            continue
+        out = []
+        for lane in edge.findall("lane"):
+            if lane.get("allow") == "pedestrian":
+                continue
+            pts = [tuple(map(float, p.split(","))) for p in lane.get("shape").split()]
+            out.append((pts[0][1], float(lane.get("width", LANE_WIDTH)) / 2.0, pts[0][0], pts[-1][0]))
+        lanes[edge.get("id")] = out
+
+    east, west = main_chains(road)
+    # 방향별: (진행 방향 d, 보호구역 엣지들, 입구 x, 출구 x, 지그재그 엣지, 횡단보도 뒤 엣지)
+    dirs = [(+1.0, east[1:5], sz["lo"], sz["hi"], east[2], east[3]),
+            (-1.0, west[1:5], sz["hi"], sz["lo"], west[2], west[3])]
+    angle_of = {+1.0: 90.0, -1.0: 270.0}    # POI 그림 위쪽을 진행 방향으로 (SUMO: 시계방향, 북=0)
+
+    def dashes(car, d, phase_x, xa, xb, layer=_ROAD_LAYER + 0.1):
+        """차로 사이 흰 점선 (SUMO와 같은 3 m 선 / 6 m 틈, phase_x = 차로 시작점) 을 xa→xb 구간에."""
+        lo_x, hi_x = sorted((xa, xb))
+        for k in range(len(car) - 1):
+            (ya, ha, _, _), (yb, hb, _, _) = car[k], car[k + 1]
+            y = (ya + yb) / 2.0
+            t = phase_x + d * 9.0 * math.floor(((xa - phase_x) * d) / 9.0)
+            while (t < hi_x) if d > 0 else (t > lo_x):
+                a, b = sorted((t, t + d * 3.0))
+                a, b = max(a, lo_x), min(b, hi_x)
+                if b - a > 0.1:
+                    rect(SCHOOL_MARK_TYPE, white, layer, a, b, y - 0.06, y + 0.06)
+                t += d * 9.0
+
+    # 0) 엣지를 나눈 지점: SUMO가 그리는 정지선·화살표를 도로색으로 덮고 점선을 잇는다
+    #    (실제 도로에는 없는 표시). 정문 횡단보도 지점은 정지선이 필요하므로 그대로 둔다.
+    for d, chain in ((+1.0, east), (-1.0, west)):
+        for e_in, e_out in zip(chain[:-1], chain[1:]):
+            if e_in in (east[2], west[2]):
+                continue
+            car = lanes[e_in]
+            end_x, start_x = car[0][3], lanes[e_out][0][2]
+            ys = [y + s * h for y, h, _, _ in car for s in (-1, 1)]
+            a, b = sorted((end_x - d * 7.0, start_x))
+            rect(SCHOOL_MARK_TYPE, "0,0,0", _COVER_LAYER, a, b, min(ys), max(ys))
+            walk_y = (min(ys) - 2.0, min(ys)) if d > 0 else (max(ys), max(ys) + 2.0)   # 오른쪽 보도
+            a, b = sorted((end_x - d * 1.0, start_x))
+            rect(SCHOOL_MARK_TYPE, "128,128,128", _COVER_LAYER, a, b, *walk_y)
+            dashes(car, d, car[0][2], end_x - d * 7.0, start_x, _COVER_LAYER + 0.1)
+            a, b = sorted((end_x - d * 7.0, start_x))
+            for yb in (min(ys), max(ys)):                # 덮개가 가린 흰 차도 가장자리선
+                rect(SCHOOL_MARK_TYPE, white, _COVER_LAYER + 0.1, a, b, yb - 0.05, yb + 0.05)
+
+    for d, zone_edges, x_in, x_out, zz_edge, after_edge in dirs:
+        car = lanes[zone_edges[0]]                       # 차로 배치는 구간 내내 같다
+        right = [y - d * h for y, h, _, _ in car]        # 차로별 오른쪽 경계 y
+        left = [y + d * h for y, h, _, _ in car]
+        x_at = lambda s: x_in + d * s                    # 입구에서 진행 방향으로 s m
+        stop_x = lanes[zz_edge][0][3]                    # 지그재그 엣지 차로 끝 = 정지선 위치
+        s_stop = (stop_x - x_in) * d
+        s_after = (lanes[after_edge][0][2] - x_in) * d   # 횡단보도 건너편 차로 시작
+        s_end = (x_out - x_in) * d
+        s0_lane = (car[0][2] - x_in) * d                 # 첫 차로 시작 (분할 지점 덮개 뒤)
+        zz = sz["zz"]
+
+        def lane_rect(ptype, color, layer, s0, s1, extra=""):
+            for y, h, _, _ in car:
+                a, b = sorted((x_at(s0), x_at(s1)))
+                rect(ptype, color, layer, a, b, y - h, y + h, extra)
+
+        def across(ptype, color, layer, s0, s1):        # 그 방향 전 차로를 가로지르는 띠
+            a, b = sorted((x_at(s0), x_at(s1)))
+            ys = right + left
+            rect(ptype, color, layer, a, b, min(ys), max(ys))
+
+        # 1) 적색 미끄럼방지포장: 시점부 2줄 + 횡단보도 앞 지그재그 구간
+        bands = [(s0_lane, s0_lane + 10.0), (s0_lane + 20.0, s0_lane + 30.0)]
+        for s0, s1 in bands + [(s_stop - zz, s_stop)]:
+            lane_rect(SCHOOL_ZONE_TYPE, pave, _ROAD_LAYER, s0, s1, limit_param)
+        # 적색 포장이 가린 흰 차선 점선을 다시 그린다 (시점부만; 지그재그 구간은 지그재그가 대신)
+        for s0, s1 in bands:
+            dashes(car, d, car[0][2], x_at(s0), x_at(s1))
+
+        # 2) 노면 글자·기호 (차로마다, 그림 위쪽 = 진행 방향)
+        marks = [("text", s0_lane + 35.5), ("speed", s0_lane + 41.5), ("speed", s_stop - zz - 18.0)]
+        for key, s in marks:
+            for y, _, _, _ in car:
+                image(key, x_at(s), y, angle_of[d], _ROAD_LAYER + 0.3)
+        for y, h, _, _ in car:                           # ◇ 횡단보도 예고 (흰 마름모 테두리)
+            cx = x_at(s_stop - zz - 38.0)
+            poly(SCHOOL_MARK_TYPE, white, _ROAD_LAYER + 0.2,
+                 [(cx - 1.6, y), (cx, y + 0.7), (cx + 1.6, y), (cx, y - 0.7), (cx - 1.6, y)],
+                 fill=False, width=0.15)
+
+        # 3) 노란 지그재그 (차로 경계마다) + 흰 정지선
+        bounds = [right[0]] + [(left[k] + right[k + 1]) / 2.0 for k in range(len(car) - 1)] + [left[-1]]
+        for yb in bounds:
+            pts, s, k = [], s_stop - zz, 0
+            while s <= s_stop - 0.5 + 1e-6:
+                pts.append((x_at(s), yb + (0.3 if k % 2 else -0.3)))
+                s += 1.5
+                k += 1
+            poly(SCHOOL_MARK_TYPE, yellow, _ROAD_LAYER + 0.2, pts, fill=False, width=0.15)
+        across(SCHOOL_MARK_TYPE, white, _ROAD_LAYER + 0.2, s_stop - 0.45, s_stop)
+
+        # 4) 노란 이중 가장자리선 (주정차 금지): 입구 ~ 지그재그 앞, 횡단보도 뒤 ~ 출구
+        yr = right[0]
+        for s0, s1 in ((0.0, s_stop - zz), (s_after, s_end)):
+            for inset in (0.15, 0.45):
+                yl = yr + d * inset                      # 차로 안쪽으로 inset
+                a, b = sorted((x_at(s0), x_at(s1)))
+                rect(SCHOOL_LINE_TYPE, yellow, _COVER_LAYER + 0.1, a, b, yl - 0.06, yl + 0.06)
+
+        # 5) 길가 표지판 (오른쪽 보도 바깥, 위에서 본 아이콘이라 글자는 북쪽이 위)
+        side_y = -d * (sz["curb"] + 1.8)
+        image("sign_start", x_at(1.0), side_y - d * 0.6, 0.0, 6.0)
+        image("sign_end", x_at(s_end), side_y - d * 0.4, 0.0, 6.0)
+
+    # 6) 노란 횡단보도: SUMO 흰 줄무늬를 도로색으로 덮고 노란 줄무늬를 다시 그린다
+    for edge in net.iter("edge"):
+        if edge.get("function") != "crossing" or not edge.get("id").startswith(":sz_c_"):
+            continue
+        lane = edge.find("lane")
+        (ax, ay), (bx, by) = [tuple(map(float, p.split(","))) for p in lane.get("shape").split()][:2]
+        hw = float(lane.get("width", sz["cw"])) / 2.0
+        length = math.hypot(bx - ax, by - ay)
+        ux, uy = (bx - ax) / length, (by - ay) / length   # 횡단 방향
+        nx, ny = -uy, ux                                  # 차량 진행 방향
+        def quad(t0, t1, w):
+            return [(ax + ux * t + nx * s * w, ay + uy * t + ny * s * w)
+                    for t, s in ((t0, -1), (t1, -1), (t1, 1), (t0, 1))]
+        poly(SCHOOL_MARK_TYPE, "0,0,0", _ROAD_LAYER, quad(0.0, length, hw + 0.05))
+        t = 0.4
+        while t + 0.45 <= length - 0.2:
+            poly(SCHOOL_MARK_TYPE, yellow, _ROAD_LAYER + 0.1, quad(t, t + 0.45, hw - 0.2))
+            t += 0.9
+
+    # 7) 학교 (남쪽 길가): 부지·운동장·트랙·교사동·담장·정문 진입로·학교 이름
+    x0, x1, top, bot = _school_site(sz)
+    g = sz["gate"]
+    rect("school", "196,190,172", 0.6, x0, x1, bot, top)                     # 부지 바닥
+    rect("school", "176,174,168", 0.7, g - 4.0, g + 4.0, top, -sz["curb"])   # 정문 → 보도 진입로
+    fx0, fx1, fy0, fy1 = g + 2.0, x1 - 8.0, bot + 10.0, top - 8.0            # 운동장 (동쪽)
+    rect("school", "201,160,105", 0.7, fx0, fx1, fy0, fy1)
+    cx, cy = (fx0 + fx1) / 2, (fy0 + fy1) / 2                                # 트랙 (흰 타원)
+    rx, ry = (fx1 - fx0) / 2 - 5.0, (fy1 - fy0) / 2 - 5.0
+    poly("school", white, 0.8, [(cx + rx * math.cos(a), cy + ry * math.sin(a))
+                                for a in [2 * math.pi * k / 48 for k in range(49)]],
+         fill=False, width=0.35)
+    rect("school", "176,174,168", 0.7, g - 4.0, g + 2.0, bot + 8.0, top)    # 정문 → 현관 길
+    # 교사동: 뒤쪽 본관 + 서쪽 별관 (ㄱ자), 그림자는 남동쪽 (나무와 같은 해 방향)
+    blocks = [(x0 + 8.0, g - 8.0, bot + 8.0, bot + 24.0), (x0 + 8.0, x0 + 24.0, bot + 24.0, top - 16.0)]
+    for bx0, bx1, by0, by1 in blocks:
+        rect("school", "70,70,64,110", 0.8, bx0 + 1.5, bx1 + 1.5, by0 - 1.5, by1 - 1.5)
+    for bx0, bx1, by0, by1 in blocks:
+        rect("school", "214,201,168", 0.9, bx0, bx1, by0, by1)
+        rect("school", "186,170,135", 0.95, bx0 + 1.0, bx1 - 1.0, (by0 + by1) / 2 - 0.3,
+             (by0 + by1) / 2 + 0.3)                                            # 지붕 용마루
+    image("name", (blocks[0][0] + blocks[0][1]) / 2, blocks[0][2] + 5.0, 0.0, 6.0, "school")
+    # 담장 (정문 자리 8 m만 비움)
+    fence, t = "45,95,55", 0.35
+    for a, b in ((x0, g - 4.0), (g + 4.0, x1)):
+        rect("school", fence, 1.0, a, b, top - t, top)
+    rect("school", fence, 1.0, x0, x1, bot, bot + t)
+    rect("school", fence, 1.0, x0, x0 + t, bot, top)
+    rect("school", fence, 1.0, x1 - t, x1, bot, top)
+
+    lines.append("</additional>")
+    with open(os.path.join(out_dir, "highway.school.xml"), "w") as f:
+        f.write("\n".join(lines) + "\n")
+
+
 def _blob(cx: float, cy: float, r: float, rng, n: int = 14,
           roughness: float = 0.35) -> str:
     """유기적인(울퉁불퉁한) 수관 실루엣 다각형을 만든다.
@@ -728,11 +1107,16 @@ def _write_scenery(out_dir: str, road: dict):
         lines.append(f'    <poly id="bs_{i}" color="{g}" fill="1" '
                      f'layer="2" shape="{_blob(x, y, r, rng, n=8)}"/>')
 
+    sz = school_layout(road)
     for side_sign, base_y in [(+1, road_top + side), (-1, road_bottom - side)]:
+        gaps = [gap] if gap is not None else []
+        if sz and side_sign < 0:          # 남쪽 길가의 학교 부지는 비운다 (학교가 따로 그림)
+            gaps.append((sz["gate"] - SCHOOL_SITE[0] / 2, sz["gate"] + SCHOOL_SITE[0] / 2))
         x = rng.uniform(0, spacing)
         while x < length:
-            if gap is not None and gap[0] - 6.0 < x < gap[1] + 6.0:
-                x = gap[1] + 6.0
+            hit = next((g for g in gaps if g[0] - 6.0 < x < g[1] + 6.0), None)
+            if hit is not None:
+                x = hit[1] + 6.0
                 continue
             y = base_y + side_sign * rng.uniform(0, 4.0)
             roll = rng.random()
@@ -749,6 +1133,18 @@ def _write_scenery(out_dir: str, road: dict):
                     draw_tree(gx, gy, rng.uniform(2.2, 3.8))
                 x += spacing * 0.4                     # 군락 뒤엔 간격 조금 더
             x += spacing * rng.uniform(1.0 - jitter, 1.0 + jitter)
+    if sz:   # 학교 담장 안쪽 둘레에 나무 (정문 앞은 비움)
+        x0, x1, top, bot = _school_site(sz)
+        x = x0 + 6.0
+        while x < x1 - 4.0:
+            if abs(x - sz["gate"]) > 10.0:
+                draw_tree(x + rng.uniform(-1.5, 1.5), top - 3.5, rng.uniform(2.2, 3.2))
+            x += 11.0
+        y = top - 14.0
+        while y > bot + 12.0:
+            for tx in (x0 + 3.5, x1 - 3.5):
+                draw_tree(tx, y + rng.uniform(-1.5, 1.5), rng.uniform(2.2, 3.2))
+            y -= 12.0
     lines.append("</additional>")
     with open(path, "w") as f:
         f.write("\n".join(lines) + "\n")
