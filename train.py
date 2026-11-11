@@ -79,6 +79,7 @@ REWARD_OVERRIDES = dict(
                                    #   0.05 한 가지일 땐 정지선 30~50 m 앞에서 미리 섰음
     approach_overspeed_penalty=0.02,  # 정지 신호 접근 시 편한 감속 곡선 초과 1 m/s당 스텝 감점
                                       #   (없을 땐 가까이 서는 모델일수록 신호위반 5~6%)
+    no_stop_zone_penalty=0.1,         # 정차금지지대에서 서 있으면 스텝당 감점
 )
 REWARD = {**REWARD_DEFAULTS, **REWARD_OVERRIDES}
 

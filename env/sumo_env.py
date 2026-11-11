@@ -18,6 +18,7 @@
 """
 import os
 import sys
+import csv
 
 import numpy as np
 import gymnasium as gym
@@ -58,6 +59,30 @@ import traci
 from sumolib import checkBinary
 
 from env.safety_filter import PedSafetyFilter
+
+
+def _load_zone_rows(filename, columns):
+    """data/road_data의 CSV를 읽어 columns 순서의 튜플 목록으로 만든다.
+
+    숫자로 적힌 칸은 float이 된다. 파일이 없으면 빈 목록.
+    """
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "data", "road_data", filename)
+    if not os.path.exists(path):
+        return []
+    rows = []
+    with open(path, encoding="utf-8-sig", newline="") as f:
+        for row in csv.DictReader(f):
+            item = []
+            for col in columns:
+                val = (row.get(col) or "").strip()
+                try:
+                    val = float(val)
+                except ValueError:
+                    pass
+                item.append(val)
+            rows.append(tuple(item))
+    return rows
 
 
 class SumoHighwayEnv(gym.Env):
@@ -171,6 +196,9 @@ class SumoHighwayEnv(gym.Env):
         self.lane_change_threshold = float(action.get("lane_change_threshold", 0.5))
         self.lane_change_duration = float(action.get("lane_change_duration", 1.0))
         self.rw = reward
+        # 정차금지지대 (edge, 시작 m, 끝 m). 파일은 data/road_data/no_stop_zones.csv
+        self._no_stop_zones = _load_zone_rows(
+            "no_stop_zones.csv", ("edge_id", "start_pos", "end_pos"))
 
         # GUI는 ego를 따라가며 가까이 보이도록 기본값을 둔다.
         self.gui_zoom = float(mdp_sim.get("gui_zoom", 1200.0))
@@ -1373,6 +1401,13 @@ class SumoHighwayEnv(gym.Env):
             "signal_state": signal_before[2] if signal_before else None,
             "signal_dist": signal_before[1] if signal_before else None,
         }
+        # 정차금지지대 안에서 거의 서 있으면 스텝마다 감점
+        if alive and not traci.vehicle.getRoadID(self.ego_id).startswith(":"):
+            edge = traci.vehicle.getRoadID(self.ego_id)
+            pos = traci.vehicle.getLanePosition(self.ego_id)
+            if traci.vehicle.getSpeed(self.ego_id) < 0.5 and any(
+                    z[0] == edge and z[1] <= pos <= z[2] for z in self._no_stop_zones):
+                reward -= float(self.rw.get("no_stop_zone_penalty", 0.0))
         return obs, float(reward), terminated, truncated, info
 
     # ==================================================================

@@ -280,6 +280,8 @@ REWARD = {
     "approach_overspeed_penalty": 0.0,
     "approach_decel": 2.0,
     "approach_penalty_cap": 0.2,
+    # 정차금지지대에서 속도 0.5 m/s 미만이면 스텝당 이 값만큼 감점
+    "no_stop_zone_penalty": 0.1,
 }
 # 보상 스케일에 대한 메모 (수업에서 다뤄볼 만한 지점):
 #   처음엔 speed_weight=1.0, collision=-10, arrival=+5 였는데,
