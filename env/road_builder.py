@@ -102,7 +102,8 @@ def _build_cheonggyecheon(ego: dict, out_dir: str) -> str:
     if n_fix:
         subprocess.run([checkBinary("netconvert"), "--sumo-net-file", net_path,
                         "--connection-files", con_path, "-o", net_path,
-                        "--offset.disable-normalization", "true"],
+                        "--offset.disable-normalization", "true",
+                        "--tls.rebuild", "true"],
                        check=True, capture_output=True)
     return os.path.join(out_dir, "cgc.sumocfg")
 
