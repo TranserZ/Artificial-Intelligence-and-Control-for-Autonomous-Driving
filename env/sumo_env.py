@@ -85,6 +85,13 @@ def _load_zone_rows(filename, columns):
     return rows
 
 
+# 왕복 route에서 ego가 서는 순서. 정차 시간은 reset에서 15초.
+BUS_STOPS_ORDER = [
+    "bs_01", "bs_02", "bs_03", "bs_04", "bs_05",
+    "bs_06", "bs_07", "bs_08", "bs_09", "bs_10", "bs_11",
+]
+
+
 class SumoHighwayEnv(gym.Env):
     metadata = {"render_modes": ["human"]}
 
@@ -545,6 +552,10 @@ class SumoHighwayEnv(gym.Env):
                                       if depart_lane.isdigit() else depart_lane),
                           departPos="0",
                           departSpeed=self.ego_depart_speed)
+        # 왕복 route면 정류장 11곳에 정차. 정차 시간 15초 (TODO: 노션 조사값 들어오면 교체)
+        if self.ego_route == "r0_loop":
+            for bs_id in BUS_STOPS_ORDER:
+                traci.vehicle.setBusStop(self.ego_id, bs_id, duration=15)
 
         # ★ 중요: speedMode=0 → SUMO의 내장 안전장치(자동 안전제동 등)를 전부 끔.
         #   이걸 꺼야 RL이 속도를 온전히 제어하고, 잘못 배우면 실제로 충돌한다.

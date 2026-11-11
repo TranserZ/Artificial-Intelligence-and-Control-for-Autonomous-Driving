@@ -66,6 +66,44 @@ def in_no_stop(zones, edge_id, pos):
     return any(eid == edge_id and start <= pos <= end for eid, start, end in zones)
 
 
+def fit_bus_stop(length, start, end):
+    """정류장 endPos가 엣지보다 길면 끝에 맞춘다.
+
+    15 m 창이 엣지 안에 안 들어가면 끝에서 15 m(엣지가 더 짧으면 처음부터)로 당긴다.
+    """
+    if length <= 0.2:
+        return 0.0, round(max(length - 0.01, 0.1), 2)
+    end = min(float(end), length - 0.1)
+    start = min(float(start), end - 0.1)
+    if end - start < 8.0:
+        start = max(0.0, end - 15.0)
+    return round(start, 1), round(end, 1)
+
+
+def bus_stop_lane_index(edge):
+    """보도가 lane 0이면 정류장은 승용차 차로 1. 아니면 0."""
+    lane0 = edge.getLane(0)
+    if lane0.allows("pedestrian") and not lane0.allows("passenger") and edge.getLaneNumber() > 1:
+        return 1
+    return 0
+
+
+# 분석 좌표. endPos가 엣지보다 길면 fit_bus_stop이 맞춘다.
+BUS_STOPS = [
+    ("bs_01", "e73541403_2", 22, 37, "청계광장"),
+    ("bs_02", "e73541403_8", 45, 60, "청계1가.광교"),
+    ("bs_03", "e908646367_3", 30, 45, "청계2가.삼일교(동)"),
+    ("bs_04", "e218924602_1", 39, 54, "청계3가.관수교(동)"),
+    ("bs_05", "e218924602_6", 68, 83, "청계4가.배오개다리"),
+    ("bs_06", "e1212424785_1", 184, 199, "청계5가.광장시장"),
+    ("bs_07", "e732213463_1", 113, 128, "청계4가.세운교"),
+    ("bs_08", "e732213463_4", 43, 58, "청계3가.관수교(서)"),
+    ("bs_09", "e1212424791_3", 38, 53, "청계2가.수표교"),
+    ("bs_10", "e908694578_1", 43, 58, "청계2가.삼일교(서)"),
+    ("bs_11", "e908694578_3", 66, 81, "청계1가.장통교"),
+]
+
+
 def shortest(net, a, b):
     path, _ = net.getShortestPath(net.getEdge(a), net.getEdge(b))
     return path
@@ -331,6 +369,26 @@ def build(net_path, out_dir, args):
     with open(os.path.join(out_dir, "cgc.rou.xml"), "w", encoding="utf-8", newline="\n") as f:
         f.write("\n".join(L) + "\n")
 
+    # 정류장 11개. 보도가 lane 0이면 승용차 차로(_1)에 둔다.
+    add = ["<additional>"]
+    written_stops = 0
+    for sid, eid, start, end, name in BUS_STOPS:
+        try:
+            edge = net.getEdge(eid)
+        except Exception:
+            print("정류장 엣지 없음:", sid, eid)
+            continue
+        lane = bus_stop_lane_index(edge)
+        start_pos, end_pos = fit_bus_stop(edge.getLength(), start, end)
+        safe_name = name.replace("&", "&amp;").replace('"', "")
+        add.append(
+            f'    <busStop id="{sid}" lane="{eid}_{lane}" startPos="{start_pos}" '
+            f'endPos="{end_pos}" name="{safe_name}"/>')
+        written_stops += 1
+    add.append("</additional>")
+    with open(os.path.join(out_dir, "cgc.add.xml"), "w", encoding="utf-8", newline="\n") as f:
+        f.write("\n".join(add) + "\n")
+
     # GUI: 전체 도로가 한 화면에 보이도록 (x 0~2275, y -280~210)
     with open(os.path.join(out_dir, "cgc.gui.xml"), "w", encoding="utf-8", newline="\n") as f:
         f.write('<viewsettings>\n    <scheme name="real world"/>\n'
@@ -338,11 +396,13 @@ def build(net_path, out_dir, args):
                 '    <delay value="100"/>\n</viewsettings>\n')
     with open(os.path.join(out_dir, "cgc.sumocfg"), "w", encoding="utf-8", newline="\n") as f:
         f.write('<configuration>\n    <input>\n        <net-file value="cgc.net.xml"/>\n'
-                '        <route-files value="cgc.rou.xml"/>\n    </input>\n'
+                '        <route-files value="cgc.rou.xml"/>\n'
+                '        <additional-files value="cgc.add.xml"/>\n    </input>\n'
                 '    <gui_only>\n        <gui-settings-file value="cgc.gui.xml"/>\n    </gui_only>\n'
                 '</configuration>\n')
     print(f"경로 {len(route)}개 엣지, 왕복 {args.loop_route_id} {len(loop)}개 엣지, "
-          f"측면 합류 {len(srcs)}곳, 불법주정차 {len(park_spots)}곳, 오토바이 주차 {moto_n}대")
+          f"측면 합류 {len(srcs)}곳, 불법주정차 {len(park_spots)}곳, 오토바이 주차 {moto_n}대, "
+          f"정류장 {written_stops}개")
     print("측면 합류 엣지:", [e.getID() for e in srcs])
 
 
