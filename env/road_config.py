@@ -275,4 +275,8 @@ if CHEONGGYECHEON["enabled"]:
            "route_depart_lane": {},
            # 자율주행 셔틀(버스) 물리 특성 — 일반 승용차보다 가감속이 완만하다.
            "accel": 1.2,
-           "decel": 4.0}
+           "decel": 4.0,
+           # 출발 엣지(e73541403_1, 컴파일 후 약 5.8 m·1차로)가 짧아, 버스 차체
+           # (12 m)로 10 m/s 출발을 넣으면 "Departure speed too high"로 삽입이
+           # 거부된다. 정류장에서 막 출발하는 상황이 더 현실적이기도 해서 낮춘다.
+           "depart_speed": 2.0}

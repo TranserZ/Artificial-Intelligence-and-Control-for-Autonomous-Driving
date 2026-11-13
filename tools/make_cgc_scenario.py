@@ -33,12 +33,6 @@ EXCLUDE_EDGES_FOR_PARKING = [
     "e218924602_6", "e1212424785_1", "e732213463_1", "e732213463_4",
     "e1212424791_3", "e908694578_1", "e908694578_3",
 ]
-# 광장시장 구간은 엣지당 2곳 (길이의 30%, 70%).
-DENSE_PARK_EDGES = {
-    "e218924602_4", "e218924602_5", "e218924602_6",
-    "e1212424783_1", "e1212424783_2", "e1212424783_3", "e1212424783_4",
-    "e1212424785_1", "e1212424785_2",
-}
 # 로드뷰에서 오토바이가 서 있던 구간. 광장시장 쪽이 가장 밀집.
 MOTO_PARK_EDGES = [
     "e73541403_2", "e73541403_6",
@@ -417,36 +411,24 @@ def build(net_path, out_dir, args):
     if args.demo_ego:
         L.append(f'    <flow id="ego_demo" type="ego_type" route="{rid}" begin="{args.ego_begin}" '
                  f'end="100000" period="{args.ego_period}" departLane="{first_car_lane}" departSpeed="0"/>')
-    # 불법주정차 (1-5): 동행(route) 전 구간을 30 m 간격으로 촘촘히 채운다.
-    # 제외: 정류장 엣지, 정차금지지대, 승용차 1차로 엣지(이미 좁아 중복 안 함).
-    # 서행(west)은 배경 교통류용으로 기존처럼 엣지당 1~2곳만 가볍게 둔다.
+    # 불법주정차 (1-5): 동행·서행 전 구간을 30 m 간격으로 촘촘히 채운다
+    # (기존 엣지당 1~2곳 방식 대비 밀도 약 2배). 제외: 정류장 엣지,
+    # 정차금지지대, 승용차 1차로 엣지(이미 좁아 중복 안 함).
     PARK_SPACING = 30.0
     park_spots = []
-    for e in route:
-        eid = e.getID()
-        if eid in EXCLUDE_EDGES_FOR_PARKING:
-            continue
-        lanes = passenger_lane_indexes(e)
-        if len(lanes) < 2:
-            continue
-        pos = PARK_SPACING / 2.0
-        while pos < e.getLength() - 1.0:
-            if not in_excluded_zone(no_stop, bus_stop_zones, eid, pos):
-                park_spots.append((e, lanes[0], rid, pos))
-            pos += PARK_SPACING
-    for e in west:
-        eid = e.getID()
-        if eid in EXCLUDE_EDGES_FOR_PARKING or e.getLength() <= 30:
-            continue
-        lanes = passenger_lane_indexes(e)
-        if len(lanes) < 2:
-            continue
-        fracs = (0.3, 0.7) if eid in DENSE_PARK_EDGES else (0.6,)
-        for frac in fracs:
-            pos = e.getLength() * frac
-            if in_no_stop(no_stop, eid, pos):
+    for edges, route_name in ((route, rid), (west, "main_west")):
+        for e in edges:
+            eid = e.getID()
+            if eid in EXCLUDE_EDGES_FOR_PARKING:
                 continue
-            park_spots.append((e, lanes[0], "main_west", pos))
+            lanes = passenger_lane_indexes(e)
+            if len(lanes) < 2:
+                continue
+            pos = PARK_SPACING / 2.0
+            while pos < e.getLength() - 1.0:
+                if not in_excluded_zone(no_stop, bus_stop_zones, eid, pos):
+                    park_spots.append((e, lanes[0], route_name, pos))
+                pos += PARK_SPACING
     for i, (e, lane, route_name, pos) in enumerate(park_spots):
         L.append(f'    <flow id="illegal_park_{i}" type="parked_car" route="{route_name}" '
                  f'begin="{args.ego_begin + 20 + (i % 30) * 4}" end="100000" period="{args.park_period}" '
