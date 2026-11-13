@@ -270,6 +270,9 @@ if CHEONGGYECHEON["enabled"]:
             "length": CHEONGGYECHEON["route_length"],
             "num_lanes": 2}                 # 청계천 양쪽 일방통행, 각 편도 2차로
     EGO = {**EGO,
-           "routes": {"r0": 0.0, "r0_loop": 1.0},  # 왕복 route로 학습/평가
+           "routes": {"r0": 1.0},          # 편도(동행) route만 학습/평가
            "depart_lane": 0,               # 맨 오른쪽 차로에서 출발 (정류장 쪽)
-           "route_depart_lane": {}}
+           "route_depart_lane": {},
+           # 자율주행 셔틀(버스) 물리 특성 — 일반 승용차보다 가감속이 완만하다.
+           "accel": 1.2,
+           "decel": 4.0}

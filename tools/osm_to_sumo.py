@@ -58,6 +58,23 @@ def load_school_speeds():
     return speeds
 
 
+def load_lane_overrides():
+    """로드뷰로 확인한 실제 차로 수. edge id → 차로 수. 파일이 없으면 빈 dict.
+
+    OSM의 lanes 태그는 누락·오기가 많아(특히 청계천로 편도 구간), 현장 확인한
+    값으로 덮어쓴다. data/road_data/cgc_lanes.csv.
+    """
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "data", "road_data", "cgc_lanes.csv")
+    lanes = {}
+    if not os.path.exists(path):
+        return lanes
+    with open(path, encoding="utf-8-sig", newline="") as f:
+        for row in csv.DictReader(f):
+            lanes[row["edge_id"].strip()] = int(row["lanes"])
+    return lanes
+
+
 def kmh_of(tags):
     raw = tags.get("maxspeed")
     if raw:
@@ -200,7 +217,9 @@ def convert(osm_path, out_dir):
             f.write(f'    <node id="n{r}" x="{x:.2f}" y="{y:.2f}" type="{kind}"/>\n')
         f.write("</nodes>\n")
     school_speeds = load_school_speeds()
+    lane_overrides = load_lane_overrides()
     n_school = 0
+    n_lanes_fixed = 0
     with open(os.path.join(out_dir, "cgc.edg.xml"), "w", encoding="utf-8", newline="\n") as f:
         f.write("<edges>\n")
         for eid, a, b, n_lane, speed, pts, tags in edges:
@@ -212,6 +231,9 @@ def convert(osm_path, out_dir):
             if full_id in school_speeds:
                 speed = school_speeds[full_id]
                 n_school += 1
+            if full_id in lane_overrides:
+                n_lane = lane_overrides[full_id]
+                n_lanes_fixed += 1
             f.write(f'    <edge id="{full_id}" from="n{a}" to="n{b}" numLanes="{n_lane}" '
                     f'speed="{speed:.2f}" priority="{ {"primary":4,"secondary":3,"tertiary":2}.get(tags.get("highway"),1) }" '
                     f'{name_attr}{attr}/>\n')
@@ -219,7 +241,7 @@ def convert(osm_path, out_dir):
 
     n_tl = sum(1 for r in used_nodes if useful_signal(r))
     print(f"노드 {len(used_nodes)}개 (신호등 {n_tl}, 빠른 도로 중간 신호 {n_drop}개 제외), "
-          f"엣지 {len(edges)}개, 어린이보호구역 속도 {n_school}개 → {out_dir}")
+          f"엣지 {len(edges)}개, 어린이보호구역 속도 {n_school}개, 차로 수 보정 {n_lanes_fixed}개 → {out_dir}")
     return edges
 
 
