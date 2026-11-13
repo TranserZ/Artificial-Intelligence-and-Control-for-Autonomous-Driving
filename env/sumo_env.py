@@ -85,11 +85,12 @@ def _load_zone_rows(filename, columns):
     return rows
 
 
-# 왕복 route에서 ego가 서는 순서. 정차 시간은 reset에서 15초.
-BUS_STOPS_ORDER = [
-    "bs_01", "bs_02", "bs_03", "bs_04", "bs_05",
-    "bs_06", "bs_07", "bs_08", "bs_09", "bs_10", "bs_11",
-]
+# 편도(동행) route에서 ego가 서는 순서. 정차 시간은 reset에서 15초.
+# bs_06(광장시장)은 서행 엣지(e1212424785_1)에 있어 편도 동행 route(r0)에서는 제외한다.
+BUS_STOPS_ORDER = ["bs_01", "bs_02", "bs_03", "bs_04", "bs_05"]
+
+# 어린이보호구역(세운상가, 3차로) 구간 — 버스 노선은 가운데 차로를 유지한다.
+SCHOOL_ZONE_CENTER_LANE_EDGES = ("e218924602_1", "e218924602_2", "e218924602_3")
 
 
 class SumoHighwayEnv(gym.Env):
@@ -557,8 +558,8 @@ class SumoHighwayEnv(gym.Env):
                                       if depart_lane.isdigit() else depart_lane),
                           departPos="0",
                           departSpeed=self.ego_depart_speed)
-        # 왕복 route면 정류장 11곳에 정차. 정차 시간 15초 (TODO: 노션 조사값 들어오면 교체)
-        if self.ego_route == "r0_loop":
+        # 편도(동행) route면 정류장 5곳에 정차. 정차 시간 15초 (TODO: 노션 조사값 들어오면 교체)
+        if self.ego_route in ("r0", "r0_loop"):
             for bs_id in BUS_STOPS_ORDER:
                 traci.vehicle.setBusStop(self.ego_id, bs_id, duration=15)
 
@@ -1196,6 +1197,19 @@ class SumoHighwayEnv(gym.Env):
         # ----- (2) 시뮬레이션 1스텝 -----
         traci.simulationStep()
         self.step_count += 1
+
+        # 어린이보호구역(3차로) 가운데 차로 유지: RL의 차선변경 명령과 별개로,
+        # 이 구간에 있으면 매 스텝 가운데 차로로 변경을 "권고"한다
+        # (이미 그 차로면 SUMO가 조용히 무시하므로 매 스텝 호출해도 안전하다).
+        if self.ego_id in traci.vehicle.getIDList():
+            edge = traci.vehicle.getRoadID(self.ego_id)
+            if edge in SCHOOL_ZONE_CENTER_LANE_EDGES:
+                lo, hi = self._car_lanes(edge)
+                if hi - lo >= 3:
+                    try:
+                        traci.vehicle.changeLane(self.ego_id, lo + 1, 10.0)
+                    except traci.TraCIException:
+                        pass
 
         # ----- (3) 이벤트/관측 -----
         collided = self.ego_id in traci.simulation.getCollidingVehiclesIDList()
