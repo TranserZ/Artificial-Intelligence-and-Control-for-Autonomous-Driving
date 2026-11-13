@@ -142,4 +142,9 @@ if __name__ == "__main__":
     with open(out, "w", encoding="utf-8") as f:
         f.write(md)
     print(f"\n저장: {out}")
-    print(md)
+    try:
+        print(md)
+    except UnicodeEncodeError:
+        # Windows 콘솔(cp949)이 일부 기호(em dash 등)를 못 그려도 파일 저장은
+        # 이미 끝났으므로 스크립트를 실패시키지 않는다.
+        print(md.encode("utf-8", "replace").decode("ascii", "replace"))
