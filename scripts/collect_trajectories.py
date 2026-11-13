@@ -51,6 +51,7 @@ def collect(model_path, episodes, out_dir, no_filter=False):
             rows = []
             last_edge, last_pos, last_lane = None, None, None
             reason = "timeout"
+            ep_red, ep_yield = False, False
             t = 0
             while True:
                 action = agent.predict(obs, deterministic=True)
@@ -76,6 +77,8 @@ def collect(model_path, episodes, out_dir, no_filter=False):
                     "lane_change_applied": int(bool(info.get("lane_change_applied"))),
                     "reward": reward,
                 })
+                ep_red = ep_red or bool(info.get("red_violation"))
+                ep_yield = ep_yield or bool(info.get("yield_violation"))
                 if info.get("collided"):
                     reason = "collision"
                 elif info.get("red_violation") and terminated:
@@ -98,6 +101,9 @@ def collect(model_path, episodes, out_dir, no_filter=False):
                 w.writerows(rows)
 
             row = {"episode": ep, "steps": t, "reason": reason,
+                  "arrived": int(reason == "arrival"), "collided": int(reason == "collision"),
+                  "timeout": int(reason == "timeout"),
+                  "red_violation_any": int(ep_red), "yield_violation_any": int(ep_yield),
                   "end_edge": last_edge, "end_lane_pos": last_pos, "end_lane": last_lane}
             row.update(tracker.as_row())
             summary_rows.append(row)
