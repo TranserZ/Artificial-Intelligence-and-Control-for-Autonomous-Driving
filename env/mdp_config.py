@@ -43,7 +43,7 @@ SIMULATION = {
     "gui_track_ego": True,
 }
 
-# 청계천로(1.4 km, 경로 위 신호 6곳)는 신호 대기가 많아 600초로는 시간초과가 난다.
+# 청계천로(2.1 km, 경로 위 신호 6곳)는 신호 대기가 많아 600초로는 시간초과가 난다.
 #   주행 ~180초 + 신호 6곳 대기 + 보행자·끼어들기 여유 → 900초(1800스텝).
 from env.road_config import CHEONGGYECHEON as _CGC  # noqa: E402
 if _CGC["enabled"]:
