@@ -18,11 +18,7 @@ SIMULATION = {
                           # 작게 하면(0.1) 제어가 정밀해지지만 에피소드가 길어지고,
                           # 크게 하면(1.0) 학습이 빨라지지만 제어가 거칠어진다.
     "max_steps": 1200,    # 에피소드 최대 스텝 수. 1200 * 0.5초 = 600초.
-                          #   교차로 layout 1km: 주행 ~125초 + 신호 대기(천호 주기 200초 중
-                          #   직진 적색 최대 ~130초) + 우회전 보행자 대기 + 정체 여유.
-                          #   (300초일 땐 신호·보행자 대기에 걸리면 시간초과가 났다.
-                          #    12km 고속도로 예제는 1500 = 750초였음)
-                          # 도로 12km를 평균 24 m/s로 달리면 약 1000스텝.
+                          # 편도(동행) route 2146m, 예상 400초, 안전 마진 포함.
                           # 이 시간 안에 완주 못하면 truncation(시간 초과) 처리.
     "ped_filter": True,   # 보행자 안전 필터 켜기/끄기 (env/safety_filter.py)
     "warmup_steps": 4,    # ego 투입 전 프리필 차량들이 자리잡는 정착 스텝.
@@ -43,11 +39,16 @@ SIMULATION = {
     "gui_track_ego": True,
 }
 
-# 청계천로(2.1 km, 경로 위 신호 6곳)는 신호 대기가 많아 600초로는 시간초과가 난다.
-#   주행 ~180초 + 신호 6곳 대기 + 보행자·끼어들기 여유 → 900초(1800스텝).
+# 청계천로(2.1 km, 경로 위 신호 6곳, 정류장 5곳)는 600초로는 시간초과가 난다.
+#   주행 ~250초(버스 가속 1.2 m/s², 자전거 뒤 서행) + 신호 6곳 대기 + 정류장 5곳 × 15초
+#   + 정차 감속 + 보행자·끼어들기 여유 → 1200초(2400스텝).
 from env.road_config import CHEONGGYECHEON as _CGC  # noqa: E402
 if _CGC["enabled"]:
-    SIMULATION["max_steps"] = 1800
+    SIMULATION["max_steps"] = 2400
+    # 차량 안전 필터(shield): 앞차 간격 기준 안전 속도를 넘는 가속은 제동으로 바꾼다.
+    #   천호 모델을 청계천로에 그대로 돌렸을 때 충돌 39/40 (대부분 추돌·교차로 진입 충돌).
+    #   학습 중에도 켜 두고, 개입한 스텝은 shield_penalty로 감점한다 (shield + punishment).
+    SIMULATION["veh_shield"] = {"enabled": True, "decel": 3.0, "margin": 2.5}
 
 # ──────────────────────────────────────────────────────────────
 # 2) 관측 (Observation, 상태 S) — 31차원, 범위 [-1, 1]
@@ -135,6 +136,10 @@ OBSERVATION = {
     },
 }
 
+# 청계천로: 버스정류장 관측(+2 → 44차원)과 정류장 앞 규칙 동작 (sumo_env._bus_stop_control)
+if _CGC["enabled"]:
+    OBSERVATION["bus_stop"] = {"enabled": True, "visibility": 150.0, "approach": 300.0}
+
 # ──────────────────────────────────────────────────────────────
 # 3) 행동 (Action, A) — [종방향 가감속, 차선 변경] 2차원
 #
@@ -193,6 +198,11 @@ ACTION = {
     "lane_change_threshold": 0.5,   # raw <= -0.5→-1, >=+0.5→+1, 그 사이→0
     "lane_change_duration": 1.0,    # SUMO에 차선 변경 명령을 유지하는 시간(초)
 }
+
+# 청계천로: 신호 교차로 사이 엣지가 짧아(대부분 60 m 미만) 입구 보호 60 m면 차로변경이
+# 거의 막힌다. 교차로를 건너온 차가 갑자기 나타나는 사각지대만 피하도록 20 m로 줄인다.
+if _CGC["enabled"]:
+    ACTION["lane_change_safety"]["spawn_protect"] = 20.0
 
 # ──────────────────────────────────────────────────────────────
 # 4) 보상 (Reward, R)
@@ -312,6 +322,12 @@ REWARD = {
     "zone_approach_penalty": 0.0,
     "zone_approach_decel": 2.0,
     "zone_approach_cap": 0.2,
+    # 정차금지지대에서 속도 0.5 m/s 미만이면 스텝당 이 값만큼 감점
+    "no_stop_zone_penalty": 0.1,
+    # 어린이보호구역 제한 초과 1 m/s당 감점. 한 스텝 상한은 0.5 (sumo_env).
+    "school_zone_speeding_penalty": 0.1,
+    # 차량 안전 필터가 개입한 스텝 감점 (SIMULATION["veh_shield"])
+    "shield_penalty": 0.0,
 }
 # 보상 스케일에 대한 메모 (수업에서 다뤄볼 만한 지점):
 #   처음엔 speed_weight=1.0, collision=-10, arrival=+5 였는데,

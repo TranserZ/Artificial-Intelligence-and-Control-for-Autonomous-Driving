@@ -81,7 +81,7 @@ def main():
                 if term or trunc:
                     break
             keys = [k for k in ("collided", "arrived", "red_violation", "ped_collision",
-                                "yield_violation", "filter_active") if k in info]
+                                "yield_violation", "missed_stops") if k in info]
             print(f"  steps={t} return={total:.1f} 종료={'term' if term else 'trunc' if trunc else 'max'} "
                   + " ".join(f"{k}={info[k]}" for k in keys)
                   + (f" | NaN 관측 {bad}" if bad else ""))

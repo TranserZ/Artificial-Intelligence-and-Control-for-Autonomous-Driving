@@ -95,13 +95,19 @@ def _build_cheonggyecheon(ego: dict, out_dir: str) -> str:
          "--ego-max-speed", str(ego["max_speed"])])
     make_cgc_scenario.build(args.net, out_dir, args)
     # 버스 경로 위 오른쪽 차로가 직진으로 안 이어지는 교차로 보정 (도로망만 다시 쓰고, 경로는 그대로)
+    # r0_loop의 청계5가·청계광장 좌회전은 오른쪽 승용차 차로(lane 1)에 따로 붙인다.
     net_path = os.path.join(out_dir, "cgc.net.xml")
+    rou_path = os.path.join(out_dir, "cgc.rou.xml")
     con_path = os.path.join(out_dir, "cgc.fix.con.xml")
-    if osm_to_sumo.route_straight_connections(
-            net_path, os.path.join(out_dir, "cgc.rou.xml"), "r0", con_path):
+    n_fix = osm_to_sumo.route_straight_connections(net_path, rou_path, "r0", con_path)
+    n_fix += osm_to_sumo.route_straight_connections(
+        net_path, rou_path, "r0_loop", con_path, append=True)
+    n_fix += osm_to_sumo.loop_left_connections(net_path, con_path, append=True)
+    if n_fix:
         subprocess.run([checkBinary("netconvert"), "--sumo-net-file", net_path,
                         "--connection-files", con_path, "-o", net_path,
-                        "--offset.disable-normalization", "true"],
+                        "--offset.disable-normalization", "true",
+                        "--tls.rebuild", "true"],
                        check=True, capture_output=True)
     return os.path.join(out_dir, "cgc.sumocfg")
 

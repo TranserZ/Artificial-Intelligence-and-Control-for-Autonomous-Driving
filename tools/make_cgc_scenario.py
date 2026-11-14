@@ -11,6 +11,7 @@
   일반 차량 controller 4종 혼합   → Krauss/IDM/EIDM/ACC (수업 기본 설정과 동일 비율)
 """
 import argparse
+import csv
 import math
 import os
 import sys
@@ -20,8 +21,118 @@ SUMO_HOME = os.environ.get("SUMO_HOME", os.path.expanduser("~/src/sumo-1.27.1-me
 sys.path.append(os.path.join(SUMO_HOME, "tools"))
 import sumolib  # noqa: E402
 
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+NO_STOP_CSV = os.path.join(ROOT, "data", "road_data", "no_stop_zones.csv")
+
 START_EDGE = "e73541403_1"      # 청계광장 (동행 첫 구간)
 END_EDGE = "e1212424783_4"      # 청계5가·광장시장 부근 (동행 마지막 구간)
+
+# 정류장 엣지는 불법주정차에서 뺀다 (버스가 댈 자리).
+EXCLUDE_EDGES_FOR_PARKING = [
+    "e73541403_2", "e73541403_8", "e908646367_3", "e218924602_1",
+    "e218924602_6", "e1212424785_1", "e732213463_1", "e732213463_4",
+    "e1212424791_3", "e908694578_1", "e908694578_3",
+]
+# 로드뷰에서 오토바이가 서 있던 구간. 광장시장 쪽이 가장 밀집.
+MOTO_PARK_EDGES = [
+    "e73541403_2", "e73541403_6",
+    "e218924602_6", "e1212424783_1", "e1212424783_2",
+    "e1212424783_3", "e1212424783_4",
+]
+
+# 가게 앞 배달 트럭이 하역 중인 구간과 위치(엣지 길이 기준 비율). 1~2대씩.
+TRUCK_PARK_SPOTS = {
+    "e218924602_5": (0.35, 0.65),
+    "e1212424783_2": (0.5,),
+    "e1212424783_3": (0.5,),
+}
+
+
+def passenger_lane_indexes(edge):
+    """승용차가 달릴 수 있는 차로. 보도가 0번이면 오른쪽 승용차는 1번."""
+    return [ln.getIndex() for ln in edge.getLanes() if ln.allows("passenger")]
+
+
+def load_no_stop_zones(path=NO_STOP_CSV):
+    """정차금지지대 (edge_id, start_pos, end_pos). 파일이 없으면 빈 목록."""
+    if not os.path.exists(path):
+        return []
+    zones = []
+    with open(path, encoding="utf-8-sig", newline="") as f:
+        for row in csv.DictReader(f):
+            zones.append((row["edge_id"].strip(), float(row["start_pos"]), float(row["end_pos"])))
+    return zones
+
+
+def in_no_stop(zones, edge_id, pos):
+    return any(eid == edge_id and start <= pos <= end for eid, start, end in zones)
+
+
+def in_excluded_zone(no_stop_zones, bus_zones, edge_id, pos, margin=2.0):
+    """정차금지지대이거나, 정류장 정차 구간(margin 포함) 안이면 True."""
+    if in_no_stop(no_stop_zones, edge_id, pos):
+        return True
+    return any(start - margin <= pos <= end + margin
+               for start, end in bus_zones.get(edge_id, []))
+
+
+def fit_bus_stop(length, start, end):
+    """정류장 endPos가 엣지보다 길면 끝에 맞춘다.
+
+    15 m 창이 엣지 안에 안 들어가면 끝에서 15 m(엣지가 더 짧으면 처음부터)로 당긴다.
+    """
+    if length <= 0.2:
+        return 0.0, round(max(length - 0.01, 0.1), 2)
+    end = min(float(end), length - 0.1)
+    start = min(float(start), end - 0.1)
+    if end - start < 8.0:
+        start = max(0.0, end - 15.0)
+    return round(start, 1), round(end, 1)
+
+
+def place_bus_stop(net, chains, eid, start, end, min_room=20.0):
+    """정류장 좌표가 엣지보다 길면 경로상 다음 엣지로 넘긴다 (fit_bus_stop 전에).
+
+    교차로가 합쳐지며 엣지가 짧아지면(예: 관수교 e218924602_1 14.8 m) 원래 좌표(39~54 m)가
+    엣지 밖으로 나간다. 그때 12 m 버스가 서기 어려운 엣지 끝에 욱여넣지 않고, 같은 노선의
+    다음 엣지로 남은 거리만큼 옮긴다. chains: 노선 엣지 목록들 (동행, 서행).
+    """
+    for chain in chains:
+        ids = [e.getID() for e in chain]
+        if eid not in ids:
+            continue
+        k = ids.index(eid)
+        while k + 1 < len(chain) and start > chain[k].getLength() - min_room:
+            start -= chain[k].getLength()
+            end -= chain[k].getLength()
+            k += 1
+        start = max(start, 0.0)
+        return chain[k].getID(), start, max(end, start + 15.0)
+    return eid, start, end
+
+
+def bus_stop_lane_index(edge):
+    """보도가 lane 0이면 정류장은 승용차 차로 1. 아니면 0."""
+    lane0 = edge.getLane(0)
+    if lane0.allows("pedestrian") and not lane0.allows("passenger") and edge.getLaneNumber() > 1:
+        return 1
+    return 0
+
+
+# 분석 좌표. endPos가 엣지보다 길면 fit_bus_stop이 맞춘다.
+BUS_STOPS = [
+    ("bs_01", "e73541403_2", 22, 37, "청계광장"),
+    ("bs_02", "e73541403_8", 45, 60, "청계1가.광교"),
+    ("bs_03", "e908646367_3", 30, 45, "청계2가.삼일교(동)"),
+    ("bs_04", "e218924602_1", 39, 54, "청계3가.관수교(동)"),
+    ("bs_05", "e218924602_6", 68, 83, "청계4가.배오개다리"),
+    ("bs_06", "e1212424785_1", 184, 199, "청계5가.광장시장"),
+    ("bs_07", "e732213463_1", 113, 128, "청계4가.세운교"),
+    ("bs_08", "e732213463_4", 43, 58, "청계3가.관수교(서)"),
+    ("bs_09", "e1212424791_3", 38, 53, "청계2가.수표교"),
+    ("bs_10", "e908694578_1", 43, 58, "청계2가.삼일교(서)"),
+    ("bs_11", "e908694578_3", 66, 81, "청계1가.장통교"),
+]
 
 
 def shortest(net, a, b):
@@ -34,6 +145,51 @@ BAD_SIDE = {"e506246961_1b", "e329995230_2a", "e329995230_2b", "e228795468_3a"} 
 
 EAST_WAYS = ["73541403", "1536659790", "908646367", "218924602", "1212424783"]  # 청계광장→광장시장
 WEST_WAYS = ["1212424785", "732213463", "1212424791", "908694578", "350127794"]  # 광장시장→청계광장
+
+# 청계광장 회차(e183272596_1) + 청계5가 좌회전 두 번으로 도는 왕복.
+# OSM 중심선 기준 63개. netconvert가 교차로에 삼킨 id는 resolve_loop_edges가 뺀다.
+LOOP_EDGE_IDS = (
+    "e73541403_1 e73541403_2 e73541403_3 e73541403_4 e73541403_5 e73541403_6 "
+    "e73541403_7 e73541403_8 "
+    "e1536659790_1 e1536659790_2 e1536659790_3 e1536659790_4 e1536659790_5 e1536659790_6 "
+    "e908646367_1 e908646367_2 e908646367_3 e908646367_4 e908646367_5 e908646367_6 "
+    "e218924602_1 e218924602_2 e218924602_3 e218924602_4 e218924602_5 e218924602_6 "
+    "e1212424783_1 e1212424783_2 e1212424783_3 e1212424783_4 "
+    "e1455526426_1 e482167259_1a e608946831_1a e608946832_1a "
+    "e1212424785_1 e1212424785_2 "
+    "e732213463_1 e732213463_2 e732213463_3 e732213463_4 e732213463_5 "
+    "e1212424791_1 e1212424791_2 e1212424791_3 e1212424791_4 e1212424791_5 "
+    "e1212424791_6 e1212424791_7 e1212424791_8 "
+    "e908694578_1 e908694578_2 e908694578_3 e908694578_4 e908694578_5 e908694578_6 "
+    "e908694578_7 "
+    "e350127794_1 e350127794_2 e350127794_3 e350127794_4 e350127794_5 e350127794_6 "
+    "e183272596_1"
+).split()
+
+
+def resolve_loop_edges(net, edge_ids):
+    """왕복 edge 목록을 현재 net.xml에 맞게 고친다.
+
+    청계5가 짧은 연결(e482167259_1a, e608946832_1a)은 선행 확인에서 id가 살아 있었다.
+    그보다 앞선 본선에서 netconvert가 없앤 e73541403_7, e1212424791_8처럼
+    목록에만 있고 네트워크에 없는 id는 빼고, 앞뒤가 직접 이어지는지 본다.
+    """
+    present, missing = [], []
+    for eid in edge_ids:
+        try:
+            present.append(net.getEdge(eid))
+        except Exception:
+            missing.append(eid)
+    if missing:
+        print("왕복 route에서 제외 (net.xml에 없음):", " ".join(missing))
+    out = []
+    for edge in present:
+        if out and edge not in out[-1].getOutgoing():
+            raise RuntimeError(
+                f"왕복 경로가 끊김: {out[-1].getID()} → {edge.getID()} "
+                f"(제외된 엣지: {' '.join(missing) or '없음'})")
+        out.append(edge)
+    return out
 
 
 def chain_route(net, way_ids):
@@ -116,6 +272,22 @@ def build(net_path, out_dir, args):
     route = route[:[e.getID() for e in route].index(END_EDGE) + 1]
     west = chain_route(net, WEST_WAYS)
     srcs = side_sources(net, route)
+    # 세종대로 합류(발표 ①: 접촉사고 원인 재현)는 일반 측면 합류와 분리해
+    # 빈도를 직접 지정한다 (중복 투입 방지를 위해 일반 합류 목록에서는 뺀다).
+    sejong_srcs = [e for e in srcs if "세종대로" in (e.getName() or "")]
+    srcs = [e for e in srcs if e not in sejong_srcs]
+    # 정류장 5곳의 실제 정차 구간(엣지 길이로 잘린 뒤 좌표) — 불법주정차가
+    # 버스 정차 자리를 막지 않도록 이 구간(±margin)은 모든 주정차에서 뺀다.
+    bus_stop_zones = {}
+    placed_stops = []
+    for sid, eid, start, end, name in BUS_STOPS:
+        try:
+            eid, start, end = place_bus_stop(net, (route, west), eid, start, end)
+            s, e2 = fit_bus_stop(net.getEdge(eid).getLength(), start, end)
+        except Exception:
+            continue
+        placed_stops.append((sid, eid, s, e2, name))
+        bus_stop_zones.setdefault(eid, []).append((s, e2))
     ids = " ".join(e.getID() for e in route)
     rid = args.route_id   # 학습 환경(sumo_env)은 ego/배경 경로를 "r0"으로 찾는다
     rng = random.Random(7)
@@ -132,8 +304,9 @@ def build(net_path, out_dir, args):
     e_acc = args.ego_accel if args.ego_accel is not None else 1.5
     e_dec = args.ego_decel if args.ego_decel is not None else 4.0
     e_max = args.ego_max_speed if args.ego_max_speed is not None else args.shuttle_kmh / 3.6
+    # 자율주행 셔틀(청계A01) 실제 차체 — 일반 승용차 대신 버스 규격(길이/폭/vClass).
     L.append(f'    <vType id="ego_type" accel="{e_acc}" decel="{e_dec}" maxSpeed="{e_max:.2f}" '
-             f'length="5.0" width="2.0" color="1,0,0" vClass="passenger" guiShape="bus"/>')
+             f'length="12.0" width="2.5" color="1,0,0" vClass="bus" guiShape="bus"/>')
     L.append('    <vTypeDistribution id="carDist">')
     for cid, model, p, acc, dec, tau, gap, vmax, sigma, color in ctrl:
         sg = f' sigma="{sigma}"' if sigma is not None else ""
@@ -149,9 +322,25 @@ def build(net_path, out_dir, args):
     L.append('    <vType id="motorcycle" vClass="motorcycle" guiShape="motorcycle" length="2.2" width="0.8" '
              'accel="3.5" decel="5.0" maxSpeed="11" minGap="1.0" lcAssertive="2" lcImpatience="0.5" lcCooperative="0.5" '
              'jmIgnoreFoeProb="0.2" color="0.2,0.2,0.2"/>')
+    # OSM 조사: highway=cycleway 13개는 자동차 도로가 아니라 변환에서 빠진다.
+    # 청계천로 자동차 way 14개에는 cycleway:left=track(천 쪽 분리 자전거도로)이 있으나
+    # 그 태그는 전용 차로로 만들지 않는다. 대신 본선에 저속 자전거 흐름을 둔다.
+    # maxSpeed 5 m/s, speedFactor 0.8 → 대략 3–5 m/s.
+    L.append('    <vType id="bicycle" vClass="bicycle" guiShape="bicycle" length="1.8" width="0.65" '
+             'accel="1.2" decel="3.0" maxSpeed="5.0" speedFactor="0.8" speedDev="0.15" minGap="0.5" '
+             'color="0,0.55,0.25"/>')
     L.append('    <vType id="parked_car" accel="2.0" decel="4.5" maxSpeed="8.3" color="0.5,0.5,0.5" '
              'vClass="passenger" guiShape="passenger/van"/>')
+    # 광장시장에 세워 둔 오토바이. 차로를 막지 않는 정식 주차(parking=true).
+    L.append('    <vType id="parked_moto" vClass="motorcycle" length="2.2" width="0.8" '
+             'accel="2.0" decel="4.5" maxSpeed="8.3" color="0.15,0.15,0.15" guiShape="motorcycle"/>')
+    # 가게 앞 하역 중인 배달 트럭. 차로를 막는 정식 주차(parking=true), 하역 시간 300초.
+    L.append('    <vType id="parked_truck" vClass="delivery" length="6.0" width="2.3" '
+             'accel="2.0" decel="4.0" maxSpeed="8.3" color="0.3,0.3,0.4" guiShape="delivery"/>')
     L.append(f'    <route id="{rid}" edges="{ids}"/>')
+    loop = resolve_loop_edges(net, LOOP_EDGE_IDS)
+    loop_ids = " ".join(e.getID() for e in loop)
+    L.append(f'    <route id="{args.loop_route_id}" edges="{loop_ids}"/>')
     if west:
         L.append(f'    <route id="main_west" edges="{" ".join(e.getID() for e in west)}"/>')
     # 본선 통과 교통 (동행/서행)
@@ -165,9 +354,68 @@ def build(net_path, out_dir, args):
         L.append(f'    <flow id="side_{e.getID()}" type="cutin_car" from="{e.getID()}" to="{END_EDGE}" '
                  f'begin="0" end="100000" vehsPerHour="{args.side_vph}" departLane="best" '
                  f'departSpeed="max"/>')
+    # 세종대로 합류 (발표 ①: 접촉사고 원인 재현용). 가볍게 60초에 1대.
+    for i, e in enumerate(sejong_srcs):
+        L.append(f'    <flow id="through_merge_{i}" type="cutin_car" from="{e.getID()}" to="{END_EDGE}" '
+                 f'begin="0" end="100000" period="60" departLane="best" departSpeed="max"/>')
     # 오토바이: 본선 전체를 달리며 차선 사이를 파고든다
     L.append(f'    <flow id="moto" type="motorcycle" route="{rid}" begin="0" end="100000" '
              f'vehsPerHour="{args.moto_vph}" departLane="best" departSpeed="max"/>')
+    # 동행·서행 전 구간. 20초에 한 대면 4 m/s 기준으로 약 80 m 간격.
+    L.append(f'    <flow id="bike_e" type="bicycle" route="{rid}" begin="0" end="100000" '
+             f'period="20" departLane="best" departSpeed="max"/>')
+    if west:
+        L.append('    <flow id="bike_w" type="bicycle" route="main_west" begin="0" end="100000" '
+                 'period="20" departLane="best" departSpeed="max"/>')
+    # 광장시장 구간: 15 m 간격으로 오토바이를 세워 둔다. 정차금지지대 위치는 뺀다.
+    no_stop = load_no_stop_zones()
+    moto_n = 0
+    for eid in MOTO_PARK_EDGES:
+        try:
+            e = net.getEdge(eid)
+        except Exception:
+            print("오토바이 주정차 엣지 없음:", eid)
+            continue
+        lanes = passenger_lane_indexes(e)
+        if not lanes:
+            continue
+        lane = lanes[0]
+        pos = 15.0
+        while pos < e.getLength() - 1.0:
+            if not in_excluded_zone(no_stop, bus_stop_zones, eid, pos):
+                depart = max(pos - 1.0, 0.1)
+                L.append(
+                    f'    <flow id="parked_moto_{moto_n}" type="parked_moto" from="{eid}" to="{eid}" '
+                    f'begin="0" end="300" period="301" departLane="{lane}" departPos="{depart:.1f}" '
+                    f'departSpeed="0">'
+                    f'<stop lane="{eid}_{lane}" endPos="{pos:.1f}" duration="300" parking="true"/>'
+                    f'</flow>')
+                moto_n += 1
+            pos += 15.0
+    # 가게 앞 하역 중인 배달 트럭 (TRUCK_PARK_SPOTS). 차로를 막는 정식 주차.
+    truck_n = 0
+    for eid, fracs in TRUCK_PARK_SPOTS.items():
+        try:
+            e = net.getEdge(eid)
+        except Exception:
+            print("배달 트럭 주정차 엣지 없음:", eid)
+            continue
+        lanes = passenger_lane_indexes(e)
+        if not lanes:
+            continue
+        lane = lanes[0]
+        for frac in fracs:
+            pos = e.getLength() * frac
+            if in_excluded_zone(no_stop, bus_stop_zones, eid, pos):
+                continue
+            depart = max(pos - 1.0, 0.1)
+            L.append(
+                f'    <flow id="parked_truck_{truck_n}" type="parked_truck" from="{eid}" to="{eid}" '
+                f'begin="0" end="300" period="301" departLane="{lane}" departPos="{depart:.1f}" '
+                f'departSpeed="0">'
+                f'<stop lane="{eid}_{lane}" endPos="{pos:.1f}" duration="300" parking="true"/>'
+                f'</flow>')
+            truck_n += 1
     # 보행자: 청계천 남·북 보도를 오가며 신호 횡단보도를 건넌다 (팀 천호사거리와 같은 personFlow 방식)
     if args.ped_pph > 0:
         # 보행 경로(횡단보도·보행구역)를 따라가려면 internal/pedestrian 연결을 함께 읽어야 한다
@@ -188,30 +436,66 @@ def build(net_path, out_dir, args):
     if args.demo_ego:
         L.append(f'    <flow id="ego_demo" type="ego_type" route="{rid}" begin="{args.ego_begin}" '
                  f'end="100000" period="{args.ego_period}" departLane="{first_car_lane}" departSpeed="0"/>')
-    # 불법주정차: 본선 중간 엣지의 우측 차로(0번)에 잠깐 서는 차 (뒤차가 왼쪽으로 끼어들게 함)
-    stop_edges = [e for e in route if e.getLength() > 60 and e.getLaneNumber() >= 2 + first_car_lane][:4]
-    for i, e in enumerate(stop_edges):
-        pos = e.getLength() * 0.6
-        L.append(f'    <flow id="illegal_park_{i}" type="parked_car" route="{rid}" begin="{args.ego_begin + 40 + 40 * i}" '
-                 f'end="100000" period="{args.park_period}" departLane="{first_car_lane}" departSpeed="max">'
-                 f'<stop lane="{e.getID()}_{first_car_lane}" endPos="{pos:.1f}" duration="{rng.randint(25, 50)}" parking="false"/>'
-                 f'</flow>')
+    # 불법주정차 (1-5): 동행·서행 전 구간을 30 m 간격으로 촘촘히 채운다
+    # (기존 엣지당 1~2곳 방식 대비 밀도 약 2배). 제외: 정류장 엣지,
+    # 정차금지지대, 승용차 1차로 엣지(이미 좁아 중복 안 함).
+    PARK_SPACING = 30.0
+    park_spots = []
+    for edges, route_name in ((route, rid), (west, "main_west")):
+        for e in edges:
+            eid = e.getID()
+            if eid in EXCLUDE_EDGES_FOR_PARKING:
+                continue
+            lanes = passenger_lane_indexes(e)
+            if len(lanes) < 2:
+                continue
+            pos = PARK_SPACING / 2.0
+            while pos < e.getLength() - 1.0:
+                if not in_excluded_zone(no_stop, bus_stop_zones, eid, pos):
+                    park_spots.append((e, lanes[0], route_name, pos))
+                pos += PARK_SPACING
+    for i, (e, lane, route_name, pos) in enumerate(park_spots):
+        L.append(f'    <flow id="illegal_park_{i}" type="parked_car" route="{route_name}" '
+                 f'begin="{args.ego_begin + 20 + (i % 30) * 4}" end="100000" period="{args.park_period}" '
+                 f'departLane="{lane}" departSpeed="max">'
+                 f'<stop lane="{e.getID()}_{lane}" endPos="{pos:.1f}" duration="{rng.randint(25, 50)}" '
+                 f'parking="false"/></flow>')
     L.append("</routes>")
-    with open(os.path.join(out_dir, "cgc.rou.xml"), "w") as f:
+    with open(os.path.join(out_dir, "cgc.rou.xml"), "w", encoding="utf-8", newline="\n") as f:
         f.write("\n".join(L) + "\n")
 
+    # 정류장 11개. 보도가 lane 0이면 승용차 차로(_1)에 둔다.
+    add = ["<additional>"]
+    written_stops = 0
+    for sid, eid, start_pos, end_pos, name in placed_stops:
+        edge = net.getEdge(eid)
+        lane = bus_stop_lane_index(edge)
+        safe_name = name.replace("&", "&amp;").replace('"', "")
+        add.append(
+            f'    <busStop id="{sid}" lane="{eid}_{lane}" startPos="{start_pos}" '
+            f'endPos="{end_pos}" name="{safe_name}"/>')
+        written_stops += 1
+    add.append("</additional>")
+    with open(os.path.join(out_dir, "cgc.add.xml"), "w", encoding="utf-8", newline="\n") as f:
+        f.write("\n".join(add) + "\n")
+
     # GUI: 전체 도로가 한 화면에 보이도록 (x 0~2275, y -280~210)
-    with open(os.path.join(out_dir, "cgc.gui.xml"), "w") as f:
+    with open(os.path.join(out_dir, "cgc.gui.xml"), "w", encoding="utf-8", newline="\n") as f:
         f.write('<viewsettings>\n    <scheme name="real world"/>\n'
                 f'    <viewport zoom="{args.zoom}" x="{args.view_x}" y="{args.view_y}" angle="0"/>\n'
                 '    <delay value="100"/>\n</viewsettings>\n')
-    with open(os.path.join(out_dir, "cgc.sumocfg"), "w") as f:
+    with open(os.path.join(out_dir, "cgc.sumocfg"), "w", encoding="utf-8", newline="\n") as f:
         f.write('<configuration>\n    <input>\n        <net-file value="cgc.net.xml"/>\n'
-                '        <route-files value="cgc.rou.xml"/>\n    </input>\n'
+                '        <route-files value="cgc.rou.xml"/>\n'
+                '        <additional-files value="cgc.add.xml"/>\n    </input>\n'
                 '    <gui_only>\n        <gui-settings-file value="cgc.gui.xml"/>\n    </gui_only>\n'
                 '</configuration>\n')
-    print(f"경로 {len(route)}개 엣지, 측면 합류 {len(srcs)}곳, 불법주정차 {len(stop_edges)}곳")
+    print(f"경로 {len(route)}개 엣지, 왕복 {args.loop_route_id} {len(loop)}개 엣지, "
+          f"측면 합류 {len(srcs)}곳(+세종대로 {len(sejong_srcs)}곳), "
+          f"불법주정차 {len(park_spots)}곳, 오토바이 주차 {moto_n}대, 트럭 주정차 {truck_n}대, "
+          f"정류장 {written_stops}개")
     print("측면 합류 엣지:", [e.getID() for e in srcs])
+    print("세종대로 합류 엣지:", [e.getID() for e in sejong_srcs])
 
 
 def parse_args(argv=None):
@@ -219,6 +503,8 @@ def parse_args(argv=None):
     ap.add_argument("--net", default="env/cheonggyecheon/cgc.net.xml")
     ap.add_argument("--out", default="env/cheonggyecheon")
     ap.add_argument("--route-id", default="main_east")
+    ap.add_argument("--loop-route-id", default="r0_loop",
+                    help="청계광장·청계5가에서 되돌아오는 왕복 route id")
     ap.add_argument("--shuttle-kmh", type=float, default=20.0)
     ap.add_argument("--ego-accel", type=float, default=None)
     ap.add_argument("--ego-decel", type=float, default=None)

@@ -297,6 +297,13 @@ if CHEONGGYECHEON["enabled"]:
             "length": CHEONGGYECHEON["route_length"],
             "num_lanes": 2}                 # 청계천 양쪽 일방통행, 각 편도 2차로
     EGO = {**EGO,
-           "routes": {"r0": 1.0},          # 버스 노선 하나 (우회전 경로 없음)
+           "routes": {"r0": 1.0},          # 편도(동행) route만 학습/평가
            "depart_lane": 0,               # 맨 오른쪽 차로에서 출발 (정류장 쪽)
-           "route_depart_lane": {}}
+           "route_depart_lane": {},
+           # 자율주행 셔틀(버스) 물리 특성 — 일반 승용차보다 가감속이 완만하다.
+           "accel": 1.2,
+           "decel": 4.0,
+           # 출발 엣지(e73541403_1, 컴파일 후 약 5.8 m·1차로)가 짧아, 버스 차체
+           # (12 m)로 10 m/s 출발을 넣으면 "Departure speed too high"로 삽입이
+           # 거부된다. 정류장에서 막 출발하는 상황이 더 현실적이기도 해서 낮춘다.
+           "depart_speed": 2.0}

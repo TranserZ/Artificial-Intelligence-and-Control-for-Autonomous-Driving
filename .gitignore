@@ -3,4 +3,5 @@ __pycache__/
 crossroad_api_config.py
 data/road_data/국토교통부_교통영향평가_기하구조정보_*.csv
 env/sumo/cgc.*
+docs/cheonggyecheon_solution.md
 results/run_20261029_200354/

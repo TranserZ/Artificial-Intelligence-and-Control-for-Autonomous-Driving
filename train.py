@@ -83,6 +83,9 @@ REWARD_OVERRIDES = dict(
     zone_overspeed_penalty=0.1,    # 어린이 보호구역 안 30 km/h(+0.3 m/s) 초과 1 m/s당 스텝 감점
                                    #   (최대 0.5). 50 km/h로 달리면 속도 보상 +0.04, 감점 -0.5
     zone_approach_penalty=0.05,    # 보호구역 입구에서 30 km/h가 되도록 감속 곡선 초과 1 m/s당 감점
+    no_stop_zone_penalty=0.1,         # 정차금지지대에서 서 있으면 스텝당 감점
+    school_zone_speeding_penalty=0.1, # 어린이보호구역 초과 1 m/s당 감점 (상한 0.5)
+    shield_penalty=0.05,              # 차량 안전 필터가 개입한 스텝 감점 (청계천로에서만 켜짐)
 )
 REWARD = {**REWARD_DEFAULTS, **REWARD_OVERRIDES}
 

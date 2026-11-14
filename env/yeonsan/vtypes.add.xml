@@ -1,0 +1,9 @@
+<additional>
+    <vTypeDistribution id="carDist">
+        <vType id="car_krauss" probability="0.35" carFollowModel="Krauss" accel="2.0" decel="4.5" tau="1.0" minGap="2.5" maxSpeed="8.3" speedDev="0.1" color="1,1,0" vClass="passenger" guiShape="passenger/sedan" sigma="0.3" lcStrategic="1" lcCooperative="0.5" lcAssertive="1.2" lcImpatience="0.2"/>
+        <vType id="car_idm" probability="0.3" carFollowModel="IDM" accel="1.8" decel="3.5" tau="1.2" minGap="2.0" maxSpeed="8.3" speedDev="0.1" color="0,1,1" vClass="passenger" guiShape="passenger/sedan" lcStrategic="1" lcCooperative="0.5" lcAssertive="1.2" lcImpatience="0.2"/>
+        <vType id="car_eidm" probability="0.2" carFollowModel="EIDM" accel="2.0" decel="4.0" tau="1.1" minGap="2.0" maxSpeed="8.3" speedDev="0.1" color="1,0.6,0" vClass="passenger" guiShape="passenger/sedan" lcStrategic="1" lcCooperative="0.5" lcAssertive="1.2" lcImpatience="0.2"/>
+        <vType id="car_acc" probability="0.15" carFollowModel="ACC" accel="2.0" decel="4.0" tau="1.5" minGap="2.0" maxSpeed="8.3" speedDev="0.1" color="1,0,1" vClass="passenger" guiShape="passenger/sedan" lcStrategic="1" lcCooperative="0.5" lcAssertive="1.2" lcImpatience="0.2"/>
+    </vTypeDistribution>
+    <vType id="ped" vClass="pedestrian" speed="1.3" color="0,0.4,1"/>
+</additional>
