@@ -33,6 +33,9 @@ DEFAULT_KMH = {"primary": 50, "secondary": 50, "tertiary": 40, "unclassified": 3
 CHEONGGYECHEON_KMH = 30   # 청계천로: OSM이 일부 구간에 maxspeed=30으로 태그함 → 전 구간에 적용(가정)
 
 
+CORRIDOR_NAME = "청계천로"
+
+
 def project(lon, lat):
     k = math.pi / 180.0
     x = (lon - ORIGIN[0]) * k * 6378137.0 * math.cos(ORIGIN[1] * k)
@@ -169,7 +172,24 @@ def convert(osm_path, out_dir):
                         if nd <= 60.0:
                             frontier.append((nb, nd))
 
+    # OSM에 신호 태그가 빠진 곳 보강: 청계천로가 간선(primary/secondary/tertiary)과
+    # 만나는 교차점은 실제로 신호교차로이므로 신호로 본다 (OSM_INFER_SIGNALS=0이면 끔).
+    inferred = set()
+    if os.environ.get("OSM_INFER_SIGNALS", "1") != "0":
+        main_cls = {"primary", "secondary", "tertiary"}
+        on_corridor, crossing = set(), set()
+        for _, tags, refs in ways:
+            name = tags.get("name") or ""
+            if CORRIDOR_NAME in name:
+                on_corridor.update(refs)
+            elif tags.get("highway", "").replace("_link", "") in main_cls:
+                crossing.update(refs)
+        inferred = {r for r in used_nodes
+                    if r in on_corridor and r in crossing and r not in stopline}
+
     def useful_signal(r):
+        if r in inferred:
+            return True
         if r in promote:
             return True
         if r in stopline:
@@ -198,7 +218,7 @@ def convert(osm_path, out_dir):
         f.write("</edges>\n")
 
     n_tl = sum(1 for r in used_nodes if useful_signal(r))
-    print(f"노드 {len(used_nodes)}개 (신호등 {n_tl}, 빠른 도로 중간 신호 {n_drop}개 제외), 엣지 {len(edges)}개 → {out_dir}")
+    print(f"노드 {len(used_nodes)}개 (신호등 {n_tl}, 추정 신호 {len(inferred)}, 빠른 도로 중간 신호 {n_drop}개 제외), 엣지 {len(edges)}개 → {out_dir}")
     return edges
 
 

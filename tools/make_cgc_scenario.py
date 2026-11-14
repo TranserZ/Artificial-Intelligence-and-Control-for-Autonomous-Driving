@@ -108,10 +108,11 @@ def ped_pairs(net, east, west, rng, n):
 def build(net_path, out_dir, args):
     net = sumolib.net.readNet(net_path)
     # 보도 차로가 있으면 차량 차로는 1번부터 (netconvert --sidewalks.guess)
-    first_car_lane = 1 if net.getEdge(START_EDGE).getLane(0).allows("pedestrian") and \
-        not net.getEdge(START_EDGE).getLane(0).allows("passenger") else 0
     # 최단경로는 600m 지점에서 본선 대신 짧은 연결로로 빠지므로 OSM way 순서대로 잇는다
+    # (출발 구간이 신호교차로에 합쳐져 사라질 수 있어 START_EDGE 대신 경로 첫 엣지를 쓴다)
     route = chain_route(net, EAST_WAYS)
+    lane0 = route[0].getLane(0)
+    first_car_lane = 1 if lane0.allows("pedestrian") and not lane0.allows("passenger") else 0
     route = route[:[e.getID() for e in route].index(END_EDGE) + 1]
     west = chain_route(net, WEST_WAYS)
     srcs = side_sources(net, route)
@@ -142,7 +143,7 @@ def build(net_path, out_dir, args):
                  f'lcStrategic="1" lcCooperative="0.5" lcAssertive="1.2" lcImpatience="0.2"/>')
     L.append("    </vTypeDistribution>")
     # 끼어드는 차: 차선변경에 적극적이고 간격이 좁은 차량 (택시·배달차 가정)
-    L.append('    <vType id="cutin_car" accel="2.6" decel="4.5" tau="0.8" minGap="1.2" maxSpeed="9.7" '
+    L.append('    <vType id="cutin_car" accel="2.6" decel="4.5" tau="1.0" minGap="1.5" maxSpeed="9.7" '
              'speedDev="0.15" lcAssertive="3" lcImpatience="1" lcSpeedGain="3" lcStrategic="1" '
              'jmIgnoreFoeProb="0.35" jmTimegapMinor="0.3" jmIgnoreFoeSpeed="3" color="0.9,0.9,0.9" vClass="taxi" guiShape="passenger/sedan"/>')
     L.append('    <vType id="motorcycle" vClass="motorcycle" guiShape="motorcycle" length="2.2" width="0.8" '

@@ -78,7 +78,7 @@ def _build_cheonggyecheon(ego: dict, out_dir: str) -> str:
          "--node-files", os.path.join(out_dir, "cgc.nod.xml"),
          "--edge-files", os.path.join(out_dir, "cgc.edg.xml"),
          "-o", os.path.join(out_dir, "cgc.net.xml"),
-         "--no-turnarounds", "true", "--junctions.join", "true", "--tls.join", "true",
+         "--no-turnarounds", "true", "--junctions.join", "true", "--tls.join", "true", "--tls.join-dist", "30",
          "--junctions.corner-detail", "5", "--output.street-names", "true",
          "--offset.disable-normalization", "true",
          "--sidewalks.guess", "true", "--sidewalks.guess.max-speed", "14",
