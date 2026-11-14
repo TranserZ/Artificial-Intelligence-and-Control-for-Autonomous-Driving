@@ -254,13 +254,26 @@ def route_straight_connections(net_path, rou_path, route_id, con_path):
                               and (l.get("allow") in (None, "") or "passenger" in l.get("allow"))]
     for c in net.findall("connection"):
         conns.add((c.get("from"), c.get("to"), int(c.get("fromLane"))))
+    pairs_all = {}
+    for c in net.findall("connection"):
+        if not c.get("from", "").startswith(":"):
+            pairs_all.setdefault((c.get("from"), c.get("to")), []).append(
+                (int(c.get("fromLane")), int(c.get("toLane"))))
     out = []
     for a, b in zip(route, route[1:]):
         la, lb = lanes.get(a, []), lanes.get(b, [])
-        for i, fl in enumerate(la):
-            if (a, b, fl) not in conns and lb:
-                tl = lb[min(i, len(lb) - 1)]
+        if not lb or all((a, b, fl) in conns for fl in la):
+            continue
+        # 차로마다 같은 순번의 차로로 곧게 잇는다 (오른쪽→오른쪽, 왼쪽→왼쪽)
+        want = {fl: lb[min(i, len(lb) - 1)] for i, fl in enumerate(la)}
+        for fl, tl in want.items():
+            if (a, b, fl) not in conns:
                 out.append(f'    <connection from="{a}" to="{b}" fromLane="{fl}" toLane="{tl}"/>')
+        # 다른 차로에서 같은 목표 차로로 비스듬히 들어가는 연결은 지운다
+        # (교차로 안에서 두 흐름이 한 차로로 합쳐지며 충돌하던 문제)
+        for fl, tl in pairs_all.get((a, b), []):
+            if want.get(fl) != tl and tl in want.values():
+                out.append(f'    <delete from="{a}" to="{b}" fromLane="{fl}" toLane="{tl}"/>')
     with open(con_path, "w", encoding="utf-8") as f:
         f.write("<connections>\n" + "\n".join(out) + ("\n" if out else "") + "</connections>\n")
     return len(out)
