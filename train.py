@@ -16,6 +16,7 @@
 import argparse
 import os
 import shutil
+import torch
 from datetime import datetime
 
 from env.road_config import ROAD, EGO, TRAFFIC
@@ -177,8 +178,18 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="PPO 학습")
     parser.add_argument("--seed", type=int, default=HPARAMS["seed"],
                         help="시드만 다르게 여러 번 학습해 운의 영향을 본다")
+    parser.add_argument("--init", default=None,
+                        help="이 모델 가중치에서 이어서 학습 (예: 천호사거리 모델 → 청계천로). "
+                             "관측 차원이 늘었으면 새 입력 가중치는 0으로 채워 기존 행동을 유지한다")
+    parser.add_argument("--timesteps", type=int, default=None, help="TOTAL_TIMESTEPS 덮어쓰기")
+    parser.add_argument("--run-name", default=None, help="results/ 아래 폴더 이름")
     args = parser.parse_args()
     HPARAMS["seed"] = args.seed
+    if args.timesteps:
+        TOTAL_TIMESTEPS = args.timesteps
+        MIDPOINT_TIMESTEPS = int(TOTAL_TIMESTEPS * 0.7)
+    if args.run_name:
+        RUN_NAME = args.run_name
 
     # 1) 도로 생성 (env/road_config.py 기준으로 매번 재생성)
     sumocfg = road_builder.build(ROAD, EGO, TRAFFIC,
@@ -213,6 +224,15 @@ if __name__ == "__main__":
         buffer=buffer,
         **HPARAMS,
     )
+    if args.init:
+        sd = torch.load(args.init, map_location=agent.device)
+        w = sd["trunk.0.weight"]
+        own = agent.policy.state_dict()["trunk.0.weight"]
+        if w.shape[1] < own.shape[1]:   # 예: 40차원 모델 → 42차원(보호구역 2개 추가)
+            pad = torch.zeros(w.shape[0], own.shape[1] - w.shape[1], dtype=w.dtype, device=w.device)
+            sd["trunk.0.weight"] = torch.cat([w, pad], dim=1)
+        agent.policy.load_state_dict(sd)
+        print(f"초기 가중치: {args.init} (입력 {w.shape[1]} → {own.shape[1]})")
     print(f"obs_dim={env.observation_space.shape[0]}, "
           f"act_dim={env.action_space.shape[0]}, device={agent.device}")
 
