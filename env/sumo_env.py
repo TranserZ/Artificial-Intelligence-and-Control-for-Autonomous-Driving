@@ -1055,11 +1055,44 @@ class SumoHighwayEnv(gym.Env):
     # 일시정지(s) 신호: 정지선 이 거리(m) 안에서 멈췄다가 지나가야 위반이 아니다
     _STOP_ZONE = 5.0
 
-    def _next_signal(self):
+    def _tls_remaining(self, tl_id, link, state):
+        """신호 tl_id의 link가 지금 색(같은 정지 필요도)을 유지하는 남은 시간 s."""
+        remaining = traci.trafficlight.getNextSwitch(tl_id) - traci.simulation.getTime()
+        # 교차로 신호는 ego 링크 기준으로 같은 색이 여러 단계에 걸쳐 이어진다
+        # (예: 기본 프로그램의 적색 37+5+3초). "ego 신호색이 바뀔 때까지"의
+        # 시간이 되도록, 같은 정지 필요도가 이어지는 다음 단계들을 더한다.
+        level = self._SIGNAL_STOP_LEVEL.get(state, 1.0)
+        program = traci.trafficlight.getProgram(tl_id)
+        logic = next(l for l in traci.trafficlight.getAllProgramLogics(tl_id)
+                     if l.programID == program)
+        phases = logic.phases
+        k = traci.trafficlight.getPhase(tl_id)
+        for _ in range(len(phases) - 1):
+            k = (k + 1) % len(phases)
+            if self._SIGNAL_STOP_LEVEL.get(phases[k].state[link], 1.0) != level:
+                break
+            remaining += phases[k].duration
+        return float(max(remaining, 0.0))
+
+    def _time_to_cover(self, v: float, d: float) -> float:
+        """속도 v에서 최대 가속(max_accel)으로 거리 d를 가는 시간 (도로 제한속도 vmax까지)."""
+        a, vmax = max(self.max_accel, 1e-3), max(self.vmax, v, 1e-3)
+        t_acc = (vmax - v) / a
+        d_acc = v * t_acc + 0.5 * a * t_acc * t_acc
+        if d <= d_acc:
+            return float((-v + np.sqrt(v * v + 2.0 * a * d)) / a)
+        return float(t_acc + (d - d_acc) / vmax)
+
+    def _next_signal(self, binding: bool = False):
         """ego 경로상 다음 신호를 (신호 id, 정지선까지 거리 m, 신호색, 남은 시간 s)로 반환.
 
         traci getNextTLS는 ego가 앞으로 지날 신호들을 가까운 순으로 돌려준다
         (거리는 ego 앞범퍼 → 정지선). 신호를 이미 지났거나 ego가 없으면 None.
+
+        binding=True: 다음 정지선 뒤에 차 길이(+2 m)도 안 되는 간격으로 또 정지선이 있고
+        그 신호가 더 엄격하면(예: 녹색 → 6.9 m 뒤 적색), 그 신호색을 "첫 정지선에서" 적용한다.
+        12 m 버스가 두 번째 정지선에서 기다리면 꼬리가 첫 교차로 횡단보도를 막아
+        보행 녹색에 건너는 보행자와 부딪혔다 (청계천로 1차 학습 평가의 보행자 충돌 전부).
         """
         if self.ego_id not in traci.vehicle.getIDList():
             return None
@@ -1068,29 +1101,27 @@ class SumoHighwayEnv(gym.Env):
             if not upcoming:
                 return None
             tl_id, link, dist, state = upcoming[0]
-            remaining = (traci.trafficlight.getNextSwitch(tl_id)
-                         - traci.simulation.getTime())
-            # 교차로 신호는 ego 링크 기준으로 같은 색이 여러 단계에 걸쳐 이어진다
-            # (예: 기본 프로그램의 적색 37+5+3초). "ego 신호색이 바뀔 때까지"의
-            # 시간이 되도록, 같은 정지 필요도가 이어지는 다음 단계들을 더한다.
-            level = self._SIGNAL_STOP_LEVEL.get(state, 1.0)
-            program = traci.trafficlight.getProgram(tl_id)
-            logic = next(l for l in traci.trafficlight.getAllProgramLogics(tl_id)
-                         if l.programID == program)
-            phases = logic.phases
-            k = traci.trafficlight.getPhase(tl_id)
-            for _ in range(len(phases) - 1):
-                k = (k + 1) % len(phases)
-                if self._SIGNAL_STOP_LEVEL.get(phases[k].state[link], 1.0) != level:
-                    break
-                remaining += phases[k].duration
-            return tl_id, float(dist), state, float(max(remaining, 0.0))
+            if binding and len(upcoming) > 1:
+                room = traci.vehicle.getLength(self.ego_id) + 2.0
+                lvl = self._SIGNAL_STOP_LEVEL.get(state, 1.0)
+                v = traci.vehicle.getSpeed(self.ego_id)
+                for tl2, link2, dist2, state2 in upcoming[1:]:
+                    if dist2 - dist >= room:
+                        break
+                    rem2 = self._tls_remaining(tl2, link2, state2)
+                    if self._SIGNAL_STOP_LEVEL.get(state2, 1.0) > lvl:
+                        return (tl2, float(dist), state2, rem2)
+                    # 둘째 신호가 녹색이어도 그 정지선을 넘기 전에 바뀔 것 같으면 첫 정지선에서
+                    # 황색처럼 본다 (교차로 사이에 갇혀 꼬리로 횡단보도를 막지 않게: "꼬리 물기 금지")
+                    if lvl == 0.0 and rem2 < self._time_to_cover(v, dist2 + 1.0) + 1.0:
+                        return (tl2, float(dist), "y", rem2)
+            return tl_id, float(dist), state, self._tls_remaining(tl_id, link, state)
         except traci.TraCIException:
             return None
 
     def _signal_obs(self):
         """관측 [31..33]: 정지선 거리 / 정지 필요도 / 남은 시간 (mdp_config 참고)."""
-        nxt = self._next_signal()
+        nxt = self._next_signal(binding=True)
         if nxt is None or nxt[1] > self.signal_visibility:
             return [1.0, 0.0, 1.0]                 # 신호 없음/멀리: 제약 없음
         tl_id, dist, state, remaining = nxt
@@ -1541,7 +1572,8 @@ class SumoHighwayEnv(gym.Env):
             if self.veh_shield:
                 accel_raw, shield_active = self._shield_accel(accel_raw, v)
             if self.signal_shield:
-                accel_raw, sig_hit = self._signal_shield_accel(accel_raw, v, signal_before)
+                accel_raw, sig_hit = self._signal_shield_accel(
+                    accel_raw, v, self._next_signal(binding=True))
                 shield_active = shield_active or sig_hit
             # 정류장 앞 규칙 동작 (상위 정책): 정류장 차로로 맞추고 RL 차로변경은 막는다
             if self.stop_obs:
@@ -1599,8 +1631,11 @@ class SumoHighwayEnv(gym.Env):
         # 대신 멈춰주지 않으므로, 이 판정과 보상으로 신호 준수를 학습한다)
         # 일시정지(s)는 정지선 앞 _STOP_ZONE 안에서 한 번 멈췄으면 지나가도 된다.
         signal_after = self._next_signal() if alive else None
+        # 같은 신호(tls.join으로 묶인 교차로)의 정지선이 연달아 있으면 id가 같으므로,
+        # 다음 정지선까지 거리가 늘어난 것도 "지났다"로 본다.
         passed = bool(alive and signal_before is not None
-                      and (signal_after is None or signal_after[0] != signal_before[0]))
+                      and (signal_after is None or signal_after[0] != signal_before[0]
+                           or signal_after[1] > signal_before[1] + 0.5))
         before_level = (self._SIGNAL_STOP_LEVEL.get(signal_before[2], 1.0)
                         if signal_before is not None else 0.0)
         red_violation = passed and (
