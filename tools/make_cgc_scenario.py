@@ -2,6 +2,10 @@
 
 전제: tools/osm_to_sumo.py 로 만든 nod/edg + netconvert 로 만든 cgc.net.xml.
 
+버스 노선·정류장은 config/lines.yaml 에서 읽는다 (없으면 내장 기본값 = 청계A01).
+  - 노선(lines)은 정류장 id 순서만 적는다. 경로는 정류장 순서대로 자동 계산된다.
+  - 노선별 정차 순서는 cgc.line_meta.json 으로 함께 저장한다 (sumo_env가 읽음).
+
 실제 상황 → 시뮬레이션 대응 (근거는 docs/cheonggyecheon_research.md)
   자율주행 셔틀(청계A01)         → 빨간 ego_type, 청계광장→광장시장 동행 경로, 시속 20km급
   끼어드는 차 (접촉 사고 원인)    → ① 측면 도로에서 본선으로 합류하는 차량
@@ -12,6 +16,8 @@
 """
 import argparse
 import csv
+import heapq
+import json
 import math
 import os
 import sys
@@ -27,12 +33,6 @@ NO_STOP_CSV = os.path.join(ROOT, "data", "road_data", "no_stop_zones.csv")
 START_EDGE = "e73541403_1"      # 청계광장 (동행 첫 구간)
 END_EDGE = "e1212424783_4"      # 청계5가·광장시장 부근 (동행 마지막 구간)
 
-# 정류장 엣지는 불법주정차에서 뺀다 (버스가 댈 자리).
-EXCLUDE_EDGES_FOR_PARKING = [
-    "e73541403_2", "e73541403_8", "e908646367_3", "e218924602_1",
-    "e218924602_6", "e1212424785_1", "e732213463_1", "e732213463_4",
-    "e1212424791_3", "e908694578_1", "e908694578_3",
-]
 # 로드뷰에서 오토바이가 서 있던 구간. 광장시장 쪽이 가장 밀집.
 MOTO_PARK_EDGES = [
     "e73541403_2", "e73541403_6",
@@ -119,20 +119,61 @@ def bus_stop_lane_index(edge):
     return 0
 
 
-# 분석 좌표. endPos가 엣지보다 길면 fit_bus_stop이 맞춘다.
-BUS_STOPS = [
-    ("bs_01", "e73541403_2", 22, 37, "청계광장"),
-    ("bs_02", "e73541403_8", 45, 60, "청계1가.광교"),
-    ("bs_03", "e908646367_3", 30, 45, "청계2가.삼일교(동)"),
-    ("bs_04", "e218924602_1", 39, 54, "청계3가.관수교(동)"),
-    ("bs_05", "e218924602_6", 68, 83, "청계4가.배오개다리"),
-    ("bs_06", "e1212424785_1", 184, 199, "청계5가.광장시장"),
-    ("bs_07", "e732213463_1", 113, 128, "청계4가.세운교"),
-    ("bs_08", "e732213463_4", 43, 58, "청계3가.관수교(서)"),
-    ("bs_09", "e1212424791_3", 38, 53, "청계2가.수표교"),
-    ("bs_10", "e908694578_1", 43, 58, "청계2가.삼일교(서)"),
-    ("bs_11", "e908694578_3", 66, 81, "청계1가.장통교"),
-]
+# ──────────────────────────────────────────────────────────────
+# 버스 노선 설정 (config/lines.yaml). 파일이 없으면 아래 기본값(청계A01)을 쓴다.
+#   stops: 정류장 id → {edge, start, end, name}  (실측 좌표, 자동 보정됨)
+#   lines: 노선 이름 → {route_id, stops(정차 순서), start_edge, end_edge}
+# ──────────────────────────────────────────────────────────────
+LINES_YAML = os.path.join(ROOT, "config", "lines.yaml")
+
+DEFAULT_LINE_CONFIG = {
+    "stops": {
+        "bs_01": {"edge": "e73541403_2", "start": 22, "end": 37, "name": "청계광장"},
+        "bs_02": {"edge": "e73541403_8", "start": 45, "end": 60, "name": "청계1가.광교"},
+        "bs_03": {"edge": "e908646367_3", "start": 30, "end": 45, "name": "청계2가.삼일교(동)"},
+        "bs_04": {"edge": "e218924602_1", "start": 39, "end": 54, "name": "청계3가.관수교(동)"},
+        "bs_05": {"edge": "e218924602_6", "start": 68, "end": 83, "name": "청계4가.배오개다리"},
+        "bs_06": {"edge": "e1212424785_1", "start": 184, "end": 199, "name": "청계5가.광장시장"},
+        "bs_07": {"edge": "e732213463_1", "start": 113, "end": 128, "name": "청계4가.세운교"},
+        "bs_08": {"edge": "e732213463_4", "start": 43, "end": 58, "name": "청계3가.관수교(서)"},
+        "bs_09": {"edge": "e1212424791_3", "start": 38, "end": 53, "name": "청계2가.수표교"},
+        "bs_10": {"edge": "e908694578_1", "start": 43, "end": 58, "name": "청계2가.삼일교(서)"},
+        "bs_11": {"edge": "e908694578_3", "start": 66, "end": 81, "name": "청계1가.장통교"},
+    },
+    "lines": {
+        "A01_east": {"route_id": "r0",
+                     "stops": ["bs_01", "bs_02", "bs_03", "bs_04", "bs_05"],
+                     "start_edge": "e73541403_1", "end_edge": "e1212424783_4"},
+        "A01_loop": {"route_id": "r0_loop",
+                     "stops": ["bs_01", "bs_02", "bs_03", "bs_04", "bs_05", "bs_06",
+                               "bs_07", "bs_08", "bs_09", "bs_10", "bs_11"],
+                     "start_edge": "e73541403_1", "end_edge": "e183272596_1"},
+    },
+}
+
+
+def load_line_config(path=None):
+    """config/lines.yaml을 읽는다. 파일이 없으면 내장 기본값(청계A01)."""
+    path = path or LINES_YAML
+    if not os.path.exists(path):
+        print(f"노선 설정 없음({path}) → 내장 기본값(청계A01) 사용")
+        return DEFAULT_LINE_CONFIG
+    try:
+        import yaml
+    except ImportError:
+        raise SystemExit(f"{path}를 읽으려면 pyyaml이 필요합니다: pip install pyyaml")
+    with open(path, encoding="utf-8") as f:
+        cfg = yaml.safe_load(f)
+    for key in ("stops", "lines"):
+        if not isinstance(cfg.get(key), dict) or not cfg[key]:
+            raise SystemExit(f"{path}: '{key}' 항목이 비어 있거나 형식이 틀립니다")
+    for lname, lc in cfg["lines"].items():
+        if "route_id" not in lc or not lc.get("stops"):
+            raise SystemExit(f"{path}: 노선 {lname}에 route_id/stops가 필요합니다")
+        unknown = [s for s in lc["stops"] if s not in cfg["stops"]]
+        if unknown:
+            raise SystemExit(f"{path}: 노선 {lname}의 정류장 {unknown}이 stops에 없습니다")
+    return cfg
 
 
 def shortest(net, a, b):
@@ -140,56 +181,70 @@ def shortest(net, a, b):
     return path
 
 
+def line_route(net, stop_edges, start_edge=None, end_edge=None,
+               main_name="청계천로", off_main_factor=25.0):
+    """정류장을 순서대로 지나는 노선 경로(엣지 목록)를 자동 계산한다.
+
+    구간(정류장→다음 정류장)마다 최단경로를 찾되, 본선(main_name이 이름에 든
+    엣지) 밖은 길이를 off_main_factor배로 쳐서 종로 쪽 지름길로 빠지지 않게
+    한다. 회차 연결로처럼 본선 밖을 꼭 지나야 하는 구간에서만 밖으로 나간다.
+    """
+    def cost(e):
+        return e.getLength() * (1.0 if main_name in (e.getName() or "") else off_main_factor)
+
+    def seg(a, b):
+        if a is b:
+            return [a]
+        dist, prev = {a: 0.0}, {}
+        pq = [(0.0, a.getID(), a)]
+        while pq:
+            d, _, e = heapq.heappop(pq)
+            if e is b:
+                break
+            if d > dist.get(e, float("inf")):
+                continue
+            for nxt in e.getOutgoing():
+                if not (nxt.allows("bus") or nxt.allows("passenger")):
+                    continue
+                nd = d + cost(nxt)
+                if nd < dist.get(nxt, float("inf")) - 1e-9:
+                    dist[nxt] = nd
+                    prev[nxt] = e
+                    heapq.heappush(pq, (nd, nxt.getID(), nxt))
+        if b not in prev:
+            raise RuntimeError(f"경로 없음: {a.getID()} → {b.getID()}")
+        path, e = [b], b
+        while e is not a:
+            e = prev[e]
+            path.append(e)
+        return path[::-1]
+
+    def get(eid):
+        if not eid:
+            return None
+        try:
+            return net.getEdge(eid)
+        except Exception:
+            print(f"노선 기준 엣지 {eid}가 net.xml에 없어 정류장 엣지로 대신합니다")
+            return None
+
+    pts = [p for p in (get(start_edge),) if p is not None]
+    pts += [net.getEdge(eid) for eid in stop_edges]
+    endp = get(end_edge)
+    if endp is not None:
+        pts.append(endp)
+    out = []
+    for a, b in zip(pts, pts[1:]):
+        part = seg(a, b)
+        out.extend(part if not out else part[1:])
+    return out or pts
+
+
 BAD_SIDE = {"e506246961_1b", "e329995230_2a", "e329995230_2b", "e228795468_3a"}  # 합류부에서 계속 정체(순간이동) 확인
 
 
 EAST_WAYS = ["73541403", "1536659790", "908646367", "218924602", "1212424783"]  # 청계광장→광장시장
 WEST_WAYS = ["1212424785", "732213463", "1212424791", "908694578", "350127794"]  # 광장시장→청계광장
-
-# 청계광장 회차(e183272596_1) + 청계5가 좌회전 두 번으로 도는 왕복.
-# OSM 중심선 기준 63개. netconvert가 교차로에 삼킨 id는 resolve_loop_edges가 뺀다.
-LOOP_EDGE_IDS = (
-    "e73541403_1 e73541403_2 e73541403_3 e73541403_4 e73541403_5 e73541403_6 "
-    "e73541403_7 e73541403_8 "
-    "e1536659790_1 e1536659790_2 e1536659790_3 e1536659790_4 e1536659790_5 e1536659790_6 "
-    "e908646367_1 e908646367_2 e908646367_3 e908646367_4 e908646367_5 e908646367_6 "
-    "e218924602_1 e218924602_2 e218924602_3 e218924602_4 e218924602_5 e218924602_6 "
-    "e1212424783_1 e1212424783_2 e1212424783_3 e1212424783_4 "
-    "e1455526426_1 e482167259_1a e608946831_1a e608946832_1a "
-    "e1212424785_1 e1212424785_2 "
-    "e732213463_1 e732213463_2 e732213463_3 e732213463_4 e732213463_5 "
-    "e1212424791_1 e1212424791_2 e1212424791_3 e1212424791_4 e1212424791_5 "
-    "e1212424791_6 e1212424791_7 e1212424791_8 "
-    "e908694578_1 e908694578_2 e908694578_3 e908694578_4 e908694578_5 e908694578_6 "
-    "e908694578_7 "
-    "e350127794_1 e350127794_2 e350127794_3 e350127794_4 e350127794_5 e350127794_6 "
-    "e183272596_1"
-).split()
-
-
-def resolve_loop_edges(net, edge_ids):
-    """왕복 edge 목록을 현재 net.xml에 맞게 고친다.
-
-    청계5가 짧은 연결(e482167259_1a, e608946832_1a)은 선행 확인에서 id가 살아 있었다.
-    그보다 앞선 본선에서 netconvert가 없앤 e73541403_7, e1212424791_8처럼
-    목록에만 있고 네트워크에 없는 id는 빼고, 앞뒤가 직접 이어지는지 본다.
-    """
-    present, missing = [], []
-    for eid in edge_ids:
-        try:
-            present.append(net.getEdge(eid))
-        except Exception:
-            missing.append(eid)
-    if missing:
-        print("왕복 route에서 제외 (net.xml에 없음):", " ".join(missing))
-    out = []
-    for edge in present:
-        if out and edge not in out[-1].getOutgoing():
-            raise RuntimeError(
-                f"왕복 경로가 끊김: {out[-1].getID()} → {edge.getID()} "
-                f"(제외된 엣지: {' '.join(missing) or '없음'})")
-        out.append(edge)
-    return out
 
 
 def chain_route(net, way_ids):
@@ -276,20 +331,38 @@ def build(net_path, out_dir, args):
     # 빈도를 직접 지정한다 (중복 투입 방지를 위해 일반 합류 목록에서는 뺀다).
     sejong_srcs = [e for e in srcs if "세종대로" in (e.getName() or "")]
     srcs = [e for e in srcs if e not in sejong_srcs]
-    # 정류장 5곳의 실제 정차 구간(엣지 길이로 잘린 뒤 좌표) — 불법주정차가
-    # 버스 정차 자리를 막지 않도록 이 구간(±margin)은 모든 주정차에서 뺀다.
+    # 정류장 (config/lines.yaml): 실제 정차 구간(엣지 길이로 잘린 뒤 좌표) —
+    # 불법주정차가 버스 정차 자리를 막지 않도록 이 구간(±margin)은 모든 주정차에서 뺀다.
+    line_cfg = load_line_config(getattr(args, "lines", None))
     bus_stop_zones = {}
-    placed_stops = []
-    for sid, eid, start, end, name in BUS_STOPS:
+    placed_stops = []        # (sid, eid, start, end, name) — add.xml에 쓰는 순서
+    placed = {}              # sid → (eid, start, end, name)
+    for sid, st in line_cfg["stops"].items():
         try:
-            eid, start, end = place_bus_stop(net, (route, west), eid, start, end)
+            eid, start, end = place_bus_stop(net, (route, west), st["edge"],
+                                             float(st["start"]), float(st["end"]))
             s, e2 = fit_bus_stop(net.getEdge(eid).getLength(), start, end)
         except Exception:
+            print("정류장 배치 실패 (엣지가 net.xml에 없음?):", sid, st.get("edge"))
             continue
-        placed_stops.append((sid, eid, s, e2, name))
+        placed_stops.append((sid, eid, s, e2, st["name"]))
+        placed[sid] = (eid, s, e2, st["name"])
         bus_stop_zones.setdefault(eid, []).append((s, e2))
+    # 노선 경로: 정류장 순서대로 자동 계산 (lines.yaml의 stops 순서만 바꾸면 노선이 바뀐다)
+    line_routes = {}         # 노선 이름 → (route_id, 엣지 목록, 정차할 정류장 순서)
+    for lname, lc in line_cfg["lines"].items():
+        sids = [s for s in lc["stops"] if s in placed]
+        edges = line_route(net, [placed[s][0] for s in sids],
+                           lc.get("start_edge"), lc.get("end_edge"))
+        route_id = str(lc["route_id"])
+        if route_id in ("main_east", "main_west"):
+            raise SystemExit(f"노선 {lname}: route_id '{route_id}'는 배경 교통용 이름이라 쓸 수 없습니다")
+        line_routes[lname] = (route_id, edges, sids)
+    if args.line not in line_routes:
+        raise SystemExit(f"--line {args.line}: lines.yaml에 없는 노선 (있는 것: {list(line_routes)})")
     ids = " ".join(e.getID() for e in route)
-    rid = args.route_id   # 학습 환경(sumo_env)은 ego/배경 경로를 "r0"으로 찾는다
+    rid = line_routes[args.line][0]   # 데모 ego가 달릴 route id (기본 A01_east → r0)
+    stop_edges = {eid for _, eid, _, _, _ in placed_stops}   # 불법주정차 제외 엣지
     rng = random.Random(7)
 
     ctrl = [  # (id, model, prob, accel, decel, tau, minGap, maxSpeed, sigma, color)
@@ -337,14 +410,15 @@ def build(net_path, out_dir, args):
     # 가게 앞 하역 중인 배달 트럭. 차로를 막는 정식 주차(parking=true), 하역 시간 300초.
     L.append('    <vType id="parked_truck" vClass="delivery" length="6.0" width="2.3" '
              'accel="2.0" decel="4.0" maxSpeed="8.3" color="0.3,0.3,0.4" guiShape="delivery"/>')
-    L.append(f'    <route id="{rid}" edges="{ids}"/>')
-    loop = resolve_loop_edges(net, LOOP_EDGE_IDS)
-    loop_ids = " ".join(e.getID() for e in loop)
-    L.append(f'    <route id="{args.loop_route_id}" edges="{loop_ids}"/>')
+    # 배경 교통용 본선 route (노선과 분리 — 노선을 바꿔도 배경 교통은 그대로)
+    L.append(f'    <route id="main_east" edges="{ids}"/>')
     if west:
         L.append(f'    <route id="main_west" edges="{" ".join(e.getID() for e in west)}"/>')
+    # 버스 노선 route (lines.yaml): 정류장 순서로 자동 계산한 경로
+    for lname, (route_id, edges, sids) in line_routes.items():
+        L.append(f'    <route id="{route_id}" edges="{" ".join(e.getID() for e in edges)}"/>')
     # 본선 통과 교통 (동행/서행)
-    L.append(f'    <flow id="through_e" type="carDist" route="{rid}" begin="0" end="100000" '
+    L.append(f'    <flow id="through_e" type="carDist" route="main_east" begin="0" end="100000" '
              f'vehsPerHour="{args.through_vph}" departLane="best" departSpeed="max"/>')
     if west:
         L.append(f'    <flow id="through_w" type="carDist" route="main_west" begin="0" end="100000" '
@@ -359,10 +433,10 @@ def build(net_path, out_dir, args):
         L.append(f'    <flow id="through_merge_{i}" type="cutin_car" from="{e.getID()}" to="{END_EDGE}" '
                  f'begin="0" end="100000" period="60" departLane="best" departSpeed="max"/>')
     # 오토바이: 본선 전체를 달리며 차선 사이를 파고든다
-    L.append(f'    <flow id="moto" type="motorcycle" route="{rid}" begin="0" end="100000" '
+    L.append(f'    <flow id="moto" type="motorcycle" route="main_east" begin="0" end="100000" '
              f'vehsPerHour="{args.moto_vph}" departLane="best" departSpeed="max"/>')
     # 동행·서행 전 구간. 20초에 한 대면 4 m/s 기준으로 약 80 m 간격.
-    L.append(f'    <flow id="bike_e" type="bicycle" route="{rid}" begin="0" end="100000" '
+    L.append(f'    <flow id="bike_e" type="bicycle" route="main_east" begin="0" end="100000" '
              f'period="20" departLane="best" departSpeed="max"/>')
     if west:
         L.append('    <flow id="bike_w" type="bicycle" route="main_west" begin="0" end="100000" '
@@ -441,10 +515,10 @@ def build(net_path, out_dir, args):
     # 정차금지지대, 승용차 1차로 엣지(이미 좁아 중복 안 함).
     PARK_SPACING = 30.0
     park_spots = []
-    for edges, route_name in ((route, rid), (west, "main_west")):
+    for edges, route_name in ((route, "main_east"), (west, "main_west")):
         for e in edges:
             eid = e.getID()
-            if eid in EXCLUDE_EDGES_FOR_PARKING:
+            if eid in stop_edges:    # 정류장 엣지는 뺀다 (버스가 댈 자리)
                 continue
             lanes = passenger_lane_indexes(e)
             if len(lanes) < 2:
@@ -479,6 +553,17 @@ def build(net_path, out_dir, args):
     with open(os.path.join(out_dir, "cgc.add.xml"), "w", encoding="utf-8", newline="\n") as f:
         f.write("\n".join(add) + "\n")
 
+    # 노선 메타: route id → 정차할 정류장 순서. sumo_env가 reset에서 읽어 setBusStop 한다.
+    meta = {
+        "lines": {route_id: {"line": lname, "stops": sids,
+                             "length_m": round(sum(e.getLength() for e in edges), 1)}
+                  for lname, (route_id, edges, sids) in line_routes.items()},
+        "stops": {sid: {"edge": eid, "start": s, "end": e2, "name": name}
+                  for sid, eid, s, e2, name in placed_stops},
+    }
+    with open(os.path.join(out_dir, "cgc.line_meta.json"), "w", encoding="utf-8", newline="\n") as f:
+        json.dump(meta, f, ensure_ascii=False, indent=1)
+
     # GUI: 전체 도로가 한 화면에 보이도록 (x 0~2275, y -280~210)
     with open(os.path.join(out_dir, "cgc.gui.xml"), "w", encoding="utf-8", newline="\n") as f:
         f.write('<viewsettings>\n    <scheme name="real world"/>\n'
@@ -490,8 +575,10 @@ def build(net_path, out_dir, args):
                 '        <additional-files value="cgc.add.xml"/>\n    </input>\n'
                 '    <gui_only>\n        <gui-settings-file value="cgc.gui.xml"/>\n    </gui_only>\n'
                 '</configuration>\n')
-    print(f"경로 {len(route)}개 엣지, 왕복 {args.loop_route_id} {len(loop)}개 엣지, "
-          f"측면 합류 {len(srcs)}곳(+세종대로 {len(sejong_srcs)}곳), "
+    lines_txt = ", ".join(f"{ln} ({route_id}: 정류장 {len(sids)}곳, {len(edges)}엣지)"
+                          for ln, (route_id, edges, sids) in line_routes.items())
+    print(f"본선 {len(route)}개 엣지 / 노선: {lines_txt}")
+    print(f"측면 합류 {len(srcs)}곳(+세종대로 {len(sejong_srcs)}곳), "
           f"불법주정차 {len(park_spots)}곳, 오토바이 주차 {moto_n}대, 트럭 주정차 {truck_n}대, "
           f"정류장 {written_stops}개")
     print("측면 합류 엣지:", [e.getID() for e in srcs])
@@ -502,9 +589,14 @@ def parse_args(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--net", default="env/cheonggyecheon/cgc.net.xml")
     ap.add_argument("--out", default="env/cheonggyecheon")
-    ap.add_argument("--route-id", default="main_east")
+    ap.add_argument("--lines", default=None,
+                    help=f"노선 설정 YAML (기본 {LINES_YAML}, 없으면 내장 청계A01)")
+    ap.add_argument("--line", default="A01_east",
+                    help="데모 ego가 달릴 노선 이름 (lines.yaml의 lines 키)")
+    ap.add_argument("--route-id", default="r0",
+                    help="(호환용, 무시됨 — route id는 lines.yaml의 route_id로 정한다)")
     ap.add_argument("--loop-route-id", default="r0_loop",
-                    help="청계광장·청계5가에서 되돌아오는 왕복 route id")
+                    help="(호환용, 무시됨 — 왕복 노선은 lines.yaml의 A01_loop)")
     ap.add_argument("--shuttle-kmh", type=float, default=20.0)
     ap.add_argument("--ego-accel", type=float, default=None)
     ap.add_argument("--ego-decel", type=float, default=None)

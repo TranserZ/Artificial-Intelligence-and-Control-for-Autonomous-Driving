@@ -90,18 +90,26 @@ def _build_cheonggyecheon(ego: dict, out_dir: str) -> str:
         subprocess.run(netconvert_cmd, check=True, capture_output=True)
     args = make_cgc_scenario.parse_args(
         ["--net", os.path.join(out_dir, "cgc.net.xml"), "--out", out_dir,
-         "--route-id", "r0", "--no-demo-ego",
+         "--no-demo-ego",
          "--ego-accel", str(ego["accel"]), "--ego-decel", str(ego["decel"]),
          "--ego-max-speed", str(ego["max_speed"])])
     make_cgc_scenario.build(args.net, out_dir, args)
     # 버스 경로 위 오른쪽 차로가 직진으로 안 이어지는 교차로 보정 (도로망만 다시 쓰고, 경로는 그대로)
-    # r0_loop의 청계5가·청계광장 좌회전은 오른쪽 승용차 차로(lane 1)에 따로 붙인다.
+    # 왕복 노선의 청계5가·청계광장 좌회전은 오른쪽 승용차 차로(lane 1)에 따로 붙인다.
+    # 노선 route id는 cgc.line_meta.json에서 읽는다 (config/lines.yaml 기준).
     net_path = os.path.join(out_dir, "cgc.net.xml")
     rou_path = os.path.join(out_dir, "cgc.rou.xml")
     con_path = os.path.join(out_dir, "cgc.fix.con.xml")
-    n_fix = osm_to_sumo.route_straight_connections(net_path, rou_path, "r0", con_path)
-    n_fix += osm_to_sumo.route_straight_connections(
-        net_path, rou_path, "r0_loop", con_path, append=True)
+    meta_path = os.path.join(out_dir, "cgc.line_meta.json")
+    route_ids = ["r0", "r0_loop"]
+    if os.path.exists(meta_path):
+        import json
+        with open(meta_path, encoding="utf-8") as f:
+            route_ids = list(json.load(f)["lines"].keys())
+    n_fix = 0
+    for i, rid in enumerate(route_ids):
+        n_fix += osm_to_sumo.route_straight_connections(
+            net_path, rou_path, rid, con_path, append=i > 0)
     n_fix += osm_to_sumo.loop_left_connections(net_path, con_path, append=True)
     if n_fix:
         subprocess.run([checkBinary("netconvert"), "--sumo-net-file", net_path,

@@ -297,7 +297,9 @@ if CHEONGGYECHEON["enabled"]:
             "length": CHEONGGYECHEON["route_length"],
             "num_lanes": 2}                 # 청계천 양쪽 일방통행, 각 편도 2차로
     EGO = {**EGO,
-           "routes": {"r0": 1.0},          # 편도(동행) route만 학습/평가
+           # 편도(동행) 노선만 학습/평가. 노선·정류장 정의는 config/lines.yaml
+           # (A01_east → r0, A01_loop → r0_loop). 왕복을 학습하려면 {"r0_loop": 1.0}.
+           "routes": {"r0": 1.0},
            "depart_lane": 0,               # 맨 오른쪽 차로에서 출발 (정류장 쪽)
            "route_depart_lane": {},
            # 자율주행 셔틀(버스) 물리 특성 — 일반 승용차보다 가감속이 완만하다.

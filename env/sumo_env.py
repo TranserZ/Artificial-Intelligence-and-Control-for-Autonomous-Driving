@@ -19,6 +19,7 @@
 import os
 import sys
 import csv
+import json
 
 import numpy as np
 import gymnasium as gym
@@ -85,8 +86,8 @@ def _load_zone_rows(filename, columns):
     return rows
 
 
-# 편도(동행) route에서 ego가 서는 순서. 정차 시간은 reset에서 15초.
-# bs_06(광장시장)은 서행 엣지(e1212424785_1)에 있어 편도 동행 route(r0)에서는 제외한다.
+# 노선별 정차 순서는 시나리오 생성 시 cgc.line_meta.json으로 저장된다 (config/lines.yaml).
+# 아래는 메타 파일이 없는 구버전 시나리오용 fallback (청계A01 동행 5곳).
 BUS_STOPS_ORDER = ["bs_01", "bs_02", "bs_03", "bs_04", "bs_05"]
 
 # 어린이보호구역(세운상가, 3차로) 구간 — 버스 노선은 가운데 차로를 유지한다.
@@ -121,6 +122,14 @@ class SumoHighwayEnv(gym.Env):
         self.cfg_path = cfg_path
         self.gui = gui
         self.gui_autostart = gui_autostart
+        # 노선 메타 (route id → 정차할 정류장 순서). make_cgc_scenario가 만든다.
+        self._line_stops = {}
+        meta_path = os.path.join(os.path.dirname(os.path.abspath(cfg_path)),
+                                 "cgc.line_meta.json")
+        if os.path.exists(meta_path):
+            with open(meta_path, encoding="utf-8") as f:
+                self._line_stops = {route_id: d.get("stops", [])
+                                    for route_id, d in json.load(f)["lines"].items()}
 
         # ----- 도로/차량 설정에서 필요한 값들 -----
         self.vmax = float(road["speed_limit"])   # 속도 정규화 기준
@@ -753,10 +762,16 @@ class SumoHighwayEnv(gym.Env):
                                       if depart_lane.isdigit() else depart_lane),
                           departPos="0",
                           departSpeed=self.ego_depart_speed)
-        # 편도(동행) route면 정류장 5곳에 정차. 정차 시간 15초 (TODO: 노션 조사값 들어오면 교체)
-        if self.ego_route in ("r0", "r0_loop"):
-            for bs_id in BUS_STOPS_ORDER:
+        # 이 route의 노선 정류장에 순서대로 정차 (cgc.line_meta.json).
+        # 정차 시간 15초 (TODO: 노션 조사값 들어오면 교체)
+        line_stops = self._line_stops.get(self.ego_route)
+        if line_stops is None and self.ego_route in ("r0", "r0_loop"):
+            line_stops = BUS_STOPS_ORDER   # 구버전 시나리오(메타 없음) 호환
+        for bs_id in line_stops or []:
+            try:
                 traci.vehicle.setBusStop(self.ego_id, bs_id, duration=15)
+            except traci.TraCIException:
+                print("정류장 지정 실패 (add.xml에 없음):", bs_id)
 
         # ★ 중요: speedMode=0 → SUMO의 내장 안전장치(자동 안전제동 등)를 전부 끔.
         #   이걸 꺼야 RL이 속도를 온전히 제어하고, 잘못 배우면 실제로 충돌한다.
