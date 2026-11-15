@@ -126,10 +126,14 @@ class SumoHighwayEnv(gym.Env):
         self._line_stops = {}
         meta_path = os.path.join(os.path.dirname(os.path.abspath(cfg_path)),
                                  "cgc.line_meta.json")
+        self._line_names = {}
         if os.path.exists(meta_path):
             with open(meta_path, encoding="utf-8") as f:
-                self._line_stops = {route_id: d.get("stops", [])
-                                    for route_id, d in json.load(f)["lines"].items()}
+                lines_meta = json.load(f)["lines"]
+            self._line_stops = {route_id: d.get("stops", [])
+                                for route_id, d in lines_meta.items()}
+            self._line_names = {route_id: d.get("line")
+                                for route_id, d in lines_meta.items()}
 
         # ----- 도로/차량 설정에서 필요한 값들 -----
         self.vmax = float(road["speed_limit"])   # 속도 정규화 기준
@@ -773,6 +777,10 @@ class SumoHighwayEnv(gym.Env):
                 traci.vehicle.setBusStop(self.ego_id, bs_id, duration=15)
             except traci.TraCIException:
                 print("정류장 지정 실패 (add.xml에 없음):", bs_id)
+        # 노선 이름을 달아 줘야 그 노선 승객(personFlow의 ride lines=...)이 탄다
+        line_name = self._line_names.get(self.ego_route)
+        if line_name:
+            traci.vehicle.setLine(self.ego_id, line_name)
 
         # ★ 중요: speedMode=0 → SUMO의 내장 안전장치(자동 안전제동 등)를 전부 끔.
         #   이걸 꺼야 RL이 속도를 온전히 제어하고, 잘못 배우면 실제로 충돌한다.

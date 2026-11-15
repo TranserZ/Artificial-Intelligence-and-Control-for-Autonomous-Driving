@@ -91,6 +91,8 @@ def _build_cheonggyecheon(ego: dict, out_dir: str) -> str:
     args = make_cgc_scenario.parse_args(
         ["--net", os.path.join(out_dir, "cgc.net.xml"), "--out", out_dir,
          "--no-demo-ego",
+         # 승객은 ego가 달릴 수 있는 route(노선)에만 만든다
+         "--pax-route-ids", ",".join(ego.get("routes") or {"r0": 1.0}),
          "--ego-accel", str(ego["accel"]), "--ego-decel", str(ego["decel"]),
          "--ego-max-speed", str(ego["max_speed"])])
     make_cgc_scenario.build(args.net, out_dir, args)
