@@ -219,6 +219,14 @@ class SumoHighwayEnv(gym.Env):
         self.signal_margin = float(vs.get("signal_margin", 1.0))   # 정지선 앞 여유 m
         # 이 감속 이상이 필요하면(급정거) 개입하지 않는다: 뒤차·자전거 추돌 위험이 더 크다
         self.signal_max_decel = float(vs.get("signal_max_decel", self.max_decel))
+        # shield 끄는 판 비율: 학습이 진행될수록 0 → off_prob_max (off_ramp_steps 스텝에 걸쳐).
+        #   shield가 항상 켜져 있으면 모델이 충돌 결과를 겪지 못해 shield에 기대게 된다
+        #   (1차 모델: shield 켬 충돌 4% / 끔 충돌 94%). 기본값 0 = 항상 켬 (평가·재생용).
+        self.shield_off_max = float(vs.get("off_prob_max", 0.0))
+        self.shield_off_ramp = float(vs.get("off_ramp_steps", 1.0))
+        self.shield_eval_off = False   # True면 이번 평가 판들은 shield 끔 (ppo 평가에서 켬)
+        self._shield_on = True
+        self._train_steps = 0
         # ego 경로 후보와 확률 (road_config.EGO["routes"]). 네트워크에 없는 route는 reset에서 제외
         self.ego_routes = dict(ego.get("routes") or {"r0": 1.0})
         self.route_depart_lane = dict(ego.get("route_depart_lane") or {})
@@ -791,6 +799,11 @@ class SumoHighwayEnv(gym.Env):
                 pass
 
         self._stop_stuck = 0
+        if self.shield_eval_off:
+            self._shield_on = False
+        else:
+            p_off = self.shield_off_max * min(1.0, self._train_steps / max(self.shield_off_ramp, 1.0))
+            self._shield_on = bool(np.random.random() >= p_off)
         self._missed_stops = 0
         self.step_count = 0
         # 진행 보상용: 직전 스텝까지의 주행거리 (getDistance = 출발 후 누적 m)
@@ -1552,6 +1565,7 @@ class SumoHighwayEnv(gym.Env):
         lane_change_applied = False
         filter_active = False
         shield_active = False
+        shield_severity = 0.0
         stop_ctrl = False
         lane_before = None
         odo_before = None
@@ -1569,12 +1583,19 @@ class SumoHighwayEnv(gym.Env):
             if self.ped_filter is not None:
                 accel_raw, filter_active = self.ped_filter.apply(accel_raw, self.ego_id)
             shield_active = False
-            if self.veh_shield:
+            accel_before_shield = accel_raw
+            if not self.shield_eval_off:
+                self._train_steps += 1
+            if self.veh_shield and self._shield_on:
                 accel_raw, shield_active = self._shield_accel(accel_raw, v)
-            if self.signal_shield:
+            if self.signal_shield and self._shield_on:
                 accel_raw, sig_hit = self._signal_shield_accel(
                     accel_raw, v, self._next_signal(binding=True))
                 shield_active = shield_active or sig_hit
+            if shield_active:
+                # 개입 세기: 모델 명령과 shield 명령의 차이 (m/s², 최대 감속으로 나눔)
+                cmd = lambda r: r * (self.max_accel if r >= 0 else self.max_decel)
+                shield_severity = max(0.0, cmd(accel_before_shield) - cmd(accel_raw)) / self.max_decel
             # 정류장 앞 규칙 동작 (상위 정책): 정류장 차로로 맞추고 RL 차로변경은 막는다
             if self.stop_obs:
                 accel_raw, stop_ctrl = self._bus_stop_control(accel_raw, v)
@@ -1829,7 +1850,9 @@ class SumoHighwayEnv(gym.Env):
             reward = 0.0
         # 안전 필터가 개입한 스텝은 소폭 감점 → 필터 없이도 안전하게 달리도록 유도
         if shield_active and not terminated:
-            reward -= float(self.rw.get("shield_penalty", 0.0))
+            # 고정 감점 + 개입 세기에 비례한 감점 (세게 막을수록 = 충돌에 가까울수록 크게)
+            reward -= (float(self.rw.get("shield_penalty", 0.0))
+                       + float(self.rw.get("shield_penalty_scale", 0.0)) * shield_severity)
 
         # 양보 위반은 종료하지 않고 감점만 (충돌·완주와 같은 스텝이어도 적용)
         if yield_violation:
@@ -1849,6 +1872,7 @@ class SumoHighwayEnv(gym.Env):
             "accel_raw": accel_raw,          # 실제 적용 값 (필터가 바꿨으면 바뀐 값)
             "filter_active": filter_active,
             "shield_active": shield_active,
+            "shield_on": self._shield_on,
             "dwelling": bool(dwelling),
             "missed_stops": self._missed_stops,
             "approach_pen": approach_pen,

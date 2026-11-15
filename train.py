@@ -85,9 +85,16 @@ REWARD_OVERRIDES = dict(
     zone_approach_penalty=0.05,    # 보호구역 입구에서 30 km/h가 되도록 감속 곡선 초과 1 m/s당 감점
     no_stop_zone_penalty=0.1,         # 정차금지지대에서 서 있으면 스텝당 감점
     school_zone_speeding_penalty=0.1, # 어린이보호구역 초과 1 m/s당 감점 (상한 0.5)
-    shield_penalty=0.05,              # 차량 안전 필터가 개입한 스텝 감점 (청계천로에서만 켜짐)
+    shield_penalty=0.1,               # 안전 필터(차량·신호)가 개입한 스텝 고정 감점 (청계천로에서만 켜짐)
+    shield_penalty_scale=1.0,         # + 개입 세기(명령과 필터 감속 차 / 최대 감속) × 이 값
+                                      #   0.05 고정만 줬을 때 모델이 필터에 기댐 (필터 끄면 충돌 94%)
 )
 REWARD = {**REWARD_DEFAULTS, **REWARD_OVERRIDES}
+# 학습 중에만: 안전 필터를 끄는 판을 점점 늘린다 (0 → 70%, 60만 스텝에 걸쳐).
+# 필터가 늘 켜져 있으면 충돌을 겪지 못해 필터 없이 운전하는 법을 못 배운다.
+if SIMULATION.get("veh_shield", {}).get("enabled"):
+    SIMULATION["veh_shield"] = {**SIMULATION["veh_shield"],
+                                "off_prob_max": 0.7, "off_ramp_steps": 600_000}
 
 
 HPARAMS = dict(

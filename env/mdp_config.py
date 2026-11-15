@@ -333,6 +333,8 @@ REWARD = {
     "school_zone_speeding_penalty": 0.1,
     # 차량 안전 필터가 개입한 스텝 감점 (SIMULATION["veh_shield"])
     "shield_penalty": 0.0,
+    # + 개입 세기(모델 명령 − 필터 명령, 최대 감속으로 나눈 값) × 이 값
+    "shield_penalty_scale": 0.0,
 }
 # 보상 스케일에 대한 메모 (수업에서 다뤄볼 만한 지점):
 #   처음엔 speed_weight=1.0, collision=-10, arrival=+5 였는데,
