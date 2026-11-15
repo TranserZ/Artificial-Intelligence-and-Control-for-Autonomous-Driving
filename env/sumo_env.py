@@ -265,6 +265,7 @@ class SumoHighwayEnv(gym.Env):
         self.step_count = 0
         self._stop_stuck = 0
         self._missed_stops = 0
+        self._sumo_stop_ctrl = False   # True면 SUMO가 정류장 정차를 관리 중 (setSpeed 금지)
         self._started = False      # SUMO 프로세스가 떠 있는지 여부
 
         # Gymnasium 행동 공간:
@@ -814,6 +815,7 @@ class SumoHighwayEnv(gym.Env):
                 pass
 
         self._stop_stuck = 0
+        self._sumo_stop_ctrl = False
         if self.shield_eval_off:
             self._shield_on = False
         else:
@@ -1202,6 +1204,7 @@ class SumoHighwayEnv(gym.Env):
         - 다른 차로면 끼어들 틈을 만들도록 merge_speed 이하로 줄인다.
         반환: (가속 명령, RL 차로 명령을 막는지)
         """
+        self._sumo_stop_ctrl = False
         ns = self._next_stop()
         if ns is None:
             self._stop_stuck = 0
@@ -1221,9 +1224,19 @@ class SumoHighwayEnv(gym.Env):
             self._stop_stuck = 0
             return accel_raw, False
         if traci.vehicle.isAtBusStop(self.ego_id):
+            self._sumo_stop_ctrl = True   # SUMO가 정차(15초)를 관리 중 — setSpeed 금지
             return accel_raw, True
         cur_edge = traci.vehicle.getRoadID(self.ego_id)
         cur = traci.vehicle.getLaneIndex(self.ego_id)
+        # 정차 직전(정류장 엣지의 정류장 차로, 15 m 안)에는 SUMO에 속도 제어를 넘긴다.
+        #   RL이 setSpeed로 속도를 쥔 채로는 SUMO가 '정류장 정차'를 시작하지 못해
+        #   isAtBusStop이 영영 켜지지 않고, endPos 직전에서 영원히 서 있게 된다.
+        #   (감속 곡선이 이미 속도를 충분히 줄여 둔 상태라 SUMO가 편하게 세운다)
+        if cur_edge == edge and cur == idx and d <= 15.0:
+            traci.vehicle.setSpeed(self.ego_id, -1.0)
+            self._sumo_stop_ctrl = True
+            self._stop_stuck = 0
+            return accel_raw, True
         # 목표: 정류장 엣지에서는 정류장 차로, 그 전 엣지에서는 맨 오른쪽 승용차 차로
         # (청계천로 정류장은 모두 맨 오른쪽 승용차 차로에 있다)
         want = idx if cur_edge == edge else None
@@ -1620,8 +1633,11 @@ class SumoHighwayEnv(gym.Env):
             accel_cmd = (accel_raw * self.max_accel
                          if accel_raw >= 0.0 else accel_raw * self.max_decel)
             dv = accel_cmd * self.step_length
-            traci.vehicle.setSpeed(
-                self.ego_id, float(np.clip(v + dv, 0.0, self.vmax)))
+            # 정류장 정차를 SUMO가 관리 중이면 속도 명령을 보내지 않는다
+            # (보내면 SUMO의 정차 등록·15초 대기가 깨진다)
+            if not self._sumo_stop_ctrl:
+                traci.vehicle.setSpeed(
+                    self.ego_id, float(np.clip(v + dv, 0.0, self.vmax)))
 
             # 정류장 규칙이 차로를 잡고 있으면 RL 차로 명령(유지 포함)을 보내지 않는다
             #   (유지 명령도 changeLane(현재 차로)라서 정류장 차로 이동을 취소해 버린다)
