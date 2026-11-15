@@ -186,8 +186,11 @@ if __name__ == "__main__":
                              "관측 차원이 늘었으면 새 입력 가중치는 0으로 채워 기존 행동을 유지한다")
     parser.add_argument("--timesteps", type=int, default=None, help="TOTAL_TIMESTEPS 덮어쓰기")
     parser.add_argument("--run-name", default=None, help="results/ 아래 폴더 이름")
+    parser.add_argument("--lr", type=float, default=None, help="학습률 덮어쓰기 (이어 학습 시 낮춰서)")
     args = parser.parse_args()
     HPARAMS["seed"] = args.seed
+    if args.lr:
+        HPARAMS["lr"] = args.lr
     if args.timesteps:
         TOTAL_TIMESTEPS = args.timesteps
         MIDPOINT_TIMESTEPS = int(TOTAL_TIMESTEPS * 0.7)

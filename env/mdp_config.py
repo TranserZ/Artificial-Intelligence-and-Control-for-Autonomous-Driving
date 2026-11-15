@@ -48,7 +48,12 @@ if _CGC["enabled"]:
     # 차량 안전 필터(shield): 앞차 간격 기준 안전 속도를 넘는 가속은 제동으로 바꾼다.
     #   천호 모델을 청계천로에 그대로 돌렸을 때 충돌 39/40 (대부분 추돌·교차로 진입 충돌).
     #   학습 중에도 켜 두고, 개입한 스텝은 shield_penalty로 감점한다 (shield + punishment).
-    SIMULATION["veh_shield"] = {"enabled": True, "decel": 3.0, "margin": 2.5}
+    #   signal=True: 적색 신호 정지선도 같은 방식으로 지킨다. 학습 1차(100만 스텝, 시드 3개)에서
+    #   실패의 대부분이 느린 자전거·차를 따라가다 적색에 정지선을 넘는 경우였다 (같은 감점 적용).
+    SIMULATION["veh_shield"] = {"enabled": True, "decel": 3.0, "margin": 2.5,
+                                "signal": True, "signal_margin": 1.0, "signal_max_decel": 3.0}
+    #   signal_max_decel: 4.0(최대 제동)까지 허용하면 적색 급정거 때 뒤 자전거가 추돌해 충돌이 늘었다
+    #   (50판 평가: 4.0 → 충돌 8%, 3.0 → 충돌 6%·자전거 추돌 0, 둘 다 신호 위반 0)
 
 # ──────────────────────────────────────────────────────────────
 # 2) 관측 (Observation, 상태 S) — 31차원, 범위 [-1, 1]

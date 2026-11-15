@@ -213,6 +213,12 @@ class SumoHighwayEnv(gym.Env):
         self.veh_shield = bool(vs.get("enabled", False))
         self.shield_decel = float(vs.get("decel", 3.0))     # 안전 속도 계산에 쓰는 제동 m/s²
         self.shield_margin = float(vs.get("margin", 2.5))   # 정지 후 남길 간격 m
+        # 신호 shield: 적색(또는 편하게 설 수 있는 황색)인데 정지선을 넘을 속도면 정지선 앞에 서도록 제동.
+        #   이미 최대 제동으로도 못 서는 거리면 개입하지 않는다(어차피 못 막음 → 위반은 그대로 판정).
+        self.signal_shield = bool(vs.get("signal", False))
+        self.signal_margin = float(vs.get("signal_margin", 1.0))   # 정지선 앞 여유 m
+        # 이 감속 이상이 필요하면(급정거) 개입하지 않는다: 뒤차·자전거 추돌 위험이 더 크다
+        self.signal_max_decel = float(vs.get("signal_max_decel", self.max_decel))
         # ego 경로 후보와 확률 (road_config.EGO["routes"]). 네트워크에 없는 route는 reset에서 제외
         self.ego_routes = dict(ego.get("routes") or {"r0": 1.0})
         self.route_depart_lane = dict(ego.get("route_depart_lane") or {})
@@ -1216,6 +1222,28 @@ class SumoHighwayEnv(gym.Env):
         new = need / self.max_accel if need >= 0 else need / self.max_decel
         return float(np.clip(min(new, accel_raw), -1.0, 1.0)), True
 
+    def _signal_shield_accel(self, accel_raw: float, v: float, sig):
+        """앞 신호가 적색(r/u) 또는 편하게 설 수 있는 황색(y)이면 정지선을 장애물로 보고
+        _shield_accel과 같은 정지거리 모델로 속도를 제한한다. sig = _next_signal() 결과."""
+        if sig is None:
+            return accel_raw, False
+        _, dist, state, _ = sig
+        if state not in ("r", "u", "y"):
+            return accel_raw, False
+        room = dist - self.signal_margin
+        b, dt = self.shield_decel, self.step_length
+        if state == "y" and v * v > 2.0 * b * max(room, 0.0):
+            return accel_raw, False                 # 황색인데 편하게 못 섬 → 통과
+        if v * v > 2.0 * self.signal_max_decel * max(room, 0.0) + 1e-6:
+            return accel_raw, False                 # 허용 제동으로 못 섬 → 개입하지 않음
+        v_safe = max(np.sqrt(2.0 * b * max(room, 0.0)) - b * dt, 0.0)
+        cmd = accel_raw * (self.max_accel if accel_raw >= 0 else self.max_decel)
+        if v + cmd * dt <= v_safe:
+            return accel_raw, False
+        need = (v_safe - v) / dt
+        new = need / self.max_accel if need >= 0 else need / self.max_decel
+        return float(np.clip(min(new, accel_raw), -1.0, 1.0)), True
+
     def _get_obs(self):
         # ego가 이미 사라졌다면(충돌/도착) 0벡터 반환 — 종료 직전 마지막 관측용
         if self.ego_id not in traci.vehicle.getIDList():
@@ -1512,6 +1540,9 @@ class SumoHighwayEnv(gym.Env):
             shield_active = False
             if self.veh_shield:
                 accel_raw, shield_active = self._shield_accel(accel_raw, v)
+            if self.signal_shield:
+                accel_raw, sig_hit = self._signal_shield_accel(accel_raw, v, signal_before)
+                shield_active = shield_active or sig_hit
             # 정류장 앞 규칙 동작 (상위 정책): 정류장 차로로 맞추고 RL 차로변경은 막는다
             if self.stop_obs:
                 accel_raw, stop_ctrl = self._bus_stop_control(accel_raw, v)
