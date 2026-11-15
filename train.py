@@ -35,7 +35,8 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 #  하이퍼파라미터 — 실험은 여기서
 # ══════════════════════════════════════════════════════════════════
 TOTAL_TIMESTEPS = 1_000_000  # 총 학습 스텝 수 (신호등 200k → 500k, 보행자·우회전 추가로 1M,
-                             #   1.5M은 1M보다 신호위반이 늘어 다시 1M)
+                             #   1.5M은 1M보다 신호위반이 늘어 다시 1M. 어린이 보호구역 1.5M run도
+                             #   1M 시점 모델이 이미 같은 수준이라 효과 없음 → 1M)
 MIDPOINT_TIMESTEPS = 700_000  # 이 시점의 모델을 model_mid.pt로 따로 저장 (학습 길이 효과 비교용)
 
 # ══════════════════════════════════════════════════════════════════
@@ -79,8 +80,11 @@ REWARD_OVERRIDES = dict(
                                    #   0.05 한 가지일 땐 정지선 30~50 m 앞에서 미리 섰음
     approach_overspeed_penalty=0.02,  # 정지 신호 접근 시 편한 감속 곡선 초과 1 m/s당 스텝 감점
                                       #   (없을 땐 가까이 서는 모델일수록 신호위반 5~6%)
-    zone_overspeed_penalty=0.1,    # 어린이 보호구역 안 30 km/h(+0.3 m/s) 초과 1 m/s당 스텝 감점
-                                   #   (최대 0.5). 50 km/h로 달리면 속도 보상 +0.04, 감점 -0.5
+    zone_overspeed_penalty=0.25,   # 어린이 보호구역 안 30 km/h(+0.3 m/s) 초과 1 m/s당 스텝 감점
+                                   #   0.1: 구역 과속 7~45%, 85% 속도 30~31 km/h
+                                   #   0.4(상한 1.0): 학습 초반부터 거의 서서 다니게 배워 정지선 앞에서
+                                   #   출발을 못 함 (완주 23~60%, 시간초과 38~73%) → 중간값
+    zone_overspeed_cap=0.5,        #   스텝당 상한
     zone_approach_penalty=0.05,    # 보호구역 입구에서 30 km/h가 되도록 감속 곡선 초과 1 m/s당 감점
 )
 REWARD = {**REWARD_DEFAULTS, **REWARD_OVERRIDES}
@@ -173,12 +177,41 @@ def snapshot_configs(run_dir: str):
         shutil.copy(src, run_dir)
 
 
+BACKUP_DIR = os.path.join(BASE, "train_file_backup")
+
+
+def backup_train_script():
+    """train.py가 지난 백업과 달라졌으면 train_file_backup/train_<날짜_시각>.py로 저장한다.
+
+    train.py는 하나뿐이라 학습 방식을 바꿀 때마다 예전 버전이 덮어써진다.
+    내용이 같으면(같은 설정으로 시드만 바꿔 여러 번 돌릴 때) 새로 만들지 않는다.
+    """
+    os.makedirs(BACKUP_DIR, exist_ok=True)
+    with open(os.path.join(BASE, "train.py"), "rb") as f:
+        current = f.read()
+    backups = sorted(n for n in os.listdir(BACKUP_DIR)
+                     if n.startswith("train_") and n.endswith(".py"))
+    if backups:
+        with open(os.path.join(BACKUP_DIR, backups[-1]), "rb") as f:
+            if f.read() == current:
+                return None
+    path = os.path.join(BACKUP_DIR, datetime.now().strftime("train_%Y%m%d_%H%M%S.py"))
+    with open(path, "wb") as f:
+        f.write(current)
+    return path
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="PPO 학습")
     parser.add_argument("--seed", type=int, default=HPARAMS["seed"],
                         help="시드만 다르게 여러 번 학습해 운의 영향을 본다")
     args = parser.parse_args()
     HPARAMS["seed"] = args.seed
+
+    # 0) 학습 방식(train.py)이 바뀌었으면 train_file_backup/에 백업
+    saved = backup_train_script()
+    if saved:
+        print(f"train.py 백업: {os.path.relpath(saved, BASE)}")
 
     # 1) 도로 생성 (env/road_config.py 기준으로 매번 재생성)
     sumocfg = road_builder.build(ROAD, EGO, TRAFFIC,
