@@ -290,6 +290,12 @@ TRAFFIC = {
 CHEONGGYECHEON = {
     "enabled": True,
     "route_length": 2146,   # 버스 경로 청계광장 → 광장시장 (m). prefill 범위·완주 판정 기준
+    # 실제 청계A01 셔틀(ROii) 제원으로 바꿀지 — 차체 4.9×2.1 m, 최고 40 km/h,
+    # 정원 8명, 가속 1.0 / 감속 2.5 (비상 5.0). 기본 False = 기존 12 m 버스.
+    # ⚠ 켜면 차체·물리가 달라져 지금 학습 중인 모델과 환경이 달라진다.
+    #   관측 정규화(vmax=도로 제한속도 13.89)는 그대로라 이어 학습은 가능.
+    #   팀 합의 후 다음 학습 사이클부터 켤 것.
+    "roii": False,
 }
 
 if CHEONGGYECHEON["enabled"]:
@@ -309,3 +315,7 @@ if CHEONGGYECHEON["enabled"]:
            # (12 m)로 10 m/s 출발을 넣으면 "Departure speed too high"로 삽입이
            # 거부된다. 정류장에서 막 출발하는 상황이 더 현실적이기도 해서 낮춘다.
            "depart_speed": 2.0}
+    if CHEONGGYECHEON.get("roii"):
+        # ROii 실측·가정 제원 (cheonggye_A01 명세 §1): 가속·감속은 [가정],
+        # 최고속도 40 km/h는 [사실]. 차체·정원은 make_cgc_scenario --roii가 적용.
+        EGO = {**EGO, "roii": True, "accel": 1.0, "decel": 2.5, "max_speed": 11.11}

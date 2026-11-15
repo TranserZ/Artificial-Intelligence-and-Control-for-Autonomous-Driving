@@ -403,9 +403,17 @@ def build(net_path, out_dir, args):
     # 자율주행 셔틀(청계A01) 실제 차체 — 일반 승용차 대신 버스 규격(길이/폭/vClass).
     # boardingDuration: 승객 1명 타는 데 2.5초 [가정] — 한 명씩 타는 모습이 보이도록
     # SUMO 기본값(0.5초)보다 길게. 승하차가 끝날 때까지 정차(15초)가 자동 연장된다.
-    L.append(f'    <vType id="ego_type" accel="{e_acc}" decel="{e_dec}" maxSpeed="{e_max:.2f}" '
-             f'length="12.0" width="2.5" color="1,0,0" vClass="bus" guiShape="bus" '
-             f'boardingDuration="2.5"/>')
+    if args.roii:
+        # ROii 공식 사양 [사실]: 4.9×2.095 m, 2890 kg, 정원 8명(입석 금지),
+        # 최고 40 km/h·실주행 약 30 km/h (speedFactor 0.75). emergencyDecel [가정].
+        L.append(f'    <vType id="ego_type" accel="{e_acc}" decel="{e_dec}" maxSpeed="{e_max:.2f}" '
+                 f'length="4.9" width="2.095" mass="2890" personCapacity="8" '
+                 f'speedFactor="0.75" emergencyDecel="5.0" '
+                 f'color="0,0.67,1" vClass="bus" guiShape="bus" boardingDuration="2.5"/>')
+    else:
+        L.append(f'    <vType id="ego_type" accel="{e_acc}" decel="{e_dec}" maxSpeed="{e_max:.2f}" '
+                 f'length="12.0" width="2.5" color="1,0,0" vClass="bus" guiShape="bus" '
+                 f'boardingDuration="2.5"/>')
     L.append('    <vTypeDistribution id="carDist">')
     for cid, model, p, acc, dec, tau, gap, vmax, sigma, color in ctrl:
         sg = f' sigma="{sigma}"' if sigma is not None else ""
@@ -662,6 +670,8 @@ def parse_args(argv=None):
     ap.add_argument("--loop-route-id", default="r0_loop",
                     help="(호환용, 무시됨 — 왕복 노선은 lines.yaml의 A01_loop)")
     ap.add_argument("--shuttle-kmh", type=float, default=20.0)
+    ap.add_argument("--roii", action="store_true",
+                    help="ego를 실제 청계A01 셔틀(ROii) 제원으로: 4.9 m, 정원 8명, 하늘색")
     ap.add_argument("--ego-accel", type=float, default=None)
     ap.add_argument("--ego-decel", type=float, default=None)
     ap.add_argument("--ego-max-speed", type=float, default=None, help="m/s")

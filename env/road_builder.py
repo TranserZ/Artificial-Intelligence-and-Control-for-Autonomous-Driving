@@ -94,7 +94,8 @@ def _build_cheonggyecheon(ego: dict, out_dir: str) -> str:
          # 승객은 ego가 달릴 수 있는 route(노선)에만 만든다
          "--pax-route-ids", ",".join(ego.get("routes") or {"r0": 1.0}),
          "--ego-accel", str(ego["accel"]), "--ego-decel", str(ego["decel"]),
-         "--ego-max-speed", str(ego["max_speed"])])
+         "--ego-max-speed", str(ego["max_speed"])]
+        + (["--roii"] if ego.get("roii") else []))  # ROii 제원 (road_config의 "roii")
     make_cgc_scenario.build(args.net, out_dir, args)
     # 버스 경로 위 오른쪽 차로가 직진으로 안 이어지는 교차로 보정 (도로망만 다시 쓰고, 경로는 그대로)
     # 왕복 노선의 청계5가·청계광장 좌회전은 오른쪽 승용차 차로(lane 1)에 따로 붙인다.
