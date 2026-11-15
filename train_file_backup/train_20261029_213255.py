@@ -1,3 +1,18 @@
+# ══════ train.py 백업 ══════
+# 저장: 2026-10-29 21:32 (나중에 results/run_20261029_213255/train.py에서 복원)   (이전 백업: train_20260907_202220.py)
+# 이 버전으로 처음 돌린 run: results/run_20261029_213255/
+#
+# [목적]
+#   직선 도로에 신호등을 추가하고 신호를 지키는 법을 배운다.
+#   적색 신호 위반 시 감점 5 + 즉시 종료. 추월 보너스는 뺐다. 학습 200k → 500k.
+#
+# [바뀐 설정] 이전 백업과 자동 비교
+#   - CHECKPOINT_INTERVAL = 10 (새로 추가)
+#   - REWARD_OVERRIDES.overtake_bonus 삭제 (이전 0.2)
+#   - REWARD_OVERRIDES.red_light_penalty = 5.0 (새로 추가)
+#   - REWARD_OVERRIDES.red_light_terminate = True (새로 추가)
+#   - TOTAL_TIMESTEPS: 200000 → 500000
+# ══════ 백업 설명 끝 — 아래는 실행된 train.py 원본 ══════
 """학습 실행 스크립트.
 
 ╔══════════════════════════════════════════════════════════════════╗

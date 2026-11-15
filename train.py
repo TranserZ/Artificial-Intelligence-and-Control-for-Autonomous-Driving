@@ -27,9 +27,20 @@ from env.sumo_env import SumoHighwayEnv
 from algorithms.ppo import PPO
 from utils.buffer import RolloutBuffer
 from utils.logger import RunLogger
+from utils import train_backup
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 
+
+# ══════════════════════════════════════════════════════════════════
+#  이번 학습의 목적 — 학습 방식을 바꿀 때마다 여기부터 고친다.
+#  train_file_backup/train_<날짜_시각>.py 맨 위 [목적]에 그대로 들어간다.
+#  (무엇을 왜 바꿨는지 + 이전 결과의 어떤 문제를 고치려는지를 쉬운 말로)
+# ══════════════════════════════════════════════════════════════════
+TRAIN_PURPOSE = """
+학습 설정은 직전(11/13 보호구역 과속 감점 0.25)과 같다.
+train.py 백업 기능(train_file_backup/, 머리말 자동 작성)만 추가했다.
+"""
 
 # ══════════════════════════════════════════════════════════════════
 #  하이퍼파라미터 — 실험은 여기서
@@ -180,38 +191,12 @@ def snapshot_configs(run_dir: str):
 BACKUP_DIR = os.path.join(BASE, "train_file_backup")
 
 
-def backup_train_script():
-    """train.py가 지난 백업과 달라졌으면 train_file_backup/train_<날짜_시각>.py로 저장한다.
-
-    train.py는 하나뿐이라 학습 방식을 바꿀 때마다 예전 버전이 덮어써진다.
-    내용이 같으면(같은 설정으로 시드만 바꿔 여러 번 돌릴 때) 새로 만들지 않는다.
-    """
-    os.makedirs(BACKUP_DIR, exist_ok=True)
-    with open(os.path.join(BASE, "train.py"), "rb") as f:
-        current = f.read()
-    backups = sorted(n for n in os.listdir(BACKUP_DIR)
-                     if n.startswith("train_") and n.endswith(".py"))
-    if backups:
-        with open(os.path.join(BACKUP_DIR, backups[-1]), "rb") as f:
-            if f.read() == current:
-                return None
-    path = os.path.join(BACKUP_DIR, datetime.now().strftime("train_%Y%m%d_%H%M%S.py"))
-    with open(path, "wb") as f:
-        f.write(current)
-    return path
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="PPO 학습")
     parser.add_argument("--seed", type=int, default=HPARAMS["seed"],
                         help="시드만 다르게 여러 번 학습해 운의 영향을 본다")
     args = parser.parse_args()
     HPARAMS["seed"] = args.seed
-
-    # 0) 학습 방식(train.py)이 바뀌었으면 train_file_backup/에 백업
-    saved = backup_train_script()
-    if saved:
-        print(f"train.py 백업: {os.path.relpath(saved, BASE)}")
 
     # 1) 도로 생성 (env/road_config.py 기준으로 매번 재생성)
     sumocfg = road_builder.build(ROAD, EGO, TRAFFIC,
@@ -224,6 +209,12 @@ if __name__ == "__main__":
     run_dir = make_run_dir()
     logger = RunLogger(run_dir)
     print(f"결과 폴더: {run_dir}")
+
+    # 학습 방식(train.py)이 지난 백업과 달라졌으면 train_file_backup/에 머리말과 함께 저장
+    saved = train_backup.backup(os.path.join(BASE, "train.py"), BACKUP_DIR,
+                                TRAIN_PURPOSE, os.path.basename(run_dir))
+    if saved:
+        print(f"train.py 백업: {os.path.relpath(saved, BASE)}")
 
     # 3) 환경
     env = SumoHighwayEnv(
