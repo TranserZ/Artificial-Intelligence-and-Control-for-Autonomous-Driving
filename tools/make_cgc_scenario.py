@@ -160,22 +160,8 @@ def stop_shelter_polys(edge, lane_idx, sid, start_pos, end_pos, name, lines):
     x, y, dx, dy = _pos_dir(shape, s_mid)
     nx, ny = dy, -dx                              # 진행방향의 오른쪽 = 보도 쪽
     P = []
-    # 노면 표시: 정차 구간의 노란 지그재그 (한국 버스정류장 노면표시).
-    # busStop 기본 그림(파란 면+H 표지)을 숨긴 대신 '여기가 정류장'임을 보여준다.
-    # 선(fill=0)은 확대해도 가늘게 그려져서, 꺾이는 구간마다 채운 사각형으로 그린다.
-    # layer 20 이상: 차로 면이 그보다 낮은 폴리곤을 덮는다 (road_builder 실측 주석 참고).
-    zz, s, amp, step, k = [], start_pos - 1.0, 0.85, 1.6, 0
-    while s <= end_pos + 1.0:
-        zx, zy, zdx, zdy = _pos_dir(shape, max(s, 0.1))
-        side = amp if k % 2 == 0 else -amp
-        zz.append((zx + zdy * side, zy - zdx * side))
-        s += step
-        k += 1
-    for k, ((x1, y1), (x2, y2)) in enumerate(zip(zz, zz[1:])):
-        seg = math.hypot(x2 - x1, y2 - y1) or 1.0
-        ex, ey = (x2 - x1) / seg, (y2 - y1) / seg     # 세그먼트 방향
-        P.append(f'    <poly id="bsz_{sid}_{k}" color="0.95,0.78,0.08" fill="1" layer="20" '
-                 f'shape="{_rect((x1 + x2) / 2, (y1 + y2) / 2, ex, ey, ey, -ex, seg / 2, 0.14)}"/>')
+    # (노면 지그재그는 넣지 않는다 — 실제 청계천로 정류장 위성사진에 없음.
+    #  폴리곤 layer는 21 이상: 차로 면이 layer 20 미만 폴리곤을 덮는다)
     # 기둥 2개 (보도 쪽 앞 모서리)
     for k, sgn in ((0, -1.0), (1, 1.0)):
         px, py = (x + dx * sgn * 2.6 + nx * (base + 0.15),
@@ -711,7 +697,7 @@ def build(net_path, out_dir, args):
         lane = bus_stop_lane_index(edge)
         safe_name = name.replace("&", "&amp;").replace('"', "")
         # color 알파 0 = busStop 자체 그림(파란 면 + 독일식 'H' 표지)을 숨긴다.
-        # 정류장의 겉모습은 아래 한국식 그림(노란 지그재그·쉘터·표지판)이 담당.
+        # 정류장의 겉모습은 아래 한국식 그림(쉘터·표지판)이 담당.
         # lines도 일부러 안 넣는다 (넣으면 GUI가 노선 글자를 도로 위에 그린다).
         add.append(
             f'    <busStop id="{sid}" lane="{eid}_{lane}" startPos="{start_pos}" '
@@ -755,7 +741,7 @@ def build(net_path, out_dir, args):
                 'poiType_color="255,255,255" poiType_bgColor="20,70,160,235" '
                 'poiType_constantSize="0"/>\n'
                 # busStop의 SUMO 기본 그림(초록 면 + 독일식 H 표지)을 사실상 숨긴다
-                # (크기 배율 0.01). 정류장 겉모습은 지그재그·쉘터·표지판 폴리곤이 담당.
+                # (크기 배율 0.01). 정류장 겉모습은 쉘터·표지판 폴리곤이 담당.
                 '        <additionals addMode="0" add_minSize="0" add_exaggeration="0.01" '
                 'addName_show="0" addFullName_show="0"/>\n'
                 '    </scheme>\n'
