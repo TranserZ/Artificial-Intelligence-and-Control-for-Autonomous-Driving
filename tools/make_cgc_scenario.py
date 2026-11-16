@@ -154,28 +154,42 @@ def stop_shelter_polys(edge, lane_idx, sid, start_pos, end_pos, name, lines):
     shape = lane.getShape()
     w_lane = lane.getWidth()
     w_walk = edge.getLane(lane_idx - 1).getWidth() if lane_idx >= 1 else 2.0
-    # sumo-gui가 busStop을 보도 쪽에 폭 ~3 m 파란 면으로 그리므로, 쉘터는 그보다
-    # 바깥(보도 뒤편)에 둬야 가려지지 않는다. base = 보도 바깥 모서리.
-    base = w_lane / 2 + w_walk
+    base = w_lane / 2 + w_walk                    # 보도 바깥 모서리 (쉘터 위치)
     off_curb = w_lane / 2 + 0.45                  # 연석 바로 옆 (표지판 기둥)
     s_mid = (start_pos + end_pos) / 2
     x, y, dx, dy = _pos_dir(shape, s_mid)
     nx, ny = dy, -dx                              # 진행방향의 오른쪽 = 보도 쪽
     P = []
+    # 노면 표시: 정차 구간의 노란 지그재그 (한국 버스정류장 노면표시).
+    # busStop 기본 그림(파란 면+H 표지)을 숨긴 대신 '여기가 정류장'임을 보여준다.
+    # 선(fill=0)은 확대해도 가늘게 그려져서, 꺾이는 구간마다 채운 사각형으로 그린다.
+    # layer 20 이상: 차로 면이 그보다 낮은 폴리곤을 덮는다 (road_builder 실측 주석 참고).
+    zz, s, amp, step, k = [], start_pos - 1.0, 0.85, 1.6, 0
+    while s <= end_pos + 1.0:
+        zx, zy, zdx, zdy = _pos_dir(shape, max(s, 0.1))
+        side = amp if k % 2 == 0 else -amp
+        zz.append((zx + zdy * side, zy - zdx * side))
+        s += step
+        k += 1
+    for k, ((x1, y1), (x2, y2)) in enumerate(zip(zz, zz[1:])):
+        seg = math.hypot(x2 - x1, y2 - y1) or 1.0
+        ex, ey = (x2 - x1) / seg, (y2 - y1) / seg     # 세그먼트 방향
+        P.append(f'    <poly id="bsz_{sid}_{k}" color="0.95,0.78,0.08" fill="1" layer="20" '
+                 f'shape="{_rect((x1 + x2) / 2, (y1 + y2) / 2, ex, ey, ey, -ex, seg / 2, 0.14)}"/>')
     # 기둥 2개 (보도 쪽 앞 모서리)
     for k, sgn in ((0, -1.0), (1, 1.0)):
         px, py = (x + dx * sgn * 2.6 + nx * (base + 0.15),
                   y + dy * sgn * 2.6 + ny * (base + 0.15))
-        P.append(f'    <poly id="bsp_{sid}_{k}" color="55,58,64" fill="1" layer="6" '
+        P.append(f'    <poly id="bsp_{sid}_{k}" color="55,58,64" fill="1" layer="21" '
                  f'shape="{_rect(px, py, dx, dy, nx, ny, 0.16, 0.16)}"/>')
     # 벤치 (지붕보다 아래 층이라 반투명 지붕 너머로 비쳐 보인다)
-    P.append(f'    <poly id="bsb_{sid}" color="150,105,60,220" fill="1" layer="6" '
+    P.append(f'    <poly id="bsb_{sid}" color="150,105,60,220" fill="1" layer="21" '
              f'shape="{_rect(x + nx * (base + 1.15), y + ny * (base + 1.15), dx, dy, nx, ny, 1.9, 0.22)}"/>')
     # 뒷벽 유리
-    P.append(f'    <poly id="bsw_{sid}" color="150,190,215,200" fill="1" layer="6" '
+    P.append(f'    <poly id="bsw_{sid}" color="150,190,215,200" fill="1" layer="21" '
              f'shape="{_rect(x + nx * (base + 1.75), y + ny * (base + 1.75), dx, dy, nx, ny, 2.75, 0.12)}"/>')
     # 지붕 (반투명 — 아래 벤치·사람이 비쳐 보이게)
-    P.append(f'    <poly id="bsr_{sid}" color="64,70,80,150" fill="1" layer="7" '
+    P.append(f'    <poly id="bsr_{sid}" color="64,70,80,150" fill="1" layer="22" '
              f'shape="{_rect(x + nx * (base + 0.95), y + ny * (base + 0.95), dx, dy, nx, ny, 3.0, 1.0)}"/>')
     # 표지판: 정차 위치 앞머리(진행방향 끝) 연석 옆 기둥 + 파란 원판(POI).
     # 글자는 POI의 type에 넣는다 — cgc.gui.xml의 poiType_show가 "이름 | 노선"을
@@ -183,11 +197,11 @@ def stop_shelter_polys(edge, lane_idx, sid, start_pos, end_pos, name, lines):
     sx, sy, sdx, sdy = _pos_dir(shape, end_pos - 0.3)
     snx, sny = sdy, -sdx
     px, py = sx + snx * off_curb, sy + sny * off_curb
-    P.append(f'    <poly id="bss_{sid}" color="70,70,76" fill="1" layer="8" '
+    P.append(f'    <poly id="bss_{sid}" color="70,70,76" fill="1" layer="23" '
              f'shape="{_rect(px, py, sdx, sdy, snx, sny, 0.12, 0.12)}"/>')
     short = " · ".join(sorted({ln.split("_")[0] for ln in lines})) or "-"
     P.append(f'    <poi id="bsg_{sid}" x="{px:.2f}" y="{py:.2f}" color="30,97,191" '
-             f'layer="9" width="1.1" height="1.1" type="{name} | {short}"/>')
+             f'layer="24" width="0.9" height="0.9" type="{name} | {short}"/>')
     return P
 
 
@@ -476,15 +490,17 @@ def build(net_path, out_dir, args):
     # boardingDuration: 승객 1명 타는 데 2.5초 [가정] — 한 명씩 타는 모습이 보이도록
     # SUMO 기본값(0.5초)보다 길게. 승하차가 끝날 때까지 정차(15초)가 자동 연장된다.
     if args.roii:
-        # ROii 공식 사양 [사실]: 4.9×2.095 m, 2890 kg, 정원 8명(입석 금지),
+        # ROii(오토노머스에이투지) 사양: 4.9×2.095 m, 2890 kg [명세 §1],
+        # 승객 정원 8명(시험운전자 제외 — 서울시 2025-09 보도) 입석 금지,
         # 최고 40 km/h·실주행 약 30 km/h (speedFactor 0.75). emergencyDecel [가정].
+        # 색: 서울 시내버스(지선) 초록 — 실차는 흰색+랩핑이지만 화면 식별이 어렵다.
         L.append(f'    <vType id="ego_type" accel="{e_acc}" decel="{e_dec}" maxSpeed="{e_max:.2f}" '
                  f'length="4.9" width="2.095" mass="2890" personCapacity="8" '
                  f'speedFactor="0.75" emergencyDecel="5.0" '
-                 f'color="0,0.67,1" vClass="bus" guiShape="bus" boardingDuration="2.5"/>')
+                 f'color="0.36,0.69,0.15" vClass="bus" guiShape="bus" boardingDuration="2.5"/>')
     else:
         L.append(f'    <vType id="ego_type" accel="{e_acc}" decel="{e_dec}" maxSpeed="{e_max:.2f}" '
-                 f'length="12.0" width="2.5" color="1,0,0" vClass="bus" guiShape="bus" '
+                 f'length="12.0" width="2.5" color="0.36,0.69,0.15" vClass="bus" guiShape="bus" '
                  f'boardingDuration="2.5"/>')
     L.append('    <vTypeDistribution id="carDist">')
     for cid, model, p, acc, dec, tau, gap, vmax, sigma, color in ctrl:
@@ -694,11 +710,12 @@ def build(net_path, out_dir, args):
         edge = net.getEdge(eid)
         lane = bus_stop_lane_index(edge)
         safe_name = name.replace("&", "&amp;").replace('"', "")
-        # lines는 일부러 안 넣는다 — 넣으면 GUI가 노선 글자를 정류장 면 위에
-        # 지저분하게 그린다. 노선 표기는 아래 표지판(POI) 라벨이 담당.
+        # color 알파 0 = busStop 자체 그림(파란 면 + 독일식 'H' 표지)을 숨긴다.
+        # 정류장의 겉모습은 아래 한국식 그림(노란 지그재그·쉘터·표지판)이 담당.
+        # lines도 일부러 안 넣는다 (넣으면 GUI가 노선 글자를 도로 위에 그린다).
         add.append(
             f'    <busStop id="{sid}" lane="{eid}_{lane}" startPos="{start_pos}" '
-            f'endPos="{end_pos}" name="{safe_name}" color="30,97,191,170"/>')
+            f'endPos="{end_pos}" name="{safe_name}" color="0,0,0,0"/>')
         # 보도 위에 한국식 정류장 쉘터(지붕·기둥·벤치·뒷벽)와 표지판을 그린다.
         # 표지판 글자는 로마자(name_en) — sumo-gui 내장 글꼴에 한글이 없어
         # 한글은 □□로 깨진다. (busStop의 name(한글)은 클릭 정보창에는 나온다)
@@ -726,15 +743,21 @@ def build(net_path, out_dir, args):
     #   personQuality=2 → 사람 모양, person_minSize=2 → 멀리서도 점 이상 크기 보장.
     # pois: 정류장 표지판(파란 원 POI)의 type에 넣은 "정류장 이름 | 노선"을
     #   흰 글씨+파란 바탕 라벨로 띄운다 (poiName은 id가 떠서 안 쓴다).
-    #   constantSize=1 → 줌과 무관하게 읽히는 크기.
+    #   constantSize=0 + size=1.8 → 글자 높이가 실세계 1.8 m로 고정:
+    #   줌 인하면 읽히고, 줌 아웃하면 다른 것들과 같이 작아진다.
+    #   (constantSize=1은 화면 픽셀 고정이라 줌 아웃 시 세상보다 커 보였음)
     with open(os.path.join(out_dir, "cgc.gui.xml"), "w", encoding="utf-8", newline="\n") as f:
         f.write('<viewsettings>\n'
                 '    <scheme name="real world">\n'
                 '        <persons personMode="0" personQuality="2" person_minSize="2.0" '
                 'person_exaggeration="1.5" person_constantSize="0"/>\n'
-                '        <pois poiType_show="1" poiType_size="55" '
+                '        <pois poi_minSize="0" poiType_show="1" poiType_size="1.8" '
                 'poiType_color="255,255,255" poiType_bgColor="20,70,160,235" '
-                'poiType_constantSize="1"/>\n'
+                'poiType_constantSize="0"/>\n'
+                # busStop의 SUMO 기본 그림(초록 면 + 독일식 H 표지)을 사실상 숨긴다
+                # (크기 배율 0.01). 정류장 겉모습은 지그재그·쉘터·표지판 폴리곤이 담당.
+                '        <additionals addMode="0" add_minSize="0" add_exaggeration="0.01" '
+                'addName_show="0" addFullName_show="0"/>\n'
                 '    </scheme>\n'
                 f'    <viewport zoom="{args.zoom}" x="{args.view_x}" y="{args.view_y}" angle="0"/>\n'
                 '    <delay value="100"/>\n</viewsettings>\n')
