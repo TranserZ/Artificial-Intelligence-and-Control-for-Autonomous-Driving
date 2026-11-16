@@ -5,3 +5,9 @@ data/road_data/국토교통부_교통영향평가_기하구조정보_*.csv
 env/sumo/cgc.*
 docs/cheonggyecheon_solution.md
 results/run_20261029_200354/
+
+# 국가 표준노드링크 (국가교통정보센터, ~870 MB) — 각자 내려받아 data/road_data/에 둔다
+data/road_data/MOCT_*
+data/road_data/MULTILINK.dbf
+data/road_data/TURNINFO.dbf
+data/road_data/내역서.csv
