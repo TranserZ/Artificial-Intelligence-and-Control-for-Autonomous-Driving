@@ -93,6 +93,10 @@ BUS_STOPS_ORDER = ["bs_01", "bs_02", "bs_03", "bs_04", "bs_05"]
 # 어린이보호구역(세운상가, 3차로) 구간 — 버스 노선은 가운데 차로를 유지한다.
 SCHOOL_ZONE_CENTER_LANE_EDGES = ("e218924602_1", "e218924602_2", "e218924602_3")
 
+# 프리필: 같은 차로에 두 차를 이 거리(m)보다 가깝게 배치하지 않는다
+# (_prefill_traffic의 최소 배치 간격과 같은 값)
+_PREFILL_MIN_GAP = 10.0
+
 
 class SumoHighwayEnv(gym.Env):
     metadata = {"render_modes": ["human"]}
@@ -721,6 +725,7 @@ class SumoHighwayEnv(gym.Env):
                       else 1.0)
             spans.append((route_id, start, length, margin))
             start += length
+        placed = {}   # (엣지, 차선 번호) → 이미 배치한 엣지 내 위치들
         for lane in range(self.num_lanes):
             f = float(factors[lane]) if lane < len(factors) else 1.0
             lane_spacing = self.prefill_spacing * f
@@ -739,11 +744,22 @@ class SumoHighwayEnv(gym.Env):
                     if route_id is None:
                         raise traci.TraCIException("엣지 끝 여유 구간")
                     first_edge = traci.route.getEdges(route_id)[0]
+                    # 이 엣지에 해당 차선이 없으면(차로 1개 구간 등) 맨 오른쪽 차로로
+                    # 대신 넣는다. 없는 차선 번호를 주면 SUMO가 "Invalid departlane"으로
+                    # 거부해서 좁은 구간의 프리필이 빠졌다.
+                    lo, hi = self._car_lanes(first_edge)
+                    depart_lane = lo + lane if lo + lane < hi else lo
+                    # 대체 차로에 이미 배치한 차와 겹치면 건너뛴다 (겹친 차는 삽입
+                    # 대기열에 남아 같은 엣지의 다른 삽입까지 막을 수 있다)
+                    taken = placed.setdefault((first_edge, depart_lane), [])
+                    if any(abs(local - p) < _PREFILL_MIN_GAP for p in taken):
+                        raise traci.TraCIException("대체 차로 위치 겹침")
                     traci.vehicle.add(
                         vid, route_id, typeID=vtype,
-                        departLane=str(lane + self._car_lanes(first_edge)[0]),
+                        departLane=str(depart_lane),
                         departPos=f"{local:.1f}",
                         departSpeed="max")
+                    taken.append(local)
                     count += 1
                 except traci.TraCIException:
                     pass  # 겹침 / 엣지 끝 여유 구간이면 건너뜀
