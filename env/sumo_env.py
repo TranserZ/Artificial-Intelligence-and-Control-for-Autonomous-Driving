@@ -1528,19 +1528,31 @@ class SumoHighwayEnv(gym.Env):
             #  에러 로그를 찍으므로, 범위 검사를 먼저 해서 조용히 건너뛴다)
             if edge.startswith(":") or not self._is_car_lane(edge, li):
                 return None, None
-            lane_id = f"{edge}_{li}"
             my_pos = traci.vehicle.getLanePosition(self.ego_id)
+            # 같은 엣지 + 경로상 바로 앞/뒤 엣지의 같은 번호 차선도 훑는다. 보호구역 때문에
+            # 도로를 여러 엣지로 나눈 뒤, 이음매 바로 너머 옆 차선 차량을 못 봐서
+            # 이음매(x≈100 m) 직전 차선변경 측면충돌이 났다 (1M run 충돌의 절반).
+            scan = [(f"{edge}_{li}", 0.0)]
+            route = traci.vehicle.getRoute(self.ego_id)
+            ri = traci.vehicle.getRouteIndex(self.ego_id)
+            if 0 <= ri < len(route) - 1 and self._is_car_lane(route[ri + 1], li):
+                scan.append((f"{route[ri + 1]}_{li}",
+                             traci.lane.getLength(f"{edge}_{li}")))
+            if ri >= 1 and self._is_car_lane(route[ri - 1], li):
+                prev_lane = f"{route[ri - 1]}_{li}"
+                scan.append((prev_lane, -traci.lane.getLength(prev_lane)))
             front, rear = None, None
-            for vid in traci.lane.getLastStepVehicleIDs(lane_id):
-                d = traci.vehicle.getLanePosition(vid) - my_pos
-                if d >= 0:
-                    g = d - traci.vehicle.getLength(vid)
-                    if front is None or g < front[0]:
-                        front = (g, traci.vehicle.getSpeed(vid))
-                else:
-                    g = -d - traci.vehicle.getLength(self.ego_id)
-                    if rear is None or g < rear[0]:
-                        rear = (g, traci.vehicle.getSpeed(vid))
+            for lane_id, off in scan:
+                for vid in traci.lane.getLastStepVehicleIDs(lane_id):
+                    d = traci.vehicle.getLanePosition(vid) + off - my_pos
+                    if d >= 0:
+                        g = d - traci.vehicle.getLength(vid)
+                        if front is None or g < front[0]:
+                            front = (g, traci.vehicle.getSpeed(vid))
+                    else:
+                        g = -d - traci.vehicle.getLength(self.ego_id)
+                        if rear is None or g < rear[0]:
+                            rear = (g, traci.vehicle.getSpeed(vid))
             return front, rear
         except traci.TraCIException:
             return None, None
