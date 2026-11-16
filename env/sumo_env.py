@@ -271,6 +271,12 @@ class SumoHighwayEnv(gym.Env):
         # 정차금지지대 (edge, 시작 m, 끝 m). 파일은 data/road_data/no_stop_zones.csv
         self._no_stop_zones = _load_zone_rows(
             "no_stop_zones.csv", ("edge_id", "start_pos", "end_pos"))
+        # 불법주정차 다발지점 (차로 점유). reset마다 지점별 prob 확률로 0초부터 정차 상태로 세운다.
+        self._hotspots = _load_zone_rows(
+            "illegal_parking_hotspots.csv",
+            ("hotspot_id", "edge_id", "start_pos", "end_pos", "vehicles", "prob"))
+        self._hotspot_taken = {}   # (엣지, 차선 번호) → 다발지점 차량 위치 (프리필이 피함)
+        self._hotspot_placed = []  # 이번 판에 생성된 다발지점 (id, 엣지, 차량 수)
         # 어린이보호구역 edge → 제한속도 m/s
         self._school_limits = {
             edge: speed for edge, speed in _load_zone_rows(
@@ -684,6 +690,61 @@ class SumoHighwayEnv(gym.Env):
     # ==================================================================
     # 에피소드 초기화
     # ==================================================================
+    # 다발지점 차량 종류 → (vType, 차체 길이 m). vType은 make_cgc_scenario가 rou.xml에 정의
+    _HOTSPOT_TYPES = {"moto": ("parked_moto", 2.2), "truck": ("parked_truck", 6.0),
+                      "big_truck": ("illegal_truck_big", 10.0)}
+    # 다발지점 차량 사이 간격 (m). SUMO는 앞차와 minGap(기본 2.5 m)보다 가까우면 삽입을 거부해
+    # 1.0으로 두면 맨 앞 1대만 들어가고 나머지는 삽입 대기열에 영원히 남았다
+    _HOTSPOT_GAP = 2.6
+
+    def _place_illegal_parking(self):
+        """불법주정차 다발지점 (illegal_parking_hotspots.csv)에 차로를 막는 정차 차량을 세운다.
+
+        - 지점마다 prob 확률로만 생성 (에피소드마다 다양성). 시나리오 난수(_scn_rng)를 써서
+          reset(seed=k)면 같은 판이 된다.
+        - vehicles 예: "moto:3-5;truck:1" → 이륜차 3~5대(무작위) + 화물차 1대
+        - 맨 오른쪽 승용차 차로, end_pos에서 뒤쪽으로 촘촘히, 에피소드 끝까지 정차(parking=false)
+        """
+        self._hotspot_taken = {}
+        self._hotspot_placed = []          # (지점 id, 엣지, 차량 수) — 확인·평가용
+        rng = self._scn_rng
+        for hid, edge, a, b, spec, prob in self._hotspots:
+            if not edge or rng.random() >= float(prob or 0.0):
+                continue
+            try:
+                lane = self._car_lanes(edge)[0]
+                length = traci.lane.getLength(f"{edge}_{lane}")
+            except traci.TraCIException:
+                continue
+            rid = f"hs_route_{edge}"
+            if rid not in traci.route.getIDList():
+                traci.route.add(rid, [edge])
+            kinds = []
+            for part in str(spec).split(";"):
+                kind, _, cnt = part.strip().partition(":")
+                lo, _, hi = cnt.partition("-")
+                n = int(rng.integers(int(lo), int(hi or lo) + 1))
+                kinds += [kind] * n
+            pos = min(float(b), length - 0.5)   # 앞범퍼 위치. 뒤로 차곡차곡
+            n_ok = 0
+            for k, kind in enumerate(kinds):
+                vtype, vlen = self._HOTSPOT_TYPES.get(kind, self._HOTSPOT_TYPES["moto"])
+                if pos - vlen < float(a) - 0.1:
+                    break                      # 지점 범위를 넘으면 그만
+                vid = f"hs_{hid}_{k}"
+                try:
+                    traci.vehicle.add(vid, rid, typeID=vtype, departLane=str(lane),
+                                      departPos=f"{pos - 0.1:.1f}", departSpeed="0")
+                    traci.vehicle.setStop(vid, edge, pos=pos, laneIndex=lane,
+                                          duration=1.0e6, flags=0)
+                except traci.TraCIException:
+                    continue
+                self._hotspot_taken.setdefault((edge, lane), []).append(pos - vlen / 2)
+                n_ok += 1
+                pos -= vlen + self._HOTSPOT_GAP
+            if n_ok:
+                self._hotspot_placed.append((hid, edge, n_ok))
+
     def _prefill_traffic(self):
         """도로 전 구간에 배경차를 일정 간격(±jitter)으로 미리 배치한다.
 
@@ -728,7 +789,8 @@ class SumoHighwayEnv(gym.Env):
                       else 1.0)
             spans.append((route_id, start, length, margin))
             start += length
-        placed = {}   # (엣지, 차선 번호) → 이미 배치한 엣지 내 위치들
+        # (엣지, 차선 번호) → 이미 배치한 엣지 내 위치들. 불법주정차 다발지점 자리도 피한다
+        placed = {k: list(v) for k, v in self._hotspot_taken.items()}
         for lane in range(self.num_lanes):
             f = float(factors[lane]) if lane < len(factors) else 1.0
             lane_spacing = self.prefill_spacing * f
@@ -814,12 +876,24 @@ class SumoHighwayEnv(gym.Env):
         self._start_sumo()
         self._randomize_signal_phase()
 
+        # 불법주정차 다발지점: 프리필보다 먼저 세워 배경차가 그 자리를 피하게 한다
+        self._place_illegal_parking()
         # 도로 전 구간에 배경차를 미리 배치 (첫 스텝부터 실제 교통류 상태)
         if self.prefill_enabled:
             self._prefill_traffic()
         # 배치된 차들이 자리를 잡도록 몇 스텝만 정착시킨다.
         for _ in range(self.warmup_steps):
             traci.simulationStep()
+        # 끝내 못 들어간 다발지점 차량은 지운다 (삽입 대기열에 남으면 같은 엣지 삽입을 막는다)
+        for vid in traci.simulation.getPendingVehicles():
+            if vid.startswith("hs_"):
+                try:
+                    traci.vehicle.remove(vid)
+                except traci.TraCIException:
+                    pass
+        self._hotspot_placed = [
+            (hid, edge, sum(1 for v in traci.vehicle.getIDList() if v.startswith(f"hs_{hid}_")))
+            for hid, edge, _ in self._hotspot_placed]
 
         # ego 경로 선택 (EGO["routes"] 확률, 네트워크에 있는 route만)
         known = set(traci.route.getIDList())

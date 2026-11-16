@@ -835,37 +835,12 @@ def build(net_path, out_dir, args):
         L.append(f'    <flow id="ego_demo" type="ego_type" route="{rid}" begin="{args.ego_begin}" '
                  f'end="100000" period="{args.ego_period}" departLane="{first_car_lane}" '
                  f'departSpeed="0" line="{args.line}">{demo_stops}\n    </flow>')
-    # 불법주정차 (1-5): 동행·서행 전 구간을 30 m 간격으로 촘촘히 채운다
-    # (기존 엣지당 1~2곳 방식 대비 밀도 약 2배). 제외: 정류장 엣지,
-    # 정차금지지대, 승용차 1차로 엣지(이미 좁아 중복 안 함).
-    PARK_SPACING = 30.0
-    # 노상주차 줄이 있는 엣지: 주차는 연석 쪽 parkingArea가 맡고 주행 차로는 비워 둔다
-    roadside = [z for z in load_roadside_parking() if net.hasEdge(z[0])]
-    roadside_edges = {z[0] for z in roadside}
-    park_spots = []
-    for edges, route_name in ((route, "main_east"), (west, "main_west")):
-        for e in edges:
-            eid = e.getID()
-            if eid in stop_edges:    # 정류장 엣지는 뺀다 (버스가 댈 자리)
-                continue
-            if eid in roadside_edges:   # 노상주차 줄 구간은 주행 차로에 세우지 않는다
-                continue
-            lanes = passenger_lane_indexes(e)
-            if len(lanes) < 2:
-                continue
-            pos = PARK_SPACING / 2.0
-            while pos < e.getLength() - 1.0:
-                if not in_excluded_zone(no_stop, bus_stop_zones, eid, pos):
-                    park_spots.append((e, lanes[0], route_name, pos))
-                pos += PARK_SPACING
-    for i, (e, lane, route_name, pos) in enumerate(park_spots):
-        L.append(f'    <flow id="illegal_park_{i}" type="parked_car" route="{route_name}" '
-                 f'begin="{args.ego_begin + 20 + (i % 30) * 4}" end="100000" period="{args.park_period}" '
-                 f'departLane="{lane}" departSpeed="max">'
-                 f'<stop lane="{e.getID()}_{lane}" endPos="{pos:.1f}" duration="{rng.randint(25, 50)}" '
-                 f'parking="false"/></flow>')
+    # 불법주정차 (차로 점유): 로드뷰(2026.09) 다발지점 4곳만 (data/road_data/illegal_parking_hotspots.csv).
+    # 에피소드마다 지점별 확률로 생성해야 하므로 rou.xml이 아니라 sumo_env reset에서
+    # TraCI로 세운다 (_place_illegal_parking). 여기서는 그 차들이 쓰는 vType만 위에 정의.
+    # (예전 30 m 간격 자동 배치는 버스가 만나지 못하고 실측 근거도 없어 제거)
     # 노상주차 줄 (roadside_parking.csv): 주행 차로 옆 연석 쪽 parkingArea(차로 밖)에
-    # 0초부터 끝까지 차를 채워 둔다. parkingArea에 선 차는 차로에서 빠지므로 주행을
+    # 0초부터 끝까지 승용차·탑차를 채워 둔다. parkingArea에 선 차는 차로에서 빠지므로 주행을
     # 막지 않고 관측에도 잡히지 않는다 (실제 주차 줄은 주행 차로가 아님).
     roadside_areas = []
     n_roadside = 0
@@ -980,7 +955,7 @@ def build(net_path, out_dir, args):
                           for ln, (route_id, edges, sids) in line_routes.items())
     print(f"본선 {len(route)}개 엣지 / 노선: {lines_txt}")
     print(f"측면 합류 {len(srcs)}곳(+세종대로 {len(sejong_srcs)}곳), "
-          f"불법주정차 {len(park_spots)}곳, 오토바이 주차 {moto_n}대, 트럭 주정차 {truck_n}대, "
+          f"오토바이 주차 {moto_n}대, 트럭 주정차 {truck_n}대, "
           f"정류장 {written_stops}개")
     print("측면 합류 엣지:", [e.getID() for e in srcs])
     print("세종대로 합류 엣지:", [e.getID() for e in sejong_srcs])
