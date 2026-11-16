@@ -66,6 +66,9 @@ if __name__ == "__main__":
                         help="sumo-gui 대신 netedit(도로 편집기)로 열기")
     parser.add_argument("--nogui", action="store_true",
                         help="화면 없이 설정 검증만 (GUI 없는 환경용)")
+    parser.add_argument("--live", action="store_true",
+                        help="(청계천) 실시간 정류장 대기 인원 추적: 자동 재생되며 "
+                             "표지판 라벨에 'W:n'(대기 n명)이 붙고 터미널에도 요약이 나온다")
     parser.add_argument("--seconds", type=int, default=120,
                         help="--nogui 검증 시 시뮬레이션 길이(초). 기본 120초. "
                              "(GUI 모드는 시간 제한 없이 사용자가 직접 제어)")
@@ -98,6 +101,71 @@ if __name__ == "__main__":
         # SUMO의 통계 요약(투입/도착 차량 수 등)을 그대로 보여준다
         print(result.stderr.strip() or result.stdout.strip())
         print("설정 검증 OK" if result.returncode == 0 else "설정 오류!")
+
+    elif args.live:
+        # 실시간 대기 인원 추적: TraCI로 sumo-gui를 띄우고 우리가 스텝을 돌리면서
+        # 1초마다 traci.busstop.getPersonCount()로 각 정류장 대기 인원을 읽는다.
+        #   · GUI: 정류장 표지판 라벨 끝에 "W:n"을 붙여 갱신 (POI type 수정)
+        #   · CLI: 5초마다 대기 인원·버스 탑승 인원 요약 한 줄
+        # (TraCI가 재생을 주도하므로 ▶ 버튼 없이 바로 재생된다. Delay로 속도 조절)
+        import json
+        import traci
+        meta_path = os.path.join(BASE, "env", "sumo", "cgc.line_meta.json")
+        stops = {}
+        if os.path.exists(meta_path):
+            with open(meta_path, encoding="utf-8") as f:
+                stops = json.load(f)["stops"]          # sid → {name, ...}
+        print("sumo-gui 실행 중 (실시간 대기 인원 추적) ... 창을 닫거나 Ctrl+C로 종료")
+        print("  · 표지판 라벨 끝 'W:n' = 그 정류장에서 기다리는 사람 수")
+        traci.start([checkBinary("sumo-gui"), "-c", sumocfg, "--start",
+                     "--step-length", str(SIMULATION["step_length"]),
+                     "--delay", str(SIMULATION["gui_delay"])])
+        base_label, cur_label = {}, {}
+        for sid in stops:
+            try:
+                base_label[sid] = traci.poi.getType(f"bsg_{sid}")
+            except traci.TraCIException:
+                pass                                   # 다른 시나리오 등: 라벨 없음
+        next_label_t, next_cli_t = 0.0, 0.0
+        try:
+            while traci.simulation.getMinExpectedNumber() > 0:
+                traci.simulationStep()
+                t = traci.simulation.getTime()
+                if t >= next_label_t:                  # 1초마다 라벨 갱신
+                    next_label_t = t + 1.0
+                    for sid, lbl in base_label.items():
+                        try:
+                            n = traci.busstop.getPersonCount(sid)
+                        except traci.TraCIException:
+                            continue
+                        new = f"{lbl} | W:{n}" if n else lbl
+                        if cur_label.get(sid) != new:
+                            traci.poi.setType(f"bsg_{sid}", new)
+                            cur_label[sid] = new
+                if t >= next_cli_t:                    # 5초마다 터미널 요약
+                    next_cli_t = t + 5.0
+                    waits = []
+                    for sid in base_label:
+                        try:
+                            n = traci.busstop.getPersonCount(sid)
+                        except traci.TraCIException:
+                            continue
+                        if n:
+                            waits.append(f"{stops[sid].get('name', sid)} {n}명")
+                    buses = []
+                    for vid in traci.vehicle.getIDList():
+                        if traci.vehicle.getTypeID(vid).startswith("ego_type"):
+                            buses.append(f"버스 {vid} 탑승 "
+                                         f"{traci.vehicle.getPersonNumber(vid)}명")
+                    print(f"[t={int(t):4d}s] 대기: " + (", ".join(waits) or "없음")
+                          + (" | " + ", ".join(buses) if buses else ""))
+        except (KeyboardInterrupt, traci.FatalTraCIError):
+            pass                                       # 창을 닫았거나 Ctrl+C
+        finally:
+            try:
+                traci.close()
+            except Exception:
+                pass
 
     else:
         # sumo-gui: 도로를 "정적으로" 띄운다.
