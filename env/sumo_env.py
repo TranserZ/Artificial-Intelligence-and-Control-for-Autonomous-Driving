@@ -1411,6 +1411,16 @@ class SumoHighwayEnv(gym.Env):
                 pass
         return out
 
+    STOP_BLOCK_LOOK = 30.0   # m. 정류장 접근 중 이 거리 안 같은 차로에 정차 차량이 있으면 규칙을 쉰다
+
+    def _blocked_by_parked(self, look: float) -> bool:
+        """같은 차로 앞 look m 안에 정차(stop) 중인 차가 있는가. 신호 대기열(stop 아님)은 제외."""
+        try:
+            ld = traci.vehicle.getLeader(self.ego_id, look)
+            return bool(ld and ld[1] <= look and traci.vehicle.isStopped(ld[0]))
+        except traci.TraCIException:
+            return False
+
     def _bus_stop_control_inner(self, accel_raw: float, v: float):
         ns = self._next_stop()
         if ns is None:
@@ -1435,6 +1445,12 @@ class SumoHighwayEnv(gym.Env):
             return accel_raw, True
         cur_edge = traci.vehicle.getRoadID(self.ego_id)
         cur = traci.vehicle.getLaneIndex(self.ego_id)
+        # 정류장 엣지에 닿기 전, 같은 차로 앞을 "정차 중인" 차(불법주정차 다발지점 등)가 막고
+        # 있으면 규칙이 차로를 잡지 않는다 → RL이 비켜 가고, 지나간 뒤 다시 정류장 차로로 붙인다.
+        # (안 그러면 맨 오른쪽 차로 강제 + RL 차로 명령 차단으로 주정차 뒤에서 영원히 선다)
+        if cur_edge != edge and self._blocked_by_parked(self.STOP_BLOCK_LOOK):
+            self._stop_stuck = 0
+            return accel_raw, False
         # 정차 직전(정류장 엣지의 정류장 차로, 15 m 안)에는 SUMO에 속도 제어를 넘긴다.
         #   RL이 setSpeed로 속도를 쥔 채로는 SUMO가 '정류장 정차'를 시작하지 못해
         #   isAtBusStop이 영영 켜지지 않고, endPos 직전에서 영원히 서 있게 된다.
