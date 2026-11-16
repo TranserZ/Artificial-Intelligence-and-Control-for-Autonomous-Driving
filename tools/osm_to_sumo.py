@@ -279,29 +279,74 @@ if __name__ == "__main__":
 KEEP_SHORT_EDGES = {"e482167259_1a", "e608946832_1a"}
 
 
-def tiny_edge_joins(net_path, nod_path, min_len=2.0):
-    """netconvert 결과에서 교차로 영역이 겹쳐 길이가 min_len 미만이 된 엣지를 찾아,
-    양 끝 노드를 하나의 교차로로 합치라는 <join>을 nod 파일에 추가한다.
-    (예: 청계3가 부근 35 m 간격의 두 교차로 사이 엣지가 0.2 m로 줄어
-     오른쪽 차로가 곧바로 끊기던 문제) 추가한 join 개수를 반환한다.
-    청계5가 회차 엣지(KEEP_SHORT_EDGES)는 이 함수의 <join> 대상에서 뺀다.
-    주변 교차로가 따로 합쳐지면 id가 없을 수 있고, 그때 왕복 route는 남은 엣지를 쓴다."""
+def _cluster_members(nid):
+    """교차로 id → 원래 OSM 노드 id 목록. netconvert가 합친 교차로는
+    'cluster_nA_nB' 꼴이라 멤버를 꺼낼 수 있다. '#N more'로 잘린 이름은 복원
+    불가능하므로 None (join 대상에서 제외)."""
+    if not nid.startswith("cluster_"):
+        return [nid]
+    if "#" in nid:
+        return None
+    parts = nid[len("cluster_"):].split("_")
+    return parts if parts and all(p.startswith("n") for p in parts) else None
+
+
+def tiny_edge_joins(net_path, nod_path, min_len=2.0, min_len_main=8.0):
+    """netconvert 결과에서 교차로 사이에 남은 '토막 엣지'를 찾아, 양 끝 교차로를
+    하나로 합치라는 <join>을 nod 파일에 쓴다. 반환값: nod 파일이 바뀌었는가.
+
+    두 가지를 토막으로 본다.
+    - min_len(2 m) 미만: 어떤 엣지든. (예: 청계3가 부근 0.2 m — 오른쪽 차로 끊김)
+    - min_len_main(8 m) 미만이면서 차로 3개 이상(본선 방향): 차 한 대(5 m + 간격)가
+      들어가지 못하는 길이. 신호 대기 선두차가 꼬리를 앞 교차로 곡선 위에 걸친 채
+      대각선으로 서서 두 차로를 다 막는 현상의 원인. (2차로짜리 중앙 횡단 연결로는
+      일부러 제외 — 그 교차로들을 합치면 동·서 방향 도로가 한 덩어리가 된다.)
+
+    청계5가 회차 엣지(KEEP_SHORT_EDGES)와 막다른 끝(dead_end)은 제외한다.
+    이미 nod에 있는 <join>과 노드가 겹치면 한 그룹으로 합쳐 다시 쓴다
+    (netconvert는 겹치는 join 그룹을 받지 않는다)."""
     net = ET.parse(net_path).getroot()
-    pairs = set()
+    jtype = {j.get("id"): j.get("type") for j in net.findall("junction")}
+    groups = []
     for e in net.findall("edge"):
         if e.get("function") or e.get("id") in KEEP_SHORT_EDGES:
             continue
         lanes = e.findall("lane")
-        if lanes and max(float(l.get("length")) for l in lanes) < min_len:
-            a, b = e.get("from"), e.get("to")
-            if a and b and not a.startswith("cluster") and not b.startswith("cluster"):
-                pairs.add(tuple(sorted((a, b))))
-    if not pairs:
-        return 0
-    text = open(nod_path, encoding="utf-8").read().replace("</nodes>", "")
-    text += "".join(f'    <join nodes="{a} {b}"/>\n' for a, b in sorted(pairs)) + "</nodes>\n"
+        if not lanes:
+            continue
+        length = max(float(l.get("length")) for l in lanes)
+        if not (length < min_len or (length < min_len_main and len(lanes) >= 3)):
+            continue
+        a, b = e.get("from"), e.get("to")
+        if not a or not b or "dead_end" in (jtype.get(a), jtype.get(b)):
+            continue
+        ma, mb = _cluster_members(a), _cluster_members(b)
+        if ma is None or mb is None:
+            continue
+        groups.append(set(ma) | set(mb))
+    # 기존 <join> 그룹을 읽어 함께 병합한다
+    text = open(nod_path, encoding="utf-8").read()
+    old_lines = [ln for ln in text.splitlines() if "<join nodes=" in ln]
+    old_groups = [set(ln.split('nodes="')[1].split('"')[0].split()) for ln in old_lines]
+    merged = []
+    for g in groups + old_groups:
+        g = set(g)
+        while True:          # 겹치는 그룹을 모두 흡수할 때까지
+            hit = next((m for m in merged if m & g), None)
+            if hit is None:
+                break
+            merged.remove(hit)
+            g |= hit
+        merged.append(g)
+    new_set = {frozenset(g) for g in merged}
+    if new_set == {frozenset(g) for g in old_groups}:
+        return 0             # 바뀐 것이 없다 (재실행 불필요)
+    body = "".join(f'    <join nodes="{" ".join(sorted(g))}"/>\n'
+                   for g in sorted(merged, key=lambda s: sorted(s)[0]))
+    text = "\n".join(ln for ln in text.splitlines() if "<join nodes=" not in ln)
+    text = text.replace("</nodes>", body + "</nodes>")
     open(nod_path, "w", encoding="utf-8", newline="\n").write(text)
-    return len(pairs)
+    return len(merged)
 
 
 def _passenger_lane_indexes(edge_el):

@@ -55,7 +55,7 @@ def is_cheonggyecheon(road: dict) -> bool:
     return road.get("layout", "straight") == "cheonggyecheon"
 
 
-def _build_cheonggyecheon(ego: dict, out_dir: str) -> str:
+def _build_cheonggyecheon(ego: dict, out_dir: str, demo_ego: bool = False) -> str:
     """청계천로(OSM 실제 도로) 시나리오를 out_dir에 만들고 sumocfg 경로를 반환한다.
 
     1) data/osm/cheonggyecheon.osm → cgc.nod/edg.xml (tools/osm_to_sumo.py, PROJ 불필요)
@@ -84,17 +84,22 @@ def _build_cheonggyecheon(ego: dict, out_dir: str) -> str:
          "--sidewalks.guess", "true", "--sidewalks.guess.max-speed", "14",
          "--crossings.guess", "true", "--crossings.guess.speed-threshold", "14"])
     subprocess.run(netconvert_cmd, check=True, capture_output=True)
-    # 겹친 교차로 사이에 남은 아주 짧은 엣지는 교차로를 합쳐 다시 만든다
-    if osm_to_sumo.tiny_edge_joins(os.path.join(out_dir, "cgc.net.xml"),
-                                   os.path.join(out_dir, "cgc.nod.xml")):
+    # 교차로 사이에 남은 토막 엣지(차 한 대도 못 들어가는 길이)는 교차로를 합쳐
+    # 다시 만든다. 합친 뒤 새 토막이 드러날 수 있어 안정될 때까지 반복 (최대 3번).
+    for _ in range(3):
+        if not osm_to_sumo.tiny_edge_joins(os.path.join(out_dir, "cgc.net.xml"),
+                                           os.path.join(out_dir, "cgc.nod.xml")):
+            break
         subprocess.run(netconvert_cmd, check=True, capture_output=True)
     args = make_cgc_scenario.parse_args(
-        ["--net", os.path.join(out_dir, "cgc.net.xml"), "--out", out_dir,
-         "--no-demo-ego",
-         # 승객은 ego가 달릴 수 있는 route(노선)에만 만든다
-         "--pax-route-ids", ",".join(ego.get("routes") or {"r0": 1.0}),
-         "--ego-accel", str(ego["accel"]), "--ego-decel", str(ego["decel"]),
-         "--ego-max-speed", str(ego["max_speed"])]
+        ["--net", os.path.join(out_dir, "cgc.net.xml"), "--out", out_dir]
+        # 데모 셔틀: 학습·평가는 ego를 TraCI로 직접 투입하므로 끈다.
+        # view_road.py(구경용)는 켜서 버스가 노선을 돌고 승객을 태우는 모습을 보여준다.
+        + ([] if demo_ego else ["--no-demo-ego"])
+        # 승객은 ego가 달릴 수 있는 route(노선)에만 만든다
+        + ["--pax-route-ids", ",".join(ego.get("routes") or {"r0": 1.0}),
+           "--ego-accel", str(ego["accel"]), "--ego-decel", str(ego["decel"]),
+           "--ego-max-speed", str(ego["max_speed"])]
         + (["--roii"] if ego.get("roii") else []))  # ROii 제원 (road_config의 "roii")
     make_cgc_scenario.build(args.net, out_dir, args)
     # 버스 경로 위 오른쪽 차로가 직진으로 안 이어지는 교차로 보정 (도로망만 다시 쓰고, 경로는 그대로)
@@ -191,7 +196,8 @@ def _custom_program(tl: dict = None) -> bool:
     return tl_enabled(tl) and tl.get("program", "custom") in ("custom", "plan")
 
 
-def build(road: dict, ego: dict, traffic: dict, out_dir: str) -> str:
+def build(road: dict, ego: dict, traffic: dict, out_dir: str,
+          demo_ego: bool = False) -> str:
     """SUMO 파일들을 out_dir에 생성하고, sumocfg 파일 경로를 반환한다.
 
     Args:
@@ -199,11 +205,13 @@ def build(road: dict, ego: dict, traffic: dict, out_dir: str) -> str:
         ego:     configs.road_config.EGO     (RL 차량 속성)
         traffic: configs.road_config.TRAFFIC (배경 교통류)
         out_dir: 생성 위치 (보통 프로젝트의 sumo/ 폴더)
+        demo_ego: True면 (청계천 한정) SUMO가 스스로 모는 데모 버스를 넣는다.
+                  view_road.py 구경용 — 학습·평가는 ego를 TraCI로 투입하므로 False.
     신호등 설정은 configs.road_config.TRAFFIC_LIGHT 에서 읽는다.
     """
     os.makedirs(out_dir, exist_ok=True)
     if is_cheonggyecheon(road):
-        return _build_cheonggyecheon(ego, out_dir)
+        return _build_cheonggyecheon(ego, out_dir, demo_ego=demo_ego)
     use_tl = tl_enabled()
     cross = is_intersection(road)
     if cross:
