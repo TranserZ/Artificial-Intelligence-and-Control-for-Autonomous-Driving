@@ -1522,11 +1522,13 @@ class SumoHighwayEnv(gym.Env):
         """
         # 입구 보호는 "차가 새로 나타날 수 있는" 엣지에만: 도로 시작(dead_end)과 신호 교차로에서
         # 나오는 엣지. 보호구역·포켓 때문에 엣지를 나눈 지점까지 막으면 변경 금지 구간이 늘어난다.
-        # gaps_only: 정류장 규칙처럼 꼭 옮겨야 하는 경우 — 입구·정지선 구간 규칙은 건너뛰고
-        # 앞뒤 간격 검사(1)(2)만 한다
+        # gaps_only: 정류장 규칙처럼 꼭 옮겨야 하는 경우 — 정지선 구간 규칙은 건너뛰고
+        # 앞뒤 간격 검사(1)(2)만 한다. 단 입구 보호(0)는 지킨다: 교차로 직후엔 교차로 안
+        # 차가 차선 스캔에 안 잡히는 사각지대라, 정류장 쪽으로 옮기다 교차로에서 나오는 차와
+        # 옆으로 부딪혔다 (ROii, n4203161539 직후 e218924602_1, 시드 1015·1024).
         my_pos = traci.vehicle.getLanePosition(self.ego_id)
         from_node = self._edge_ends.get(traci.vehicle.getRoadID(self.ego_id), (None, None))[0]
-        if (not gaps_only and my_pos < self.lc_spawn_protect
+        if (my_pos < self.lc_spawn_protect
                 and self._junction_type.get(from_node, "dead_end") in ("dead_end", "traffic_light")):
             return False
         # 신호 정지선 앞 구간: 차선변경 금지 (교차로 앞 실선).
