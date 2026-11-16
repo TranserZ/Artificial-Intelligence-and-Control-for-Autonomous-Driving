@@ -82,7 +82,10 @@ def _build_cheonggyecheon(ego: dict, out_dir: str, demo_ego: bool = False) -> st
          "--junctions.corner-detail", "5", "--output.street-names", "true",
          "--offset.disable-normalization", "true",
          "--sidewalks.guess", "true", "--sidewalks.guess.max-speed", "14",
-         "--crossings.guess", "true", "--crossings.guess.speed-threshold", "14"])
+         "--crossings.guess", "true", "--crossings.guess.speed-threshold", "14",
+         # 배경 정리: 본 도로망과 이어지지 않은 '섬' 도로와 외톨이 엣지를 지운다
+         # (가장 큰 연결 덩어리 = 청계천로가 있는 도로망만 남김)
+         "--keep-edges.components", "1", "--remove-edges.isolated", "true"])
     subprocess.run(netconvert_cmd, check=True, capture_output=True)
     # 교차로 사이에 남은 토막 엣지(차 한 대도 못 들어가는 길이)는 교차로를 합쳐
     # 다시 만든다. 합친 뒤 새 토막이 드러날 수 있어 안정될 때까지 반복 (최대 3번).

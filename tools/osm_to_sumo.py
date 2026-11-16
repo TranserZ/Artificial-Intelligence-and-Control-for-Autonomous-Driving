@@ -36,6 +36,31 @@ CHEONGGYECHEON_KMH = 30   # 청계천로: OSM이 일부 구간에 maxspeed=30으
 
 CORRIDOR_NAME = "청계천로"
 
+# ── 배경 도로 정리 (2026-11 도로망 점검) ─────────────────────────────────────
+# 시뮬레이션이 실제로 쓰는 건 청계천로와 거기 맞닿은 옆길뿐이고, 나머지는 화면용
+# 배경이다. OSM을 그대로 옮기면 배경이 지저분해서 아래 규칙으로 정리한다.
+# 청계천로와 거기 맞닿은 도로(측면 합류 후보)는 어떤 규칙도 적용하지 않는다.
+MINOR_HIGHWAYS = {"residential", "service", "living_street", "unclassified"}
+BIG_HIGHWAYS = {"primary", "secondary", "tertiary",
+                "primary_link", "secondary_link", "tertiary_link"}
+# 주차장 통로·건물 진입로: 섬이나 막다른 토막이 되어 끊긴 것처럼 보인다 → 뺀다
+DROP_SERVICE = {"parking_aisle", "driveway", "drive-through"}
+# OSM에서 몇 m 차이로 안 이어진 골목 끝 → 이 거리 안의 교차점에 붙인다
+SNAP_DIST = 12.0
+# 지도 경계에서 이 거리 안의 막다른 끝은 '잘린 도로'라 정리하지 않는다
+BORDER_MARGIN = 25.0
+# 청계천로 노드에서 이 거리 안에 닿는 도로는 정리하지 않는다 (시뮬레이션 보호)
+PROTECT_RADIUS = 40.0
+# 청계천로에서 교차점 이 단계 안의 교차점에 닿는 도로도 정리하지 않는다
+PROTECT_HOPS = 3
+# 차로 수 태그가 없는 큰 도로: 같은 이름의 이웃 구간 값을 이어받고, 없으면 이 값
+# (방향당 차로 수). 예전엔 무조건 1이라 세종대로 8차로 중간이 1차로가 됐다.
+DEFAULT_LANES_PER_DIR = {"primary": 2, "secondary": 2, "tertiary": 1,
+                         "primary_link": 1, "secondary_link": 1, "tertiary_link": 1}
+# 골목 차로 폭 (m). OSM에 폭 정보가 전혀 없어 모두 SUMO 기본 3.2 m였다 (실제보다 넓음)
+MINOR_LANE_WIDTH = {"residential": 2.75, "unclassified": 2.75,
+                    "service": 2.5, "living_street": 2.5}
+
 
 def project(lon, lat):
     k = math.pi / 180.0
@@ -120,19 +145,23 @@ def convert(osm_path, out_dir):
         if len(run) >= 2:
             ways.append((w.get("id"), tags, run))
 
+    signals = {nid for nid, t in node_tags.items()
+               if t.get("highway") == "traffic_signals"}
+    corridor_nodes = _protected_nodes(ways, nodes, signals)
+    n_snap = _snap_near_misses(ways, nodes, signals, corridor_nodes)
+
     # 교차점: 둘 이상의 way가 공유하는 노드, 끝점, 신호등 노드
     use = Counter()
     for _, _, refs in ways:
         for r in set(refs):
             use[r] += 1
-    signals = {nid for nid, t in node_tags.items()
-               if t.get("highway") == "traffic_signals"}
+    lanes_fill = _fill_big_road_lanes(ways)
 
     def is_junction(r, ends):
         return use[r] > 1 or r in ends or r in signals
 
     edges, used_nodes, seq = [], set(), Counter()
-    for wid, tags, refs in ways:
+    for wi, (wid, tags, refs) in enumerate(ways):
         ends = {refs[0], refs[-1]}
         # junction 노드에서 way를 자른다
         cut, cur = [], [refs[0]]
@@ -152,8 +181,14 @@ def convert(osm_path, out_dir):
             pts = [project(*nodes[r]) for r in seg]
             fwd = oneway in ("yes", "true", "1")
             bwd = oneway == "-1"
+            # 차로 수 태그 없는 큰 도로: 이웃 구간에서 이어받은 값 (청계천로와 맞닿은
+            # 구간은 그대로 둔다 — 측면 합류 등 시뮬레이션이 쓰는 도로를 바꾸지 않게)
+            fill = None
+            if not lanes and wi in lanes_fill and not (
+                    seg[0] in corridor_nodes or seg[-1] in corridor_nodes):
+                fill = lanes_fill[wi]
             if fwd or bwd:
-                n_lane = int(lanes) if lanes else 1
+                n_lane = int(lanes) if lanes else (fill or 1)
                 s = seg if fwd else list(reversed(seg))
                 p = pts if fwd else list(reversed(pts))
                 seq[wid] += 1
@@ -161,12 +196,19 @@ def convert(osm_path, out_dir):
                               tags))
                 used_nodes.update([s[0], s[-1]])
             else:
-                per = max(1, int(lanes) // 2) if lanes else 1
+                per = max(1, int(lanes) // 2) if lanes else (fill or 1)
                 seq[wid] += 1
                 edges.append((f"{wid}_{seq[wid]}a", seg[0], seg[-1], per, speed, pts, tags))
                 edges.append((f"{wid}_{seq[wid]}b", seg[-1], seg[0], per, speed,
                               list(reversed(pts)), tags))
                 used_nodes.update([seg[0], seg[-1]])
+
+    # 배경 정리: 주차장 통로·진입로, 막다른 골목 토막을 뺀다. 구간 자르기(엣지 id)는
+    # 위에서 원래 데이터 기준으로 이미 끝났으므로 남은 엣지의 id는 그대로다.
+    n_before = len(edges)
+    edges = _prune_background(edges, nodes, corridor_nodes)
+    used_nodes = {r for _, a, b, _, _, _, _ in edges for r in (a, b)}
+    n_pruned = n_before - len(edges)
 
     os.makedirs(out_dir, exist_ok=True)
     # 중간 지점(연결 도로 2개 이하)에 있는 신호가 14 m/s 넘는 빠른 도로 위라면
@@ -254,15 +296,201 @@ def convert(osm_path, out_dir):
             if full_id in lane_overrides:
                 n_lane = lane_overrides[full_id]
                 n_lanes_fixed += 1
+            # 골목 차로 폭 (청계천로·맞닿은 도로 제외 — 시뮬레이션이 쓰는 도로는 그대로)
+            width_attr = ""
+            lw = MINOR_LANE_WIDTH.get(tags.get("highway"))
+            if lw and a not in corridor_nodes and b not in corridor_nodes \
+                    and CORRIDOR_NAME not in (tags.get("name") or ""):
+                width_attr = f' width="{lw}"'
             f.write(f'    <edge id="{full_id}" from="n{a}" to="n{b}" numLanes="{n_lane}" '
                     f'speed="{speed:.2f}" priority="{ {"primary":4,"secondary":3,"tertiary":2}.get(tags.get("highway"),1) }" '
-                    f'{name_attr}{attr}/>\n')
+                    f'{name_attr}{width_attr}{attr}/>\n')
         f.write("</edges>\n")
 
     n_tl = sum(1 for r in used_nodes if useful_signal(r))
     print(f"노드 {len(used_nodes)}개 (신호등 {n_tl}, 추정 신호 {len(inferred)}, 빠른 도로 중간 신호 {n_drop}개 제외), "
           f"엣지 {len(edges)}개, 어린이보호구역 속도 {n_school}개, 차로 수 보정 {n_lanes_fixed}개 → {out_dir}")
+    print(f"배경 정리: 끊긴 끝 잇기 {n_snap}곳, 막다른 토막·주차장 통로 {n_pruned}개 엣지 제거, "
+          f"차로 수 채운 큰 도로 {len(lanes_fill)}개 way")
     return edges
+
+
+def _protected_nodes(ways, nodes, signals):
+    """정리 규칙을 적용하지 않을 노드 = 시뮬레이션이 쓰는 도로 주변.
+
+    (1) 청계천로 노드에서 PROTECT_RADIUS 안의 노드 — netconvert가 근처 교차점을
+        하나로 합치므로, 합쳐진 교차로의 다른 노드에 닿은 도로를 바꿔도 교차로
+        모양이 바뀌어 본선 구간 길이·연결이 달라진다.
+    (2) 청계천로에서 교차점 PROTECT_HOPS 단계 안의 교차점 — 측면 합류 도로(본선에서
+        한 단계)의 먼 쪽 교차로와 그 이웃 교차로 모양까지 그대로 두기 위해.
+        (실측: 이웃 교차로가 바뀌면 그 사이 짧은 연결의 교차로 합치기가 달라져
+         측면 합류 도로 길이가 바뀌었다)"""
+    corridor = {r for _, tags, refs in ways
+                if CORRIDOR_NAME in (tags.get("name") or "") for r in refs}
+    use = Counter()
+    for _, _, refs in ways:
+        for r in set(refs):
+            use[r] += 1
+    # 교차점끼리의 이웃 관계 (way를 따라 다음 교차점)
+    adj = {}
+    for _, _, refs in ways:
+        js = [r for i, r in enumerate(refs)
+              if use[r] > 1 or r in signals or i in (0, len(refs) - 1)]
+        for p, q in zip(js, js[1:]):
+            adj.setdefault(p, set()).add(q)
+            adj.setdefault(q, set()).add(p)
+    prot = set(corridor)
+    frontier = set(corridor)
+    for _ in range(PROTECT_HOPS):
+        frontier = {q for p in frontier for q in adj.get(p, ())} - prot
+        prot |= frontier
+    cxy = [project(*nodes[r]) for r in corridor]
+    for _, _, refs in ways:
+        for r in refs:
+            if r in prot:
+                continue
+            x, y = project(*nodes[r])
+            if any(abs(x - cx) <= PROTECT_RADIUS and abs(y - cy) <= PROTECT_RADIUS
+                   and math.hypot(x - cx, y - cy) <= PROTECT_RADIUS for cx, cy in cxy):
+                prot.add(r)
+    return prot
+
+
+def _inside_margin(lon, lat):
+    """지도 경계에서 BORDER_MARGIN 이상 안쪽인가 (경계에서 잘린 도로 끝은 정리 대상 아님)."""
+    x0, y0 = project(BBOX[0], BBOX[1])
+    x1, y1 = project(BBOX[2], BBOX[3])
+    x, y = project(lon, lat)
+    m = BORDER_MARGIN
+    return x0 + m < x < x1 - m and y0 + m < y < y1 - m
+
+
+def _snap_near_misses(ways, nodes, signals, corridor_nodes):
+    """OSM에서 몇 m 차이로 안 이어진 골목 끝을 가까운 교차점에 붙인다 (ways를 고친다).
+
+    대상: 골목(MINOR_HIGHWAYS) way의 끝 노드 중 다른 way와 공유하지 않는(막다른) 것.
+    붙일 곳: SNAP_DIST 안의 '이미 교차점이거나 다른 way의 끝인' 노드 — 이미 잘리는
+    지점이라 다른 도로의 구간 나누기(엣지 id)가 바뀌지 않는다. 청계천로 노드는 제외.
+    반환: 붙인 끝의 수."""
+    use = Counter()
+    for _, _, refs in ways:
+        for r in set(refs):
+            use[r] += 1
+    anchors = {r for r, n in use.items() if n > 1} | signals
+    for _, _, refs in ways:
+        anchors.update((refs[0], refs[-1]))
+    anchors -= corridor_nodes
+    anchor_xy = [(r, project(*nodes[r])) for r in anchors if r in nodes]
+    n = 0
+    for i, (wid, tags, refs) in enumerate(ways):
+        if tags.get("highway") not in MINOR_HIGHWAYS:
+            continue
+        for k in (0, -1):
+            end = refs[k]
+            if use[end] > 1 or end in signals or not _inside_margin(*nodes[end]):
+                continue
+            ex, ey = project(*nodes[end])
+            best, bd = None, SNAP_DIST
+            own = set(refs)
+            for r, (x, y) in anchor_xy:
+                if r in own:
+                    continue
+                d = math.hypot(x - ex, y - ey)
+                if d < bd:
+                    best, bd = r, d
+            if best is not None:
+                refs[k] = best
+                use[best] += 1
+                n += 1
+    return n
+
+
+def _fill_big_road_lanes(ways):
+    """차로 수(lanes) 태그가 없는 큰 도로 way → 방향당 차로 수 {way index: n}.
+    같은 이름의 이웃 way(끝점 공유)에서 값을 이어받고(여러 번 반복해 퍼뜨림),
+    끝까지 못 받으면 DEFAULT_LANES_PER_DIR. 청계천로는 cgc_lanes.csv가 맡으므로 제외."""
+    def per_dir(tags):
+        n = int(tags["lanes"])
+        return n if tags.get("oneway") in ("yes", "true", "1", "-1") else max(1, n // 2)
+
+    by_node = {}
+    for i, (_, tags, refs) in enumerate(ways):
+        for r in (refs[0], refs[-1]):
+            by_node.setdefault(r, []).append(i)
+    known = {}
+    for i, (_, tags, _) in enumerate(ways):
+        if tags.get("highway") in BIG_HIGHWAYS and tags.get("lanes"):
+            try:
+                known[i] = per_dir(tags)
+            except ValueError:
+                pass
+    todo = [i for i, (_, tags, _) in enumerate(ways)
+            if tags.get("highway") in BIG_HIGHWAYS and not tags.get("lanes")
+            and CORRIDOR_NAME not in (tags.get("name") or "")]
+    fill = {}
+    for _ in range(20):                      # 이웃에서 이웃으로 퍼뜨린다
+        changed = False
+        for i in todo:
+            if i in fill:
+                continue
+            _, tags, refs = ways[i]
+            name = tags.get("name")
+            if not name:
+                continue
+            vals = [known.get(j, fill.get(j)) for r in (refs[0], refs[-1])
+                    for j in by_node.get(r, []) if j != i and ways[j][1].get("name") == name]
+            vals = [v for v in vals if v]
+            if vals:
+                fill[i] = max(vals)
+                changed = True
+        if not changed:
+            break
+    for i in todo:
+        fill.setdefault(i, DEFAULT_LANES_PER_DIR.get(ways[i][1].get("highway"), 1))
+    return fill
+
+
+def _prune_background(edges, nodes, corridor_nodes):
+    """배경 정리: (1) 주차장 통로·건물 진입로 (2) 막다른 골목 토막을 반복해서 뺀다.
+
+    청계천로 노드에 닿는 구간은 남긴다 (측면 합류 후보가 바뀌지 않게).
+    양방향 도로의 a/b 엣지는 한 구간(같은 id에서 a/b를 뗀 것)으로 같이 다룬다.
+    지도 경계 근처의 끝은 '잘린 도로'이므로 막다른 길로 보지 않는다."""
+    def key(eid):
+        return eid[:-1] if eid[-1] in "ab" else eid
+
+    def protected(a, b, tags):
+        return (a in corridor_nodes or b in corridor_nodes
+                or CORRIDOR_NAME in (tags.get("name") or ""))
+
+    segs = {}
+    for e in edges:
+        segs.setdefault(key(e[0]), []).append(e)
+    drop = {k for k, es in segs.items()
+            if es[0][6].get("service") in DROP_SERVICE
+            and not protected(es[0][1], es[0][2], es[0][6])}
+    while True:
+        deg = Counter()
+        for k, es in segs.items():
+            if k in drop:
+                continue
+            for r in {es[0][1], es[0][2]}:
+                deg[r] += 1
+        new = set()
+        for k, es in segs.items():
+            if k in drop:
+                continue
+            a, b, tags = es[0][1], es[0][2], es[0][6]
+            if tags.get("highway") not in MINOR_HIGHWAYS or protected(a, b, tags):
+                continue
+            for r in (a, b):
+                if deg[r] == 1 and _inside_margin(*nodes[r]):
+                    new.add(k)
+                    break
+        if not new:
+            break
+        drop |= new
+    return [e for e in edges if key(e[0]) not in drop]
 
 
 if __name__ == "__main__":
