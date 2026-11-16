@@ -178,7 +178,7 @@ STOP_PALETTE = ["#D7263D", "#F46036", "#B8860B", "#8C5A2B", "#C2187A", "#7B3FBF"
 STOP_FRAME = {
     "line_w": 0.40,              # 테두리 선 폭 (m) — 멀리서 찾기는 핀이 맡으므로 얇게
     "fill_alpha": 50,            # 안쪽 옅은 색면 투명도 (0~255)
-    "pin": 3.6,                  # 정류장 핀(색 원 + 번호) 지름 (m). 줌 아웃하면 화면
+    "pin": 2.4,                  # 정류장 핀(색 원) 지름 (m). 줌 아웃하면 화면
                                  # 크기가 일정하게 유지된다 (cgc.gui.xml poi_constantSize)
     "pin_back": 2.6,             # 핀 위치: 테두리 뒤쪽 바깥으로 이만큼 (m)
     "pad_s": (1.0, 0.8),         # 표지판 앞 / 지붕 끝 뒤로 더 두는 여유 (m)
@@ -297,11 +297,10 @@ def stop_shelter_polys(edge, lane_idx, sid, start_pos, end_pos, name, lines,
         strip(f"bsf_{sid}_a", f"{rgb},230", fs0, fs0 + lw, fo0, fo1, 24.5),       # 앞
         strip(f"bsf_{sid}_b", f"{rgb},230", fs1 - lw, fs1, fo0, fo1, 24.5),       # 끝
     ]
-    # 정류장 핀: 정류장 색 원 + 흰 테두리 + 흰 번호 (지도 앱의 위치 핀처럼).
-    # 정류장 이름 글자는 두지 않는다 (혼동을 준다는 사용자 의견) — 번호가 대기
-    # 현황 창의 표·지도 번호와 같다. 번호는 POI의 type 글자 (cgc.gui.xml poiType).
+    # 정류장 핀: 정류장 색 원 + 흰 테두리 (지도 앱의 위치 핀처럼). 글자는 없다
+    # (이름·번호 모두 사용자 요청으로 뺐다 — 정류장 구분은 색으로).
     # POI는 poi_constantSize 덕분에 줌 아웃해도 화면에서 일정 크기 아래로
-    # 작아지지 않는다 → 전체 지도에서도 정류장 위치가 번호 달린 색 점으로 보인다.
+    # 작아지지 않는다 → 전체 지도에서도 정류장 위치가 색 점으로 보인다.
     mx, my, mdx, mdy = _pos_dir(shape, (roof_s0 + roof_s1) / 2)
     off_pin = fo1 + F["pin_back"]
     kx, ky = mx + mdy * off_pin, my - mdx * off_pin
@@ -309,8 +308,7 @@ def stop_shelter_polys(edge, lane_idx, sid, start_pos, end_pos, name, lines,
     P.append(f'    <poi id="bsk_{sid}_ring" x="{kx:.2f}" y="{ky:.2f}" color="255,255,255" '
              f'layer="26" width="{pin * 1.25:.2f}" height="{pin * 1.25:.2f}"/>')
     P.append(f'    <poi id="bsk_{sid}" x="{kx:.2f}" y="{ky:.2f}" color="{rgb}" '
-             f'layer="27" width="{pin:.2f}" height="{pin:.2f}" '
-             f'type="{number if number is not None else ""}"/>')
+             f'layer="27" width="{pin:.2f}" height="{pin:.2f}"/>')
     return P
 
 
@@ -860,22 +858,15 @@ def build(net_path, out_dir, args):
     # GUI: 전체 도로가 한 화면에 보이도록 (x 0~2275, y -280~210)
     # persons: 기본값은 사람을 작은 삼각형(화살표)으로 그려서 뭔지 알아보기 어렵다.
     #   personQuality=2 → 사람 모양, person_minSize=2 → 멀리서도 점 이상 크기 보장.
-    # pois: 정류장 핀(색 원)의 type에 넣은 번호를 흰 글씨로 핀 위에 띄운다
-    #   (poiName은 id가 떠서 안 쓴다. 바탕 상자는 sumo-gui가 짧게 그려서 안 쓴다).
-    #   핀: poi_constantSize=1 → 가까이선 실제 크기, 줌 아웃하면 화면에서 일정
-    #   크기 아래로 작아지지 않는다 (위치 찾기용).
-    #   번호: poiType_constantSize=1 → 화면 픽셀 고정이라, 줌 아웃해서 핀이 최소
-    #   크기로 남을 때도 번호가 그 안에 읽히는 크기로 남는다. (예전 긴 이름 글자는
-    #   이 방식에서 너무 커 보였지만, 번호 한두 글자는 핀 안에 들어간다)
+    # pois: 정류장 핀(색 원). poi_constantSize=1 → 가까이선 실제 크기, 줌 아웃하면
+    #   화면에서 일정 크기 아래로 작아지지 않는다 (위치 찾기용). 글자는 표시 안 함.
     with open(os.path.join(out_dir, "cgc.gui.xml"), "w", encoding="utf-8", newline="\n") as f:
         f.write('<viewsettings>\n'
                 '    <scheme name="real world">\n'
                 '        <persons personMode="0" personQuality="2" person_minSize="2.0" '
                 'person_exaggeration="1.5" person_constantSize="0"/>\n'
                 '        <pois poi_minSize="0" poi_exaggeration="1" poi_constantSize="1" '
-                'poiType_show="1" poiType_size="28" '
-                'poiType_color="255,255,255" poiType_bgColor="0,0,0,0" '
-                'poiType_constantSize="1"/>\n'
+                'poiType_show="0" poiName_show="0"/>\n'
                 # busStop의 SUMO 기본 그림(초록 면 + 독일식 H 표지)을 사실상 숨긴다
                 # (크기 배율 0.01). 정류장 겉모습은 쉘터·표지판 폴리곤이 담당.
                 '        <additionals addMode="0" add_minSize="0" add_exaggeration="0.01" '
