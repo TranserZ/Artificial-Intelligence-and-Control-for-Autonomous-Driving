@@ -1,6 +1,7 @@
 <viewsettings>
     <scheme name="real world">
         <persons personMode="0" personQuality="2" person_minSize="2.0" person_exaggeration="1.5" person_constantSize="0"/>
+        <pois poiType_show="1" poiType_size="55" poiType_color="255,255,255" poiType_bgColor="20,70,160,235" poiType_constantSize="1"/>
     </scheme>
     <viewport zoom="250" x="1100" y="-30" angle="0"/>
     <delay value="100"/>

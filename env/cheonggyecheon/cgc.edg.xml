@@ -8,13 +8,13 @@
     <edge id="e37403012_1b" from="n436877019" to="n436877020" numLanes="1" speed="8.33" priority="1"  name="세종대로" shape="-31.69,-27.10"/>
     <edge id="e37930979_1" from="n2697100729" to="n11197929752" numLanes="4" speed="16.67" priority="4"  name="종로"/>
     <edge id="e37930979_2" from="n11197929752" to="n8380350230" numLanes="4" speed="16.67" priority="4"  name="종로" shape="13.58,93.73"/>
-    <edge id="e73541403_1" from="n5863541500" to="n3063260473" numLanes="2" speed="8.33" priority="3"  name="청계천로" shape="26.86,-22.52 33.31,-23.32 35.01,-23.19"/>
-    <edge id="e73541403_2" from="n3063260473" to="n3806620354" numLanes="2" speed="8.33" priority="3"  name="청계천로" shape="171.23,-35.07"/>
-    <edge id="e73541403_3" from="n3806620354" to="n2420018339" numLanes="2" speed="8.33" priority="3"  name="청계천로" shape="194.48,-37.66"/>
-    <edge id="e73541403_4" from="n2420018339" to="n2420018333" numLanes="2" speed="8.33" priority="3"  name="청계천로" shape="252.26,-42.61"/>
-    <edge id="e73541403_5" from="n2420018333" to="n4960120586" numLanes="2" speed="8.33" priority="3"  name="청계천로"/>
+    <edge id="e73541403_1" from="n5863541500" to="n3063260473" numLanes="1" speed="8.33" priority="3"  name="청계천로" shape="26.86,-22.52 33.31,-23.32 35.01,-23.19"/>
+    <edge id="e73541403_2" from="n3063260473" to="n3806620354" numLanes="1" speed="8.33" priority="3"  name="청계천로" shape="171.23,-35.07"/>
+    <edge id="e73541403_3" from="n3806620354" to="n2420018339" numLanes="1" speed="8.33" priority="3"  name="청계천로" shape="194.48,-37.66"/>
+    <edge id="e73541403_4" from="n2420018339" to="n2420018333" numLanes="1" speed="8.33" priority="3"  name="청계천로" shape="252.26,-42.61"/>
+    <edge id="e73541403_5" from="n2420018333" to="n4960120586" numLanes="1" speed="8.33" priority="3"  name="청계천로"/>
     <edge id="e73541403_6" from="n4960120586" to="n13732389920" numLanes="2" speed="8.33" priority="3"  name="청계천로" shape="461.71,-59.80 469.99,-60.64"/>
-    <edge id="e73541403_7" from="n13732389920" to="n13732389919" numLanes="2" speed="8.33" priority="3"  name="청계천로"/>
+    <edge id="e73541403_7" from="n13732389920" to="n13732389919" numLanes="1" speed="8.33" priority="3"  name="청계천로"/>
     <edge id="e73541403_8" from="n13732389919" to="n11233115507" numLanes="2" speed="8.33" priority="3"  name="청계천로" shape="510.21,-67.13 584.11,-83.11"/>
     <edge id="e73549702_1" from="n871793721" to="n4202872188" numLanes="1" speed="8.33" priority="1"  name="동호로37길"/>
     <edge id="e73549702_2" from="n4202872188" to="n9269970825" numLanes="1" speed="8.33" priority="1"  name="동호로37길" shape="2021.09,-63.46"/>
@@ -164,9 +164,9 @@
     <edge id="e218923156_1b" from="n436875670" to="n13732389934" numLanes="4" speed="13.89" priority="3"  name="남대문로"/>
     <edge id="e218923182_1a" from="n414685878" to="n1945254788" numLanes="1" speed="13.89" priority="4"  name="동호로"/>
     <edge id="e218923182_1b" from="n1945254788" to="n414685878" numLanes="1" speed="13.89" priority="4"  name="동호로"/>
-    <edge id="e218924602_1" from="n4203161539" to="n1815458102" numLanes="2" speed="8.33" priority="3"  name="청계천로" shape="1362.12,-122.51 1376.82,-121.05"/>
-    <edge id="e218924602_2" from="n1815458102" to="n871804259" numLanes="2" speed="8.33" priority="3"  name="청계천로" shape="1512.34,-107.30 1539.41,-104.75"/>
-    <edge id="e218924602_3" from="n871804259" to="n1691642790" numLanes="2" speed="8.33" priority="3"  name="청계천로" shape="1586.26,-98.61 1599.39,-97.07 1613.48,-95.37"/>
+    <edge id="e218924602_1" from="n4203161539" to="n1815458102" numLanes="3" speed="8.33" priority="3"  name="청계천로" shape="1362.12,-122.51 1376.82,-121.05"/>
+    <edge id="e218924602_2" from="n1815458102" to="n871804259" numLanes="3" speed="8.33" priority="3"  name="청계천로" shape="1512.34,-107.30 1539.41,-104.75"/>
+    <edge id="e218924602_3" from="n871804259" to="n1691642790" numLanes="3" speed="8.33" priority="3"  name="청계천로" shape="1586.26,-98.61 1599.39,-97.07 1613.48,-95.37"/>
     <edge id="e218924602_4" from="n1691642790" to="n4203244003" numLanes="2" speed="8.33" priority="3"  name="청계천로" shape="1621.16,-94.63"/>
     <edge id="e218924602_5" from="n4203244003" to="n1815457878" numLanes="2" speed="8.33" priority="3"  name="청계천로"/>
     <edge id="e218924602_6" from="n1815457878" to="n871729555" numLanes="2" speed="8.33" priority="3"  name="청계천로" shape="1757.24,-77.32"/>
@@ -924,10 +924,10 @@
     <edge id="e1207481551_1" from="n1945254874" to="n1945254879" numLanes="4" speed="16.67" priority="4"  name="종로" shape="493.27,94.31"/>
     <edge id="e1207481552_1" from="n1945254879" to="n1945254893" numLanes="4" speed="16.67" priority="4"  name="종로" shape="521.53,94.97"/>
     <edge id="e1212424782_1" from="n871729539" to="n9040757788" numLanes="2" speed="8.33" priority="3"  name="청계천로" shape="2212.08,17.29 2218.77,18.06"/>
-    <edge id="e1212424783_1" from="n871729555" to="n1326151556" numLanes="2" speed="8.33" priority="3"  name="청계천로" shape="1838.98,-63.83"/>
-    <edge id="e1212424783_2" from="n1326151556" to="n9269970833" numLanes="2" speed="8.33" priority="3"  name="청계천로"/>
-    <edge id="e1212424783_3" from="n9269970833" to="n871793721" numLanes="2" speed="8.33" priority="3"  name="청계천로"/>
-    <edge id="e1212424783_4" from="n871793721" to="n4202872186" numLanes="2" speed="8.33" priority="3"  name="청계천로" shape="2032.81,-17.37"/>
+    <edge id="e1212424783_1" from="n871729555" to="n1326151556" numLanes="1" speed="8.33" priority="3"  name="청계천로" shape="1838.98,-63.83"/>
+    <edge id="e1212424783_2" from="n1326151556" to="n9269970833" numLanes="1" speed="8.33" priority="3"  name="청계천로"/>
+    <edge id="e1212424783_3" from="n9269970833" to="n871793721" numLanes="1" speed="8.33" priority="3"  name="청계천로"/>
+    <edge id="e1212424783_4" from="n871793721" to="n4202872186" numLanes="1" speed="8.33" priority="3"  name="청계천로" shape="2032.81,-17.37"/>
     <edge id="e1212424784_1" from="n5863541381" to="n871729555" numLanes="3" speed="13.89" priority="4"  name="창경궁로"/>
     <edge id="e1212424785_1" from="n436875654" to="n10284647610" numLanes="2" speed="8.33" priority="3"  name="청계천로" shape="2172.38,50.02 2147.40,45.14 2104.48,34.91 2043.35,20.35 2024.72,15.70"/>
     <edge id="e1212424785_2" from="n10284647610" to="n436844961" numLanes="2" speed="8.33" priority="3"  name="청계천로" shape="1959.58,-0.04 1932.87,-7.73 1910.43,-14.18 1876.32,-24.00 1871.26,-25.46 1840.11,-32.36"/>
