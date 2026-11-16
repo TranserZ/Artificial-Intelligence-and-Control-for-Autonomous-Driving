@@ -269,8 +269,11 @@ class SumoHighwayEnv(gym.Env):
         self.lane_change_duration = float(action.get("lane_change_duration", 1.0))
         self.rw = reward
         # 정차금지지대 (edge, 시작 m, 끝 m). 파일은 data/road_data/no_stop_zones.csv
-        self._no_stop_zones = _load_zone_rows(
-            "no_stop_zones.csv", ("edge_id", "start_pos", "end_pos"))
+        # 행마다 엣지 범위(edge_id, start_pos, end_pos) 또는 교차로 전체(junction_id: 내부 차로 전부)
+        _ns_rows = _load_zone_rows(
+            "no_stop_zones.csv", ("edge_id", "start_pos", "end_pos", "junction_id"))
+        self._no_stop_zones = [(e, a, b) for e, a, b, _ in _ns_rows if e]
+        self._no_stop_junctions = {str(j) for _, _, _, j in _ns_rows if j}
         # 불법주정차 다발지점 (차로 점유). reset마다 지점별 prob 확률로 0초부터 정차 상태로 세운다.
         self._hotspots = _load_zone_rows(
             "illegal_parking_hotspots.csv",
@@ -2206,6 +2209,13 @@ class SumoHighwayEnv(gym.Env):
             if limit is not None and spd > limit:
                 rate = float(self.rw.get("school_zone_speeding_penalty", 0.0))
                 reward -= min(rate * (spd - limit), 0.5)
+        # 교차로 단위 정차금지지대 (no_stop_zones.csv의 junction_id): 그 교차로 내부 차로
+        # (":<교차로 id>_<번호>")에서 거의 서 있으면 스텝마다 같은 감점.
+        if alive and self._no_stop_junctions:
+            rid = traci.vehicle.getRoadID(self.ego_id)
+            if (rid.startswith(":") and rid[1:rid.rfind("_")] in self._no_stop_junctions
+                    and traci.vehicle.getSpeed(self.ego_id) < 0.5):
+                reward -= float(self.rw.get("no_stop_zone_penalty", 0.0))
         if (terminated or truncated) and not self.shield_eval_off and self.replay_prob > 0:
             self._update_replay(bool(arrived))
         info["replayed"] = self._ep_replayed

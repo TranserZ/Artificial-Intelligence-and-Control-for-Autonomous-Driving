@@ -145,6 +145,44 @@ class _Writer:
                           f'layer="{layer}" imgFile="{ASSET_REL}/{f}"/>')
 
 
+def _seg_quad(a, b, width):
+    """선분 a-b를 폭 width의 사각형으로."""
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    L = math.hypot(dx, dy) or 1.0
+    nx, ny = -dy / L * width / 2.0, dx / L * width / 2.0
+    return [(a[0] + nx, a[1] + ny), (b[0] + nx, b[1] + ny), (b[0] - nx, b[1] - ny), (a[0] - nx, a[1] - ny)]
+
+
+def _hatch_polygon(w, ptype, poly, color=YELLOW):
+    """임의 다각형에 노란 테두리 + 45° 빗금 (정차금지지대 빗금과 같은 굵기·간격)."""
+    pts = list(poly[:-1]) if len(poly) > 2 and poly[0] == poly[-1] else list(poly)
+    if len(pts) < 3:
+        return
+    edges = list(zip(pts, pts[1:] + pts[:1]))
+    for a, b in edges:
+        w.poly(ptype, color, LINE_LAYER, _seg_quad(a, b, BORDER_W * 2))
+    r2 = math.sqrt(0.5)
+    nvec, dvec = (r2, -r2), (r2, r2)                  # 빗금 법선 / 방향
+    dot = lambda p, v: p[0] * v[0] + p[1] * v[1]      # noqa: E731
+    proj = [dot(p, nvec) for p in pts]
+    c = min(proj) + HATCH_STEP / 2
+    while c < max(proj):
+        ts = []
+        for a, b in edges:
+            pa, pb = dot(a, nvec) - c, dot(b, nvec) - c
+            if (pa < 0) != (pb < 0):
+                k = pa / (pa - pb)
+                x = (a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k)
+                ts.append(dot(x, dvec))
+        ts.sort()
+        for t0, t1 in zip(ts[0::2], ts[1::2]):
+            if t1 - t0 > 0.3:
+                p0 = (c * nvec[0] + t0 * dvec[0], c * nvec[1] + t0 * dvec[1])
+                p1 = (c * nvec[0] + t1 * dvec[0], c * nvec[1] + t1 * dvec[1])
+                w.poly(ptype, color, LINE_LAYER - 0.05, _seg_quad(p0, p1, HATCH_W))
+        c += HATCH_STEP
+
+
 def marking_lines(net, log=print):
     """cgc.add.xml에 넣을 줄 목록 (BEGIN/END 표시 포함)."""
     w = _Writer()
@@ -188,7 +226,18 @@ def marking_lines(net, log=print):
 
     # ---- 정차금지지대 ----
     for r in _read_csv("no_stop_zones.csv"):
-        eid = r["edge_id"].strip()
+        eid = (r.get("edge_id") or "").strip()
+        jid = (r.get("junction_id") or "").strip()
+        if not eid and jid:
+            # 교차로 단위: 교차로 모양 전체에 노란 테두리 + 45° 빗금 (sumo_env는 내부 차로로 판정)
+            try:
+                shape = [tuple(p[:2]) for p in net.getNode(jid).getShape()]
+            except KeyError:
+                log(f"[zone_markings] 정차금지 교차로가 도로망에 없음 (건너뜀): {jid}")
+                continue
+            _hatch_polygon(w, "no_stop_zone", shape)
+            log(f"[zone_markings] 정차금지 교차로 {jid} — {r.get('reason', '')}")
+            continue
         if not net.hasEdge(eid):
             log(f"[zone_markings] 정차금지 엣지가 도로망에 없음 (건너뜀): {eid}")
             continue

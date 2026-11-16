@@ -1,2 +1,2 @@
-edge_id,start_pos,end_pos,reason
-e908646367_6,10,40,청계3가 접근 정차금지 노란빗금
+edge_id,start_pos,end_pos,junction_id,reason
+,,,cluster_n5768277866_n871729539_n9040757788,청계5가 사거리 교차로 내부 정차금지 노란 테두리+빗금 (로드뷰 카카오 2026.09 중구 방산동; 정면 중앙 직사각형 + 남쪽 동호로 쪽 대각선 박스)

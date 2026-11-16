@@ -538,6 +538,13 @@ def main():
     n_zone_poly = sum(1 for p in polys if not (p.get("id") or "").startswith("bs"))
     nsz_detail = []
     for r in read_csv(NO_STOP_CSV):
+        if not (r.get("edge_id") or "").strip():
+            jid = (r.get("junction_id") or "").strip()
+            nsz_detail.append(dict(edge=f"교차로 {jid[:40]}", a=0.0, b=0.0, s0=None, s1=None, len=None,
+                                   note="교차로 내부 전체 (r0 경로 밖일 수 있음)", reason=r["reason"]))
+            add("4.정차금지지대", f"교차로 {jid}", "기준값 없음", "-", "-", "m", "측정 불가",
+                f"{r['reason']}; 교차로 단위")
+            continue
         eid, a, b = r["edge_id"], float(r["start_pos"]), float(r["end_pos"])
         if eid not in edge_items:
             nsz_detail.append(dict(edge=eid, a=a, b=b, s0=None, s1=None, len=None,

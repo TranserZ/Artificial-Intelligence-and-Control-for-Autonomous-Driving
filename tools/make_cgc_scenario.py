@@ -58,12 +58,14 @@ def passenger_lane_indexes(edge):
 
 
 def load_no_stop_zones(path=NO_STOP_CSV):
-    """정차금지지대 (edge_id, start_pos, end_pos). 파일이 없으면 빈 목록."""
+    """엣지 범위 정차금지지대 (edge_id, start_pos, end_pos). 파일이 없으면 빈 목록."""
     if not os.path.exists(path):
         return []
     zones = []
     with open(path, encoding="utf-8-sig", newline="") as f:
         for row in csv.DictReader(f):
+            if not (row.get("edge_id") or "").strip():
+                continue      # 교차로 단위 행(junction_id)은 엣지 위 주정차 배치와 무관
             zones.append((row["edge_id"].strip(), float(row["start_pos"]), float(row["end_pos"])))
     return zones
 
