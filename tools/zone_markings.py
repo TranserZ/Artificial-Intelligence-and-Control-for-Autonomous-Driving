@@ -42,6 +42,10 @@ ASSET = {                 # env/school_assets.py FILES/SIZE와 같은 값 (그 �
     "sign_start": ("school_sign_start.png", 4.0, 2.6),
     "sign_end": ("school_sign_end.png", 4.0, 2.0),
 }
+BLUE = "40,95,200"        # 불법주정차 다발구역 노면 (illegal_parking_hotspots.csv)
+WHITE = "255,255,255"     # 노상주차 칸 흰 실선 (roadside_parking.csv)
+ROADSIDE_T = (-3.2, -0.1) # 노상주차 칸 가로 범위 t (m): 주차 차량 중심이 t≈-1.6에 그려진다
+ROADSIDE_SLOT = 7.0       # make_cgc_scenario.ROADSIDE_SLOT과 같은 값 (칸 길이 m)
 PAVE_LEN = 10.0           # 시점부 적색 포장 길이 (m)
 HATCH_STEP = 2.0          # 정차금지 빗금 간격 (m)
 HATCH_W = 0.35            # 빗금 굵기 (m)
@@ -209,6 +213,40 @@ def marking_lines(net, log=print):
                 w.poly("no_stop_zone", YELLOW, LINE_LAYER - 0.05, pts)
             c += HATCH_STEP
         log(f"[zone_markings] 정차금지 {eid} {a:g}~{b:g} m — {r.get('reason', '')}")
+
+    # ---- 불법주정차 다발구역: 맨 오른쪽 주행 차로 바닥을 파란색으로 ----
+    # (sumo_env는 이 type을 읽지 않는다 — 보기용. 차량은 sumo_env reset이 확률로 세움)
+    for r in _read_csv("illegal_parking_hotspots.csv"):
+        eid = r["edge_id"].strip()
+        if not net.hasEdge(eid):
+            log(f"[zone_markings] 다발구역 엣지가 도로망에 없음 (건너뜀): {eid}")
+            continue
+        e = EdgeFrame(net.getEdge(eid))
+        a, b = float(r["start_pos"]), min(float(r["end_pos"]), e.length)
+        if a >= b:
+            continue
+        w.poly("illegal_parking_zone", BLUE, ROAD_LAYER, e.band(a, b, 0.0, e.base.getWidth()))
+        log(f"[zone_markings] 불법주정차 다발구역 {r.get('hotspot_id', '')} {eid} {a:g}~{b:g} m")
+
+    # ---- 노상주차 칸: 차로 밖 연석 쪽 흰 실선 칸 (parkingArea 칸과 같은 간격) ----
+    for r in _read_csv("roadside_parking.csv"):
+        eid = r["edge_id"].strip()
+        if not net.hasEdge(eid):
+            continue
+        e = EdgeFrame(net.getEdge(eid))
+        a, b = float(r["start_pos"]), min(float(r["end_pos"]), e.length - 1.0)
+        cap = int((b - a) // ROADSIDE_SLOT)
+        if cap <= 0:
+            continue
+        slot = (b - a) / cap                     # SUMO parkingArea 칸 길이와 같다
+        t0, t1 = ROADSIDE_T
+        bw = BORDER_W
+        w.poly("roadside_parking", WHITE, LINE_LAYER, e.band(a, b, t0, t0 + bw))   # 바깥쪽 긴 선
+        w.poly("roadside_parking", WHITE, LINE_LAYER, e.band(a, b, t1 - bw, t1))   # 차로 쪽 긴 선
+        for k in range(cap + 1):                                                    # 칸 나누는 선
+            s = a + slot * k
+            w.poly("roadside_parking", WHITE, LINE_LAYER, e.band(max(s - bw / 2, 0.0), s + bw / 2, t0, t1))
+        log(f"[zone_markings] 노상주차 칸 {eid} {a:g}~{b:g} m, {cap}칸")
 
     return [BEGIN] + w.lines + [END]
 
