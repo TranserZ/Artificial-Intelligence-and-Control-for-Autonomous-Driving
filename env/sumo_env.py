@@ -1414,10 +1414,28 @@ class SumoHighwayEnv(gym.Env):
     STOP_BLOCK_LOOK = 30.0   # m. 정류장 접근 중 이 거리 안 같은 차로에 정차 차량이 있으면 규칙을 쉰다
 
     def _blocked_by_parked(self, look: float) -> bool:
-        """같은 차로 앞 look m 안에 정차(stop) 중인 차가 있는가. 신호 대기열(stop 아님)은 제외."""
+        """같은 차로 앞 look m 안, 또는 맨 오른쪽 차로(정류장 규칙이 붙이려는 차로)의 내 옆~앞
+        look m 안에 정차(stop) 중인 차가 있는가. 신호 대기열(stop 아님)은 제외.
+
+        옆 차로까지 보는 이유: 다발지점을 비켜 왼쪽으로 나온 직후 규칙이 다시 오른쪽으로
+        붙이면 주정차 차량 바로 뒤로 끼어들어 추돌했다 (주교동, seed 1)."""
         try:
             ld = traci.vehicle.getLeader(self.ego_id, look)
-            return bool(ld and ld[1] <= look and traci.vehicle.isStopped(ld[0]))
+            if ld and ld[1] <= look and traci.vehicle.isStopped(ld[0]):
+                return True
+            edge = traci.vehicle.getRoadID(self.ego_id)
+            if edge.startswith(":"):
+                return False
+            right = self._car_lanes(edge)[0]
+            if traci.vehicle.getLaneIndex(self.ego_id) == right:
+                return False
+            my_pos = traci.vehicle.getLanePosition(self.ego_id)
+            back = traci.vehicle.getLength(self.ego_id)
+            for vid in traci.lane.getLastStepVehicleIDs(f"{edge}_{right}"):
+                d = traci.vehicle.getLanePosition(vid) - my_pos
+                if -back <= d <= look + traci.vehicle.getLength(vid) and traci.vehicle.isStopped(vid):
+                    return True
+            return False
         except traci.TraCIException:
             return False
 
