@@ -1,0 +1,10 @@
+<configuration>
+    <input>
+        <net-file value="cgc.net.xml"/>
+        <route-files value="cgc.rou.xml"/>
+        <additional-files value="cgc.add.xml"/>
+    </input>
+    <gui_only>
+        <gui-settings-file value="cgc.gui.xml"/>
+    </gui_only>
+</configuration>

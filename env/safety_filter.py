@@ -13,6 +13,24 @@
 """
 import numpy as np
 import traci
+import traci.constants as tc
+
+
+def walking_persons():
+    """지금 '걷는 중'인 사람만 돌려준다.
+
+    정류장에서 버스를 기다리는 승객(waiting)과 버스에 타고 있는 승객(driving)은
+    차도로 들어오지 않는데, 위치가 버스 범퍼 바로 옆/안이라 보행자 필터가
+    이들 때문에 영구 제동을 걸어 버린다 (버스가 정류장에서 못 떠남).
+    """
+    out = []
+    for pid in traci.person.getIDList():
+        try:
+            if traci.person.getStage(pid).type == tc.STAGE_WALKING:
+                out.append(pid)
+        except traci.TraCIException:
+            pass
+    return out
 
 HORIZON, DT_PRED = 3.0, 0.5
 HORIZON_ENTRY = 6.0   # 정지선 앞: 교차로를 빠져나갈 시간까지 본다
@@ -75,7 +93,9 @@ class PedSafetyFilter:
             off += length
             if stopline is None and not l.startswith(":"):
                 nxt = self.env._lane_route_link(l)
-                if nxt is not None and nxt[4].startswith(":"):
+                # 정지선 = 신호 교차로나 횡단보도가 있는 노드 앞. 엣지를 나누기만 한 지점
+                # (좌회전 포켓 시작, 어린이 보호구역 경계)도 내부 차로가 있지만 정지선이 아니다.
+                if nxt is not None and nxt[4].startswith(":") and self.env.is_stop_junction(nxt[4]):
                     stopline = off
             if off > LOOKAHEAD:
                 break
@@ -91,7 +111,7 @@ class PedSafetyFilter:
         before_line = stopline is not None
         times = np.arange(0.0, (HORIZON_ENTRY if before_line else HORIZON) + 1e-6, DT_PRED)
         ex, ey = traci.vehicle.getPosition(ego)
-        persons = traci.person.getIDList()
+        persons = walking_persons()   # 정류장 대기·탑승 승객은 제외 (차도로 안 들어옴)
         best, near_now = None, False
         for pid in persons:
             x, y = traci.person.getPosition(pid)
@@ -162,7 +182,8 @@ class PedSafetyFilter:
         elif d < 0.3:
             target = 0.0
         else:
-            target = float(-BRAKE * REACT + np.sqrt((BRAKE * REACT) ** 2 + 2 * BRAKE * d))
+            brake = min(BRAKE, env.max_decel)   # 차가 낼 수 있는 감속까지만 (ROii 2.5)
+            target = float(-brake * REACT + np.sqrt((brake * REACT) ** 2 + 2 * brake * d))
         v = traci.vehicle.getSpeed(ego)
         cmd = accel_raw * (env.max_accel if accel_raw >= 0 else env.max_decel)
         if v + cmd * env.step_length <= target:

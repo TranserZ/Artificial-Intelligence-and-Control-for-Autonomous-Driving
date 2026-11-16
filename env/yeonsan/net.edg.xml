@@ -1,0 +1,185 @@
+<edges>
+    <edge id="e26005519_1a" from="n2860431565" to="n1772223700" numLanes="3" speed="13.89" priority="3"  name="월드컵대로"/>
+    <edge id="e26005519_1b" from="n1772223700" to="n2860431565" numLanes="3" speed="13.89" priority="3"  name="월드컵대로"/>
+    <edge id="e26005519_2a" from="n1772223700" to="n1768492964" numLanes="3" speed="13.89" priority="3"  name="월드컵대로"/>
+    <edge id="e26005519_2b" from="n1768492964" to="n1772223700" numLanes="3" speed="13.89" priority="3"  name="월드컵대로"/>
+    <edge id="e37400617_1a" from="n414663644" to="n1768493018" numLanes="1" speed="13.89" priority="3"  name="반송로" shape="3.28,4.14"/>
+    <edge id="e37400617_1b" from="n1768493018" to="n414663644" numLanes="1" speed="13.89" priority="3"  name="반송로" shape="3.28,4.14"/>
+    <edge id="e37400617_2a" from="n1768493018" to="n1772621899" numLanes="1" speed="13.89" priority="3"  name="반송로"/>
+    <edge id="e37400617_2b" from="n1772621899" to="n1768493018" numLanes="1" speed="13.89" priority="3"  name="반송로"/>
+    <edge id="e37400617_3a" from="n1772621899" to="n1772654473" numLanes="1" speed="13.89" priority="3"  name="반송로"/>
+    <edge id="e37400617_3b" from="n1772654473" to="n1772621899" numLanes="1" speed="13.89" priority="3"  name="반송로"/>
+    <edge id="e37400617_4a" from="n1772654473" to="n436818569" numLanes="1" speed="13.89" priority="3"  name="반송로" shape="218.22,209.87"/>
+    <edge id="e37400617_4b" from="n436818569" to="n1772654473" numLanes="1" speed="13.89" priority="3"  name="반송로" shape="218.22,209.87"/>
+    <edge id="e165290628_1" from="n1768492964" to="n4915876754" numLanes="1" speed="8.33" priority="1"  shape="35.46,-37.27"/>
+    <edge id="e165290628_2" from="n4915876754" to="n436818093" numLanes="1" speed="8.33" priority="1"  shape="42.05,-24.82 48.87,-18.27"/>
+    <edge id="e165290629_1" from="n1768492949" to="n4958136009" numLanes="1" speed="8.33" priority="1"  shape="-30.71,49.88 -36.71,39.60 -50.14,30.13"/>
+    <edge id="e165290630_1" from="n1768493018" to="n12785591054" numLanes="1" speed="8.33" priority="1"  shape="28.11,52.11 10.30,56.00 -2.14,62.11"/>
+    <edge id="e165290633_1" from="n436818093" to="n1768493018" numLanes="1" speed="8.33" priority="1"  shape="50.57,-3.53 44.24,9.09 41.79,26.24"/>
+    <edge id="e165679331_1a" from="n12791011252" to="n1772207795" numLanes="1" speed="8.33" priority="1"  shape="-88.71,-95.20"/>
+    <edge id="e165679331_1b" from="n1772207795" to="n12791011252" numLanes="1" speed="8.33" priority="1"  shape="-88.71,-95.20"/>
+    <edge id="e165679335_1a" from="n1772207739" to="n1772207809" numLanes="1" speed="8.33" priority="1"  name="월드컵대로145번길" shape="-180.27,-141.08"/>
+    <edge id="e165679335_1b" from="n1772207809" to="n1772207739" numLanes="1" speed="8.33" priority="1"  name="월드컵대로145번길" shape="-180.27,-141.08"/>
+    <edge id="e165679335_2a" from="n1772207809" to="n1772207795" numLanes="1" speed="8.33" priority="1"  name="월드컵대로145번길"/>
+    <edge id="e165679335_2b" from="n1772207795" to="n1772207809" numLanes="1" speed="8.33" priority="1"  name="월드컵대로145번길"/>
+    <edge id="e165679336_1a" from="n1772207783" to="n1772207809" numLanes="1" speed="8.33" priority="1"  name="거제천로152번길"/>
+    <edge id="e165679336_1b" from="n1772207809" to="n1772207783" numLanes="1" speed="8.33" priority="1"  name="거제천로152번길"/>
+    <edge id="e165679338_1a" from="n1772207739" to="n12791011253" numLanes="1" speed="11.11" priority="2"  name="중앙대로1075번길"/>
+    <edge id="e165679338_1b" from="n12791011253" to="n1772207739" numLanes="1" speed="11.11" priority="2"  name="중앙대로1075번길"/>
+    <edge id="e165679344_1a" from="n1772207783" to="n1772207816" numLanes="1" speed="8.33" priority="1"  name="월드컵대로153번길"/>
+    <edge id="e165679344_1b" from="n1772207816" to="n1772207783" numLanes="1" speed="8.33" priority="1"  name="월드컵대로153번길"/>
+    <edge id="e165681324_1a" from="n1772223817" to="n1772223728" numLanes="1" speed="8.33" priority="1"  name="월드컵대로111번길"/>
+    <edge id="e165681324_1b" from="n1772223728" to="n1772223817" numLanes="1" speed="8.33" priority="1"  name="월드컵대로111번길"/>
+    <edge id="e165681334_1a" from="n1772223801" to="n1772223771" numLanes="1" speed="8.33" priority="1"  name="월드컵대로119번길"/>
+    <edge id="e165681334_1b" from="n1772223771" to="n1772223801" numLanes="1" speed="8.33" priority="1"  name="월드컵대로119번길"/>
+    <edge id="e165681334_2a" from="n1772223771" to="n1772223817" numLanes="1" speed="8.33" priority="1"  name="월드컵대로119번길"/>
+    <edge id="e165681334_2b" from="n1772223817" to="n1772223771" numLanes="1" speed="8.33" priority="1"  name="월드컵대로119번길"/>
+    <edge id="e165681334_3a" from="n1772223817" to="n1772223693" numLanes="1" speed="8.33" priority="1"  name="월드컵대로119번길"/>
+    <edge id="e165681334_3b" from="n1772223693" to="n1772223817" numLanes="1" speed="8.33" priority="1"  name="월드컵대로119번길"/>
+    <edge id="e165681336_1a" from="n1772223771" to="n1772223781" numLanes="1" speed="8.33" priority="1"  name="월드컵대로99번길"/>
+    <edge id="e165681336_1b" from="n1772223781" to="n1772223771" numLanes="1" speed="8.33" priority="1"  name="월드컵대로99번길"/>
+    <edge id="e165681339_1a" from="n12791011290" to="n1772223801" numLanes="1" speed="8.33" priority="1"  name="중앙대로1076번길"/>
+    <edge id="e165681339_1b" from="n1772223801" to="n12791011290" numLanes="1" speed="8.33" priority="1"  name="중앙대로1076번길"/>
+    <edge id="e165681339_2a" from="n1772223801" to="n4915876780" numLanes="1" speed="8.33" priority="1"  name="중앙대로1076번길"/>
+    <edge id="e165681339_2b" from="n4915876780" to="n1772223801" numLanes="1" speed="8.33" priority="1"  name="중앙대로1076번길"/>
+    <edge id="e165681340_1a" from="n2860431565" to="n1772223728" numLanes="1" speed="8.33" priority="1"  name="월드컵대로111번길"/>
+    <edge id="e165681340_1b" from="n1772223728" to="n2860431565" numLanes="1" speed="8.33" priority="1"  name="월드컵대로111번길"/>
+    <edge id="e165681340_2a" from="n1772223728" to="n1772223781" numLanes="1" speed="8.33" priority="1"  name="월드컵대로111번길"/>
+    <edge id="e165681340_2b" from="n1772223781" to="n1772223728" numLanes="1" speed="8.33" priority="1"  name="월드컵대로111번길"/>
+    <edge id="e165722340_1a" from="n1772621899" to="n1772654459" numLanes="1" speed="8.33" priority="1" />
+    <edge id="e165722340_1b" from="n1772654459" to="n1772621899" numLanes="1" speed="8.33" priority="1" />
+    <edge id="e165722340_2a" from="n1772654459" to="n1772621845" numLanes="1" speed="8.33" priority="1" />
+    <edge id="e165722340_2b" from="n1772621845" to="n1772654459" numLanes="1" speed="8.33" priority="1" />
+    <edge id="e165722344_1a" from="n1772621845" to="n1772621859" numLanes="1" speed="8.33" priority="1" />
+    <edge id="e165722344_1b" from="n1772621859" to="n1772621845" numLanes="1" speed="8.33" priority="1" />
+    <edge id="e165722345_1a" from="n12791011294" to="n1772223693" numLanes="1" speed="8.33" priority="1" />
+    <edge id="e165722345_1b" from="n1772223693" to="n12791011294" numLanes="1" speed="8.33" priority="1" />
+    <edge id="e165722346_1a" from="n436818092" to="n1772621898" numLanes="1" speed="8.33" priority="1"  name="고분로13번길"/>
+    <edge id="e165722346_1b" from="n1772621898" to="n436818092" numLanes="1" speed="8.33" priority="1"  name="고분로13번길"/>
+    <edge id="e165722346_2a" from="n1772621898" to="n9706613131" numLanes="1" speed="8.33" priority="1"  name="고분로13번길" shape="228.12,14.55"/>
+    <edge id="e165722346_2b" from="n9706613131" to="n1772621898" numLanes="1" speed="8.33" priority="1"  name="고분로13번길" shape="228.12,14.55"/>
+    <edge id="e165722346_3a" from="n9706613131" to="n7432889210" numLanes="1" speed="8.33" priority="1"  name="고분로13번길"/>
+    <edge id="e165722346_3b" from="n7432889210" to="n9706613131" numLanes="1" speed="8.33" priority="1"  name="고분로13번길"/>
+    <edge id="e165722357_1a" from="n2860431565" to="n4915895074" numLanes="1" speed="8.33" priority="1"  name="월드컵로114번길"/>
+    <edge id="e165722357_1b" from="n4915895074" to="n2860431565" numLanes="1" speed="8.33" priority="1"  name="월드컵로114번길"/>
+    <edge id="e165722357_2a" from="n4915895074" to="n1772625972" numLanes="1" speed="8.33" priority="1"  name="월드컵로114번길"/>
+    <edge id="e165722357_2b" from="n1772625972" to="n4915895074" numLanes="1" speed="8.33" priority="1"  name="월드컵로114번길"/>
+    <edge id="e165722357_3a" from="n1772625972" to="n436818092" numLanes="1" speed="8.33" priority="1"  name="월드컵로114번길"/>
+    <edge id="e165722357_3b" from="n436818092" to="n1772625972" numLanes="1" speed="8.33" priority="1"  name="월드컵로114번길"/>
+    <edge id="e165722358_1a" from="n1772621859" to="n1772621902" numLanes="1" speed="8.33" priority="1"  name="월드컵로120번길" shape="109.19,-74.81"/>
+    <edge id="e165722358_1b" from="n1772621902" to="n1772621859" numLanes="1" speed="8.33" priority="1"  name="월드컵로120번길" shape="109.19,-74.81"/>
+    <edge id="e165722358_2a" from="n1772621902" to="n1772223700" numLanes="1" speed="8.33" priority="1"  name="월드컵로120번길" shape="94.73,-101.89 92.29,-106.03"/>
+    <edge id="e165722358_2b" from="n1772223700" to="n1772621902" numLanes="1" speed="8.33" priority="1"  name="월드컵로120번길" shape="92.29,-106.03 94.73,-101.89"/>
+    <edge id="e165722831_1a" from="n1772626056" to="n1772625988" numLanes="1" speed="8.33" priority="1"  name="고분로20번길" shape="255.06,-243.67"/>
+    <edge id="e165722831_1b" from="n1772625988" to="n1772626056" numLanes="1" speed="8.33" priority="1"  name="고분로20번길" shape="255.06,-243.67"/>
+    <edge id="e165725282_1a" from="n1772649256" to="n1772649274" numLanes="1" speed="8.33" priority="1"  name="거제천로182번길"/>
+    <edge id="e165725282_1b" from="n1772649274" to="n1772649256" numLanes="1" speed="8.33" priority="1"  name="거제천로182번길"/>
+    <edge id="e165725285_1a" from="n4958136011" to="n1772649256" numLanes="1" speed="8.33" priority="1" />
+    <edge id="e165725285_1b" from="n1772649256" to="n4958136011" numLanes="1" speed="8.33" priority="1" />
+    <edge id="e165725285_2a" from="n1772649256" to="n12785591048" numLanes="1" speed="8.33" priority="1" />
+    <edge id="e165725285_2b" from="n12785591048" to="n1772649256" numLanes="1" speed="8.33" priority="1" />
+    <edge id="e165726041_1a" from="n12785591052" to="n1772654444" numLanes="1" speed="8.33" priority="1"  name="중앙대로1120번길" shape="-26.42,174.04"/>
+    <edge id="e165726041_1b" from="n1772654444" to="n12785591052" numLanes="1" speed="8.33" priority="1"  name="중앙대로1120번길" shape="-26.42,174.04"/>
+    <edge id="e165726041_2a" from="n1772654444" to="n1772654456" numLanes="1" speed="8.33" priority="1"  name="중앙대로1120번길"/>
+    <edge id="e165726041_2b" from="n1772654456" to="n1772654444" numLanes="1" speed="8.33" priority="1"  name="중앙대로1120번길"/>
+    <edge id="e165726045_1a" from="n6606304800" to="n1772654444" numLanes="1" speed="8.33" priority="1"  name="중앙대로1120번길"/>
+    <edge id="e165726045_1b" from="n1772654444" to="n6606304800" numLanes="1" speed="8.33" priority="1"  name="중앙대로1120번길"/>
+    <edge id="e165726045_2a" from="n1772654444" to="n1772654457" numLanes="1" speed="8.33" priority="1"  name="중앙대로1120번길"/>
+    <edge id="e165726045_2b" from="n1772654457" to="n1772654444" numLanes="1" speed="8.33" priority="1"  name="중앙대로1120번길"/>
+    <edge id="e165726046_1a" from="n1772654487" to="n6606304800" numLanes="1" speed="8.33" priority="1"  name="중앙대로1124번길"/>
+    <edge id="e165726046_1b" from="n6606304800" to="n1772654487" numLanes="1" speed="8.33" priority="1"  name="중앙대로1124번길"/>
+    <edge id="e165726046_2a" from="n6606304800" to="n12785591051" numLanes="1" speed="8.33" priority="1"  name="중앙대로1124번길" shape="15.12,246.83"/>
+    <edge id="e165726046_2b" from="n12785591051" to="n6606304800" numLanes="1" speed="8.33" priority="1"  name="중앙대로1124번길" shape="15.12,246.83"/>
+    <edge id="e165726047_1a" from="n12785591053" to="n1772654457" numLanes="1" speed="8.33" priority="1"  name="중앙대로"/>
+    <edge id="e165726047_1b" from="n1772654457" to="n12785591053" numLanes="1" speed="8.33" priority="1"  name="중앙대로"/>
+    <edge id="e165726048_1a" from="n1772654459" to="n9706613130" numLanes="1" speed="8.33" priority="1" />
+    <edge id="e165726048_1b" from="n9706613130" to="n1772654459" numLanes="1" speed="8.33" priority="1" />
+    <edge id="e165726048_2a" from="n9706613130" to="n1772654473" numLanes="1" speed="8.33" priority="1" />
+    <edge id="e165726048_2b" from="n1772654473" to="n9706613130" numLanes="1" speed="8.33" priority="1" />
+    <edge id="e165726049_1a" from="n1772654473" to="n1772654456" numLanes="1" speed="8.33" priority="1"  name="거제천로230번길"/>
+    <edge id="e165726049_1b" from="n1772654456" to="n1772654473" numLanes="1" speed="8.33" priority="1"  name="거제천로230번길"/>
+    <edge id="e165726049_2a" from="n1772654456" to="n1772654487" numLanes="1" speed="8.33" priority="1"  name="거제천로230번길" shape="118.66,227.07"/>
+    <edge id="e165726049_2b" from="n1772654487" to="n1772654456" numLanes="1" speed="8.33" priority="1"  name="거제천로230번길" shape="118.66,227.07"/>
+    <edge id="e369240560_1" from="n6611333129" to="n1768492964" numLanes="1" speed="8.33" priority="1"  shape="-27.01,-48.74 -12.76,-47.01 3.42,-48.89 13.47,-52.34 21.80,-56.06"/>
+    <edge id="e369240563_1" from="n4958136221" to="n12791011265" numLanes="1" speed="8.33" priority="1"  shape="-62.80,4.98 -53.69,-3.90 -44.53,-17.02 -41.82,-21.70 -39.77,-29.56"/>
+    <edge id="e500551294_1a" from="n4915805216" to="n4915805219" numLanes="1" speed="5.56" priority="1"  name="고분로20번가길" shape="203.08,-262.41 220.57,-231.67"/>
+    <edge id="e500551294_1b" from="n4915805219" to="n4915805216" numLanes="1" speed="5.56" priority="1"  name="고분로20번가길" shape="220.57,-231.67 203.08,-262.41"/>
+    <edge id="e500551294_2a" from="n4915805219" to="n4915805222" numLanes="1" speed="5.56" priority="1"  name="고분로20번가길" shape="247.26,-114.06 251.10,-107.45"/>
+    <edge id="e500551294_2b" from="n4915805222" to="n4915805219" numLanes="1" speed="5.56" priority="1"  name="고분로20번가길" shape="251.10,-107.45 247.26,-114.06"/>
+    <edge id="e500562199_1a" from="n4915876754" to="n4915876757" numLanes="1" speed="5.56" priority="1"  shape="48.94,-44.72 64.83,-54.30 69.80,-57.29"/>
+    <edge id="e500562199_1b" from="n4915876757" to="n4915876754" numLanes="1" speed="5.56" priority="1"  shape="69.80,-57.29 64.83,-54.30 48.94,-44.72"/>
+    <edge id="e500564996_1a" from="n1772621902" to="n4915895074" numLanes="1" speed="8.33" priority="1" />
+    <edge id="e500564996_1b" from="n4915895074" to="n1772621902" numLanes="1" speed="8.33" priority="1" />
+    <edge id="e506007334_1" from="n414663644" to="n12785591047" numLanes="1" speed="13.89" priority="3"  name="월드컵대로"/>
+    <edge id="e506009344_1" from="n4958136019" to="n13277680599" numLanes="1" speed="13.89" priority="3"  name="월드컵대로"/>
+    <edge id="e506009345_1" from="n4958136225" to="n4958136009" numLanes="3" speed="13.89" priority="3"  name="월드컵대로"/>
+    <edge id="e506009345_2" from="n4958136009" to="n4958136011" numLanes="3" speed="13.89" priority="3"  name="월드컵대로"/>
+    <edge id="e506009345_3" from="n4958136011" to="n4958136224" numLanes="3" speed="13.89" priority="3"  name="월드컵대로"/>
+    <edge id="e512187678_1" from="n12791011290" to="n12791011293" numLanes="2" speed="16.67" priority="3"  name="중앙대로"/>
+    <edge id="e512187678_2" from="n12791011293" to="n12791011294" numLanes="2" speed="16.67" priority="3"  name="중앙대로"/>
+    <edge id="e512187678_3" from="n12791011294" to="n6611333129" numLanes="2" speed="16.67" priority="3"  name="중앙대로"/>
+    <edge id="e512187678_4" from="n6611333129" to="n12791011266" numLanes="2" speed="16.67" priority="3"  name="중앙대로"/>
+    <edge id="e512187678_5" from="n12791011266" to="n414663644" numLanes="2" speed="16.67" priority="3"  name="중앙대로"/>
+    <edge id="e517488002_1" from="n4958136018" to="n4958136012" numLanes="4" speed="13.89" priority="3"  name="월드컵대로"/>
+    <edge id="e517488002_2" from="n4958136012" to="n4958136221" numLanes="4" speed="13.89" priority="3"  name="월드컵대로"/>
+    <edge id="e517488002_3" from="n4958136221" to="n4958136019" numLanes="4" speed="13.89" priority="3"  name="월드컵대로"/>
+    <edge id="e718492834_1a" from="n1772654457" to="n1772621899" numLanes="1" speed="8.33" priority="1"  name="반송로"/>
+    <edge id="e718492834_1b" from="n1772621899" to="n1772654457" numLanes="1" speed="8.33" priority="1"  name="반송로"/>
+    <edge id="e757351801_1a" from="n4915876790" to="n1772626033" numLanes="1" speed="8.33" priority="1"  name="대리로5번길"/>
+    <edge id="e757351801_1b" from="n1772626033" to="n4915876790" numLanes="1" speed="8.33" priority="1"  name="대리로5번길"/>
+    <edge id="e757351801_2a" from="n1772626033" to="n1772625972" numLanes="1" speed="8.33" priority="1"  name="대리로5번길" shape="162.82,-163.38 160.36,-139.27"/>
+    <edge id="e757351801_2b" from="n1772625972" to="n1772626033" numLanes="1" speed="8.33" priority="1"  name="대리로5번길" shape="160.36,-139.27 162.82,-163.38"/>
+    <edge id="e771838157_1a" from="n1772207795" to="n1772207792" numLanes="1" speed="8.33" priority="1"  name="월드컵대로145번길"/>
+    <edge id="e771838157_1b" from="n1772207792" to="n1772207795" numLanes="1" speed="8.33" priority="1"  name="월드컵대로145번길"/>
+    <edge id="e771838157_2a" from="n1772207792" to="n4958136012" numLanes="1" speed="8.33" priority="1"  name="월드컵대로145번길"/>
+    <edge id="e771838157_2b" from="n4958136012" to="n1772207792" numLanes="1" speed="8.33" priority="1"  name="월드컵대로145번길"/>
+    <edge id="e771838158_1" from="n1772621816" to="n1772621898" numLanes="1" speed="8.33" priority="1"  shape="260.68,-27.46"/>
+    <edge id="e771838159_1" from="n1772621898" to="n1772621845" numLanes="1" speed="8.33" priority="1"  name="고분로13번길"/>
+    <edge id="e771838160_1a" from="n12791011293" to="n1772223771" numLanes="1" speed="8.33" priority="1" />
+    <edge id="e771838160_1b" from="n1772223771" to="n12791011293" numLanes="1" speed="8.33" priority="1" />
+    <edge id="e794688373_1a" from="n1772625988" to="n4915805222" numLanes="1" speed="8.33" priority="1"  name="고분로20번길" shape="255.92,-142.40"/>
+    <edge id="e794688373_1b" from="n4915805222" to="n1772625988" numLanes="1" speed="8.33" priority="1"  name="고분로20번길" shape="255.92,-142.40"/>
+    <edge id="e794688373_2a" from="n4915805222" to="n1772625986" numLanes="1" speed="8.33" priority="1"  name="고분로20번길" shape="256.04,-90.15"/>
+    <edge id="e794688373_2b" from="n1772625986" to="n4915805222" numLanes="1" speed="8.33" priority="1"  name="고분로20번길" shape="256.04,-90.15"/>
+    <edge id="e794688374_1a" from="n1772625988" to="n4915805219" numLanes="1" speed="8.33" priority="1"  name="쌍미천로129번길"/>
+    <edge id="e794688374_1b" from="n4915805219" to="n1772625988" numLanes="1" speed="8.33" priority="1"  name="쌍미천로129번길"/>
+    <edge id="e794688374_2a" from="n4915805219" to="n1772626033" numLanes="1" speed="8.33" priority="1"  name="쌍미천로129번길"/>
+    <edge id="e794688374_2b" from="n1772626033" to="n4915805219" numLanes="1" speed="8.33" priority="1"  name="쌍미천로129번길"/>
+    <edge id="e794688376_1a" from="n1772621816" to="n1772625986" numLanes="1" speed="13.89" priority="3"  name="고분로"/>
+    <edge id="e794688376_1b" from="n1772625986" to="n1772621816" numLanes="1" speed="13.89" priority="3"  name="고분로"/>
+    <edge id="e794688376_2a" from="n1772625986" to="n436818092" numLanes="1" speed="13.89" priority="3"  name="고분로"/>
+    <edge id="e794688376_2b" from="n436818092" to="n1772625986" numLanes="1" speed="13.89" priority="3"  name="고분로"/>
+    <edge id="e794688377_1a" from="n436818092" to="n1772621859" numLanes="1" speed="13.89" priority="3"  name="고분로"/>
+    <edge id="e794688377_1b" from="n1772621859" to="n436818092" numLanes="1" speed="13.89" priority="3"  name="고분로"/>
+    <edge id="e794688377_2a" from="n1772621859" to="n436818093" numLanes="1" speed="13.89" priority="3"  name="고분로"/>
+    <edge id="e794688377_2b" from="n436818093" to="n1772621859" numLanes="1" speed="13.89" priority="3"  name="고분로"/>
+    <edge id="e794688378_1a" from="n436818093" to="n414663644" numLanes="1" speed="13.89" priority="3"  name="고분로"/>
+    <edge id="e794688378_1b" from="n414663644" to="n436818093" numLanes="1" speed="13.89" priority="3"  name="고분로"/>
+    <edge id="e794688380_1a" from="n1772223693" to="n1772223700" numLanes="1" speed="8.33" priority="1"  name="월드컵대로119번길" shape="40.80,-121.65"/>
+    <edge id="e794688380_1b" from="n1772223700" to="n1772223693" numLanes="1" speed="8.33" priority="1"  name="월드컵대로119번길" shape="40.80,-121.65"/>
+    <edge id="e794688387_1a" from="n1772207816" to="n1772207792" numLanes="1" speed="8.33" priority="1"  name="거제천로154번길"/>
+    <edge id="e794688387_1b" from="n1772207792" to="n1772207816" numLanes="1" speed="8.33" priority="1"  name="거제천로154번길"/>
+    <edge id="e794688388_1a" from="n1772207816" to="n4958136018" numLanes="1" speed="8.33" priority="1"  name="월드컵대로153번길"/>
+    <edge id="e794688388_1b" from="n4958136018" to="n1772207816" numLanes="1" speed="8.33" priority="1"  name="월드컵대로153번길"/>
+    <edge id="e795083570_1a" from="n1768492964" to="n414663644" numLanes="3" speed="13.89" priority="3"  name="월드컵대로"/>
+    <edge id="e795083570_1b" from="n414663644" to="n1768492964" numLanes="3" speed="13.89" priority="3"  name="월드컵대로"/>
+    <edge id="e1056370711_1a" from="n9706613129" to="n9706613130" numLanes="1" speed="5.56" priority="1" />
+    <edge id="e1056370711_1b" from="n9706613130" to="n9706613129" numLanes="1" speed="5.56" priority="1" />
+    <edge id="e1056370712_1a" from="n9706613131" to="n9706613132" numLanes="1" speed="5.56" priority="1" />
+    <edge id="e1056370712_1b" from="n9706613132" to="n9706613131" numLanes="1" speed="5.56" priority="1" />
+    <edge id="e1292830755_1" from="n12785591066" to="n12785591048" numLanes="2" speed="13.89" priority="3"  name="중앙대로"/>
+    <edge id="e1381093795_1" from="n414663644" to="n12791011265" numLanes="2" speed="13.89" priority="3"  name="중앙대로" shape="-17.74,-9.04 -30.81,-18.67"/>
+    <edge id="e1381093795_2" from="n12791011265" to="n12791011252" numLanes="2" speed="13.89" priority="3"  name="중앙대로"/>
+    <edge id="e1381093795_3" from="n12791011252" to="n12791011253" numLanes="2" speed="13.89" priority="3"  name="중앙대로"/>
+    <edge id="e1381093796_1" from="n414663644" to="n12785591054" numLanes="2" speed="13.89" priority="3"  name="중앙대로" shape="-0.53,28.80"/>
+    <edge id="e1381093798_1" from="n12785591054" to="n12785591053" numLanes="2" speed="13.89" priority="3"  name="중앙대로"/>
+    <edge id="e1381093799_1" from="n12785591052" to="n12785591051" numLanes="2" speed="13.89" priority="3"  name="중앙대로" shape="-37.25,183.35"/>
+    <edge id="e1381093802_1" from="n12785591048" to="n1768492949" numLanes="2" speed="13.89" priority="3"  name="중앙대로"/>
+    <edge id="e1381093802_2" from="n1768492949" to="n12785591046" numLanes="2" speed="13.89" priority="3"  name="중앙대로"/>
+    <edge id="e1381093803_1" from="n12785591053" to="n12785591052" numLanes="2" speed="13.89" priority="3"  name="중앙대로"/>
+    <edge id="e1381093806_1" from="n12785591047" to="n4958136225" numLanes="1" speed="13.89" priority="3"  name="월드컵대로" shape="-29.10,10.05"/>
+    <edge id="e1381093808_1" from="n12785591069" to="n414663644" numLanes="1" speed="13.89" priority="3"  name="월드컵대로"/>
+    <edge id="e1494563723_1" from="n12785591046" to="n13277693701" numLanes="2" speed="13.89" priority="3"  name="중앙대로"/>
+    <edge id="e1494563723_2" from="n13277693701" to="n414663644" numLanes="2" speed="13.89" priority="3"  name="중앙대로" shape="-14.84,22.13"/>
+    <edge id="e1574162600_1" from="n13277680599" to="n12785591069" numLanes="1" speed="13.89" priority="3"  name="월드컵대로"/>
+</edges>

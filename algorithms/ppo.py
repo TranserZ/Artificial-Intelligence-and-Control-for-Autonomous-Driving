@@ -330,7 +330,7 @@ class PPO:
     def learn(self, env, total_timesteps: int, logger=None,
               log_interval: int = 1, eval_interval: int = 0,
               eval_episodes: int = 5, checkpoint_interval: int = 0,
-              checkpoint_fn=None, eval_fn=None):
+              checkpoint_fn=None, eval_fn=None, eval_seed_base=None):
         """학습 실행.
 
         Args:
@@ -340,6 +340,7 @@ class PPO:
                 학습이 중간에 강제 종료돼도(프로세스 kill 등) 마지막
                 체크포인트까지의 모델이 남는다. (0이면 안 함)
             eval_fn: 평가마다 eval_fn(metrics)를 부른다 (best 모델 저장용).
+            eval_seed_base: 주면 평가마다 같은 판(seed_base, seed_base+1, ...)으로 평가.
         """
         obs, _ = env.reset()
         ep_stats = [0.0, 0]                    # [현재 에피소드 보상, 길이]
@@ -374,7 +375,16 @@ class PPO:
 
             # 4) 주기적 평가 (utils/evaluator.py 사용)
             if eval_interval > 0 and n_updates % eval_interval == 0:
-                m = evaluate_policy(self, env, n_episodes=eval_episodes)
+                # 평가(best 모델 선택)는 안전 필터(차량·신호 shield) 끄고: 필터 없이 잘 달리는 모델을 고른다
+                had = hasattr(env, "shield_eval_off")
+                if had:
+                    env.shield_eval_off = True
+                try:
+                    m = evaluate_policy(self, env, n_episodes=eval_episodes,
+                                        seed_base=eval_seed_base)
+                finally:
+                    if had:
+                        env.shield_eval_off = False
                 if logger is not None:
                     logger.log_eval(self.num_timesteps, m.as_dict(),
                                     m.summary(), eval_episodes)

@@ -8,4 +8,9 @@
     <node id="e1_r_bay" x="660.0" y="0"/>
     <node id="n_in_bay" x="600.0" y="60.0"/>
     <node id="s_in_bay" x="600.0" y="-60.0"/>
+    <node id="sz_s" x="100.50473689834138" y="0"/>
+    <node id="sz_zw" x="276.0" y="0"/>
+    <node id="sz_c" x="300.0" y="0"/>
+    <node id="sz_ze" x="324.0" y="0"/>
+    <node id="sz_e" x="499.4952631016586" y="0"/>
 </nodes>

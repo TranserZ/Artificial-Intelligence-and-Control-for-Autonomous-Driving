@@ -53,6 +53,10 @@ def print_summary():
     print(f"  배경 교통량    : {TRAFFIC['vehs_per_hour']} 대/시간")
     print(f"  배경차 최고속도: {TRAFFIC['max_speed']} m/s")
     print(f"  ego 가속/감속  : +{EGO['accel']} / -{EGO['decel']} m/s²")
+    sz = road_builder.school_layout(ROAD)
+    if sz:
+        print(f"  어린이 보호구역: x {sz['lo']:.0f}~{sz['hi']:.0f} m (정문 {sz['gate']:.0f} m), "
+              f"{sz['limit'] * 3.6:.0f} km/h, 지그재그 {sz['zz']:.0f} m 차로변경 금지")
     print("─" * 46)
 
 
@@ -62,13 +66,19 @@ if __name__ == "__main__":
                         help="sumo-gui 대신 netedit(도로 편집기)로 열기")
     parser.add_argument("--nogui", action="store_true",
                         help="화면 없이 설정 검증만 (GUI 없는 환경용)")
+    parser.add_argument("--live", action="store_true",
+                        help="(청계천) sumo-gui와 함께 '정류장 대기 현황' 표 창(브라우저 새 창)을 "
+                             "띄운다. 정류장별 대기 인원·버스 탑승 인원이 1초마다 갱신된다")
     parser.add_argument("--seconds", type=int, default=120,
                         help="--nogui 검증 시 시뮬레이션 길이(초). 기본 120초. "
                              "(GUI 모드는 시간 제한 없이 사용자가 직접 제어)")
     args = parser.parse_args()
 
     # 1) road_config 기준으로 SUMO 파일 (재)생성 — 수정사항이 즉시 반영된다
-    sumocfg = road_builder.build(ROAD, EGO, TRAFFIC, os.path.join(BASE, "env", "sumo"))
+    #    demo_ego=True: 구경용이므로 SUMO가 스스로 모는 데모 버스를 넣는다 (청계천 한정).
+    #    (train/test는 ego를 TraCI로 직접 투입하므로 데모 버스 없음 — 여기서만 켠다)
+    sumocfg = road_builder.build(ROAD, EGO, TRAFFIC, os.path.join(BASE, "env", "sumo"),
+                                 demo_ego=True)
     net_file = os.path.join(BASE, "env", "sumo", "highway.net.xml")
     print(f"도로 생성 완료: {sumocfg}")
     print_summary()
@@ -92,6 +102,91 @@ if __name__ == "__main__":
         print(result.stderr.strip() or result.stdout.strip())
         print("설정 검증 OK" if result.returncode == 0 else "설정 오류!")
 
+    elif args.live:
+        # 실시간 대기 현황: TraCI로 sumo-gui를 띄우고 우리가 스텝을 돌리면서,
+        # 1초(시뮬레이션 시간)마다 정류장별 대기 인원과 버스 상태를 읽어
+        # 두 번째 창(브라우저 새 창)의 표에 보낸다 — tools/live_board.py.
+        # (TraCI가 재생을 주도하므로 ▶ 버튼 없이 바로 재생된다. Delay로 속도 조절)
+        import json
+        import sys
+        import traci
+        sys.path.insert(0, os.path.join(BASE, "tools"))
+        from live_board import LiveBoard, build_map_data
+
+        meta_path = os.path.join(BASE, "env", "sumo", "cgc.line_meta.json")
+        if not os.path.exists(meta_path):
+            raise SystemExit("--live는 청계천 시나리오(정류장이 있는 도로)에서만 쓸 수 있습니다.")
+        with open(meta_path, encoding="utf-8") as f:
+            meta = json.load(f)
+        # 표 순서 = 정류장이 가장 많은 노선의 정차 순서 (보통 왕복 A01_loop), 나머지는 뒤에
+        order = list(max((ln["stops"] for ln in meta["lines"].values()), key=len, default=[]))
+        order += [s for s in meta["stops"] if s not in order]
+        names = {s: meta["stops"][s].get("name", s) for s in order}
+        # 정류장 색·번호: 시나리오 생성기가 meta에 기록 (sumo-gui 정류장 테두리와 같은 색)
+        colors = {s: meta["stops"][s].get("color") or "#2b6570" for s in order}
+        numbers = {s: meta["stops"][s].get("number") or i + 1 for i, s in enumerate(order)}
+        map_data = build_map_data(os.path.join(BASE, "env", "sumo", "cgc.net.xml"), meta)
+
+        board = LiveBoard(order, names, colors, map_data, numbers)
+        url = board.start()
+        print("sumo-gui + 대기 현황 창 실행 중 ... sumo-gui 창을 닫거나 Ctrl+C로 종료")
+        print(f"  · 대기 현황 창이 안 뜨면 브라우저에서 직접 여세요: {url}")
+
+        traci.start([checkBinary("sumo-gui"), "-c", sumocfg, "--start",
+                     "--step-length", str(SIMULATION["step_length"]),
+                     "--delay", str(SIMULATION["gui_delay"])])
+        capacity = {}
+
+        def bus_rows():
+            rows = []
+            for vid in traci.vehicle.getIDList():
+                vtype = traci.vehicle.getTypeID(vid)
+                if not vtype.startswith("ego_type"):
+                    continue
+                if vtype not in capacity:
+                    capacity[vtype] = traci.vehicletype.getPersonCapacity(vtype)
+                upcoming = [s.stoppingPlaceID for s in traci.vehicle.getStops(vid, 2)
+                            if s.stoppingPlaceID]
+                at_stop = upcoming[0] if traci.vehicle.isAtBusStop(vid) and upcoming else None
+                nxt = upcoming[1:2] if at_stop else upcoming[:1]
+                speed = traci.vehicle.getSpeed(vid)
+                if at_stop:
+                    state = f"정차 중 · {names.get(at_stop, at_stop)}"
+                elif speed < 0.5:
+                    state = "신호·정체로 멈춤"
+                else:
+                    state = "주행 중"
+                x, y = traci.vehicle.getPosition(vid)          # 지도에 버스 위치 표시
+                rows.append({"id": vid, "onboard": traci.vehicle.getPersonNumber(vid),
+                             "capacity": capacity[vtype], "state": state,
+                             "next_stop": names.get(nxt[0], nxt[0]) if nxt else "종점",
+                             "speed_kmh": speed * 3.6, "at_stop": at_stop,
+                             "x": round(x, 1), "y": round(y, 1)})
+            return rows
+
+        next_t = 0.0
+        try:
+            while traci.simulation.getMinExpectedNumber() > 0:
+                traci.simulationStep()
+                t = traci.simulation.getTime()
+                if t >= next_t:                        # 1초마다 표 갱신
+                    next_t = t + 1.0
+                    waits = {}
+                    for sid in order:
+                        try:
+                            waits[sid] = traci.busstop.getPersonCount(sid)
+                        except traci.TraCIException:
+                            pass
+                    board.update(t, waits, bus_rows())
+        except (KeyboardInterrupt, traci.FatalTraCIError):
+            pass                                       # 창을 닫았거나 Ctrl+C
+        finally:
+            try:
+                traci.close()
+            except Exception:
+                pass
+            board.stop()
+
     else:
         # sumo-gui: 도로를 "정적으로" 띄운다.
         #   --start, --quit-on-end, --end 를 모두 주지 않는 것이 핵심:
@@ -103,6 +198,8 @@ if __name__ == "__main__":
         #                 GUI 상단 Delay 입력칸에서 실행 중에도 바꿀 수 있다.
         print("sumo-gui 실행 중...")
         print("  · 창이 뜨면 도로만 보입니다. ▶(플레이) 버튼을 눌러야 차가 움직입니다.")
+        print("  · (청계천) 데모 버스는 60초에 처음 출발, 이후 5분마다 1대씩 노선을 돕니다.")
+        print("    주황색 사람 = 버스 승객, 파란색 사람 = 일반 보행자.")
         print(f"  · 확대: env/mdp_config.py의 gui_zoom={SIMULATION['gui_zoom']}")
         print("  · 속도 조절: 상단 Delay(ms) 값을 조정 (크게 = 느리게)")
         print("  · 종료하려면 창을 닫으세요.")
