@@ -16,6 +16,7 @@ import math
 import os
 import sys
 import random
+import re
 
 SUMO_HOME = os.environ.get("SUMO_HOME", os.path.expanduser("~/src/sumo-1.27.1-mesa"))
 sys.path.append(os.path.join(SUMO_HOME, "tools"))
@@ -240,6 +241,33 @@ def ped_pairs(net, east, west, rng, n):
     return pairs
 
 
+_DEMAND_TAGS = ("<flow ", "<personFlow ", "<vehicle ", "<trip ", "<person ")
+
+
+def sort_demand_by_begin(lines):
+    """rou.xml 줄 목록에서 수요 요소(flow·personFlow 등)를 begin 순으로 안정 정렬한다.
+
+    SUMO는 앞 요소보다 출발 시간이 이른 요소를 "Route file should be sorted by
+    departure time" 경고와 함께 버린다 (예: illegal_park_30~45가 begin 80~140인데
+    begin 196인 illegal_park_29 뒤에 와서 통째로 빠졌다). vType·route 정의는
+    원래 순서 그대로 앞에 두고, 수요 요소만 그 뒤에 begin 순으로 모은다.
+    lines의 마지막 원소는 "</routes>"여야 한다.
+    """
+    assert lines[-1] == "</routes>", lines[-1]
+
+    def is_demand(s):
+        return s.lstrip().startswith(_DEMAND_TAGS)
+
+    def begin(s):
+        m = re.search(r'\b(?:begin|depart)="([0-9.]+)"', s)
+        return float(m.group(1)) if m else 0.0
+
+    body = lines[:-1]
+    defs = [s for s in body if not is_demand(s)]
+    demand = sorted((s for s in body if is_demand(s)), key=begin)  # sorted는 안정 정렬
+    return defs + demand + ["</routes>"]
+
+
 def build(net_path, out_dir, args):
     net = sumolib.net.readNet(net_path)
     # 보도 차로가 있으면 차량 차로는 1번부터 (netconvert --sidewalks.guess)
@@ -436,6 +464,7 @@ def build(net_path, out_dir, args):
                  f'<stop lane="{e.getID()}_{lane}" endPos="{pos:.1f}" duration="{rng.randint(25, 50)}" '
                  f'parking="false"/></flow>')
     L.append("</routes>")
+    L = sort_demand_by_begin(L)
     with open(os.path.join(out_dir, "cgc.rou.xml"), "w", encoding="utf-8", newline="\n") as f:
         f.write("\n".join(L) + "\n")
 
