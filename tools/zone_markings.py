@@ -263,6 +263,28 @@ def marking_lines(net, log=print):
             c += HATCH_STEP
         log(f"[zone_markings] 정차금지 {eid} {a:g}~{b:g} m — {r.get('reason', '')}")
 
+    # ---- 안전지대 (safety_zones.csv): 노란 테두리 + 빗금 사다리꼴. 보기용 (감점·관측 없음) ----
+    for r in _read_csv("safety_zones.csv"):
+        eid = r["edge_id"].strip()
+        if not net.hasEdge(eid):
+            log(f"[zone_markings] 안전지대 엣지가 도로망에 없음 (건너뜀): {eid}")
+            continue
+        e = EdgeFrame(net.getEdge(eid))
+        a, b = float(r["start_pos"]), min(float(r["end_pos"]), e.length)
+        w0, w1 = float(r["width_start"]), float(r["width_end"])
+        left = (r.get("side") or "left").strip() != "right"
+        n = max(2, int(math.ceil((b - a) / 1.0)))
+        ss = [a + (b - a) * i / n for i in range(n + 1)]
+        wid = [w0 + (w1 - w0) * (s - a) / (b - a) for s in ss]
+        if left:      # 차도 왼쪽 끝(t = W)에 붙고 안쪽으로 wid만큼
+            outer = [e.xy(s, e.width) for s in ss]
+            inner = [e.xy(s, e.width - wv) for s, wv in zip(ss, wid)]
+        else:
+            outer = [e.xy(s, 0.0) for s in ss]
+            inner = [e.xy(s, wv) for s, wv in zip(ss, wid)]
+        _hatch_polygon(w, "safety_zone", outer + inner[::-1])
+        log(f"[zone_markings] 안전지대 {eid} {a:g}~{b:g} m ({'왼쪽' if left else '오른쪽'}, 폭 {w0:g}→{w1:g} m)")
+
     # ---- 불법주정차 다발구역: 맨 오른쪽 주행 차로 바닥을 파란색으로 ----
     # (sumo_env는 이 type을 읽지 않는다 — 보기용. 차량은 sumo_env reset이 확률로 세움)
     for r in _read_csv("illegal_parking_hotspots.csv"):
