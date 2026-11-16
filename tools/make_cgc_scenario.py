@@ -32,7 +32,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NO_STOP_CSV = os.path.join(ROOT, "data", "road_data", "no_stop_zones.csv")
 # 노상주차 줄: 주행 차로가 아닌 연석 쪽 주차 공간 (edge_id, start_pos, end_pos)
 ROADSIDE_PARKING_CSV = os.path.join(ROOT, "data", "road_data", "roadside_parking.csv")
-ROADSIDE_SLOT = 6.5   # 노상주차 한 칸 길이 (m): 승용차 5 m + 앞뒤 여유
+ROADSIDE_SLOT = 7.0   # 노상주차 한 칸 길이 (m): 탑차 6.5 m도 들어가게
 
 START_EDGE = "e73541403_1"      # 청계광장 (동행 첫 구간)
 END_EDGE = "e1212424783_4"      # 청계5가·광장시장 부근 (동행 마지막 구간)
@@ -683,6 +683,12 @@ def build(net_path, out_dir, args):
     # 가게 앞 하역 중인 배달 트럭. 차로를 막는 정식 주차(parking=true), 하역 시간 300초.
     L.append('    <vType id="parked_truck" vClass="delivery" length="6.0" width="2.3" '
              'accel="2.0" decel="4.0" maxSpeed="8.3" color="0.3,0.3,0.4" guiShape="delivery"/>')
+    # 불법주정차 다발지점의 대형 화물차 (sumo_env._place_illegal_parking이 사용)
+    L.append('    <vType id="illegal_truck_big" vClass="truck" length="10.0" width="2.5" '
+             'accel="1.5" decel="4.0" maxSpeed="8.3" color="0.55,0.35,0.2" guiShape="truck"/>')
+    # 노상주차 칸의 탑차 (배오개다리~청계5가 parkingArea)
+    L.append('    <vType id="parked_box" vClass="delivery" length="6.5" width="2.2" '
+             'accel="2.0" decel="4.0" maxSpeed="8.3" color="0.85,0.85,0.8" guiShape="delivery"/>')
     # 배경 교통용 본선 route (노선과 분리 — 노선을 바꿔도 배경 교통은 그대로)
     L.append(f'    <route id="main_east" edges="{ids}"/>')
     if west:
@@ -716,8 +722,14 @@ def build(net_path, out_dir, args):
                  'period="20" departLane="best" departSpeed="max"/>')
     # 광장시장 구간: 15 m 간격으로 오토바이를 세워 둔다. 정차금지지대 위치는 뺀다.
     no_stop = load_no_stop_zones()
+    # 노상주차 줄이 있는 엣지(배오개다리~청계5가): 주차는 연석 쪽 parkingArea가 맡는다.
+    # 그 엣지의 parking="true" 오토바이·트럭(300초 뒤 사라짐)은 parkingArea로 대체한다.
+    roadside = [z for z in load_roadside_parking() if net.hasEdge(z[0])]
+    roadside_edges = {z[0] for z in roadside}
     moto_n = 0
     for eid in MOTO_PARK_EDGES:
+        if eid in roadside_edges:
+            continue
         try:
             e = net.getEdge(eid)
         except Exception:
@@ -742,6 +754,8 @@ def build(net_path, out_dir, args):
     # 가게 앞 하역 중인 배달 트럭 (TRUCK_PARK_SPOTS). 차로를 막는 정식 주차.
     truck_n = 0
     for eid, fracs in TRUCK_PARK_SPOTS.items():
+        if eid in roadside_edges:
+            continue
         try:
             e = net.getEdge(eid)
         except Exception:
@@ -867,7 +881,8 @@ def build(net_path, out_dir, args):
         pa = f"roadside_{eid}_{zi}"
         roadside_areas.append((pa, eid, lanes[0], z0, z1, cap))
         for k in range(cap):
-            L.append(f'    <vehicle id="roadside_park_{n_roadside}" type="parked_car" depart="0" '
+            vtype = "parked_box" if k % 4 == 3 else "parked_car"   # 4칸에 1대는 탑차
+            L.append(f'    <vehicle id="roadside_park_{n_roadside}" type="{vtype}" depart="0" '
                      f'departLane="{lanes[0]}" departPos="stop" departSpeed="0">'
                      f'<route edges="{eid}"/>'
                      f'<stop parkingArea="{pa}" until="100000" parking="true"/></vehicle>')
