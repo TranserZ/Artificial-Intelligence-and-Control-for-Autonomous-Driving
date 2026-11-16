@@ -1,5 +1,7 @@
 <viewsettings>
-    <scheme name="real world"/>
+    <scheme name="real world">
+        <persons personMode="0" personQuality="2" person_minSize="2.0" person_exaggeration="1.5" person_constantSize="0"/>
+    </scheme>
     <viewport zoom="250" x="1100" y="-30" angle="0"/>
     <delay value="100"/>
 </viewsettings>

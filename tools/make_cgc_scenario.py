@@ -611,15 +611,22 @@ def build(net_path, out_dir, args):
         f.write("\n".join(L) + "\n")
 
     # 정류장 11개. 보도가 lane 0이면 승용차 차로(_1)에 둔다.
+    # color: 서울 시내버스 표지판 느낌의 파란색 (기본 초록 상자 대신).
+    # lines: 이 정류장에 서는 노선 이름 — GUI에서 정류장을 클릭하면 보인다.
+    stop_lines = {}
+    for lname, lc in line_cfg["lines"].items():
+        for sid in lc["stops"]:
+            stop_lines.setdefault(sid, []).append(lname)
     add = ["<additional>"]
     written_stops = 0
     for sid, eid, start_pos, end_pos, name in placed_stops:
         edge = net.getEdge(eid)
         lane = bus_stop_lane_index(edge)
         safe_name = name.replace("&", "&amp;").replace('"', "")
+        served = " ".join(stop_lines.get(sid, []))
         add.append(
             f'    <busStop id="{sid}" lane="{eid}_{lane}" startPos="{start_pos}" '
-            f'endPos="{end_pos}" name="{safe_name}"/>')
+            f'endPos="{end_pos}" name="{safe_name}" color="30,97,191" lines="{served}"/>')
         written_stops += 1
     add.append("</additional>")
     with open(os.path.join(out_dir, "cgc.add.xml"), "w", encoding="utf-8", newline="\n") as f:
@@ -637,8 +644,14 @@ def build(net_path, out_dir, args):
         json.dump(meta, f, ensure_ascii=False, indent=1)
 
     # GUI: 전체 도로가 한 화면에 보이도록 (x 0~2275, y -280~210)
+    # persons: 기본값은 사람을 작은 삼각형(화살표)으로 그려서 뭔지 알아보기 어렵다.
+    #   personQuality=2 → 사람 모양, person_minSize=2 → 멀리서도 점 이상 크기 보장.
     with open(os.path.join(out_dir, "cgc.gui.xml"), "w", encoding="utf-8", newline="\n") as f:
-        f.write('<viewsettings>\n    <scheme name="real world"/>\n'
+        f.write('<viewsettings>\n'
+                '    <scheme name="real world">\n'
+                '        <persons personMode="0" personQuality="2" person_minSize="2.0" '
+                'person_exaggeration="1.5" person_constantSize="0"/>\n'
+                '    </scheme>\n'
                 f'    <viewport zoom="{args.zoom}" x="{args.view_x}" y="{args.view_y}" angle="0"/>\n'
                 '    <delay value="100"/>\n</viewsettings>\n')
     with open(os.path.join(out_dir, "cgc.sumocfg"), "w", encoding="utf-8", newline="\n") as f:

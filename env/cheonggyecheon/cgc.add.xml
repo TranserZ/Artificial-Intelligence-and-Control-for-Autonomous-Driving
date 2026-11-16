@@ -1,13 +1,13 @@
 <additional>
-    <busStop id="bs_01" lane="e73541403_2_1" startPos="22.0" endPos="37.0" name="청계광장"/>
-    <busStop id="bs_02" lane="e73541403_8_1" startPos="45.0" endPos="60.0" name="청계1가.광교"/>
-    <busStop id="bs_03" lane="e908646367_3_1" startPos="30.0" endPos="45.0" name="청계2가.삼일교(동)"/>
-    <busStop id="bs_04" lane="e218924602_3_1" startPos="0.0" endPos="15.0" name="청계3가.관수교(동)"/>
-    <busStop id="bs_05" lane="e218924602_6_1" startPos="68.0" endPos="83.0" name="청계4가.배오개다리"/>
-    <busStop id="bs_06" lane="e1212424785_2_1" startPos="32.2" endPos="47.2" name="청계5가.광장시장"/>
-    <busStop id="bs_07" lane="e732213463_2_1" startPos="0.0" endPos="15.0" name="청계4가.세운교"/>
-    <busStop id="bs_08" lane="e732213463_5_1" startPos="0.0" endPos="15.0" name="청계3가.관수교(서)"/>
-    <busStop id="bs_09" lane="e1212424791_4_1" startPos="0.0" endPos="15.0" name="청계2가.수표교"/>
-    <busStop id="bs_10" lane="e908694578_2_1" startPos="0.0" endPos="15.0" name="청계2가.삼일교(서)"/>
-    <busStop id="bs_11" lane="e908694578_3_1" startPos="66.0" endPos="81.0" name="청계1가.장통교"/>
+    <busStop id="bs_01" lane="e73541403_2_1" startPos="22.0" endPos="37.0" name="청계광장" color="30,97,191" lines="A01_east A01_loop"/>
+    <busStop id="bs_02" lane="e73541403_8_1" startPos="45.0" endPos="60.0" name="청계1가.광교" color="30,97,191" lines="A01_east A01_loop"/>
+    <busStop id="bs_03" lane="e908646367_3_1" startPos="30.0" endPos="45.0" name="청계2가.삼일교(동)" color="30,97,191" lines="A01_east A01_loop"/>
+    <busStop id="bs_04" lane="e218924602_3_1" startPos="0.0" endPos="15.0" name="청계3가.관수교(동)" color="30,97,191" lines="A01_east A01_loop"/>
+    <busStop id="bs_05" lane="e218924602_6_1" startPos="68.0" endPos="83.0" name="청계4가.배오개다리" color="30,97,191" lines="A01_east A01_loop"/>
+    <busStop id="bs_06" lane="e1212424785_2_1" startPos="32.2" endPos="47.2" name="청계5가.광장시장" color="30,97,191" lines="A01_loop"/>
+    <busStop id="bs_07" lane="e732213463_2_1" startPos="0.0" endPos="15.0" name="청계4가.세운교" color="30,97,191" lines="A01_loop"/>
+    <busStop id="bs_08" lane="e732213463_5_1" startPos="0.0" endPos="15.0" name="청계3가.관수교(서)" color="30,97,191" lines="A01_loop"/>
+    <busStop id="bs_09" lane="e1212424791_4_1" startPos="0.0" endPos="15.0" name="청계2가.수표교" color="30,97,191" lines="A01_loop"/>
+    <busStop id="bs_10" lane="e908694578_2_1" startPos="0.0" endPos="15.0" name="청계2가.삼일교(서)" color="30,97,191" lines="A01_loop"/>
+    <busStop id="bs_11" lane="e908694578_3_1" startPos="66.0" endPos="81.0" name="청계1가.장통교" color="30,97,191" lines="A01_loop"/>
 </additional>
