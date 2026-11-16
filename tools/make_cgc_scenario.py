@@ -837,6 +837,11 @@ def build(net_path, out_dir, args):
                                   color=stop_color.get(sid, "#2B6570"),
                                   number=stop_number.get(sid))
         written_stops += 1
+    # 어린이보호구역·정차금지지대 노면 표시 (school_zones.csv, no_stop_zones.csv).
+    # sumo_env가 보호구역 적색 포장·노란선을 읽어 관측·감점에 쓴다.
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import zone_markings  # noqa: E402
+    add += zone_markings.marking_lines(net)
     add.append("</additional>")
     with open(os.path.join(out_dir, "cgc.add.xml"), "w", encoding="utf-8", newline="\n") as f:
         f.write("\n".join(add) + "\n")

@@ -361,6 +361,11 @@ class SumoHighwayEnv(gym.Env):
     #   노란(채움) 긴 선      → 보호구역 범위 (노란 이중 가장자리선, 주정차 금지)
     # 제한속도는 적색 포장에 붙은 speed_limit 값((30) 노면표시와 같은 값)을 읽는다.
     # 위치는 ego 경로상 주행거리(getDistance 기준)로 바꿔 저장한다.
+    #
+    # 다각형에 type이 붙어 있으면 type으로 고른다 (road_builder, tools/zone_markings.py):
+    #   school_zone = 적색 포장, school_zone_line = 노란선, 그 밖의 type(정차금지 빗금·
+    #   정류장 그림 등)은 무시. 노란선에 zone_id가 있으면 간격과 상관없이 같은 구역으로 잇는다
+    #   (청계천로는 구역 사이에 100 m 넘는 교차로가 있다). type이 하나도 없으면 예전처럼 색으로.
     # ==================================================================
     @staticmethod
     def _is_red(c):
@@ -418,16 +423,22 @@ class SumoHighwayEnv(gym.Env):
             return
         geom = self._route_lane_geometry()
         reds, lines = [], []
+        types = {pid: traci.polygon.getType(pid) for pid in poly_ids}
+        typed = any(t in ("school_zone", "school_zone_line") for t in types.values())
         for pid in poly_ids:
             color = traci.polygon.getColor(pid)
             if not traci.polygon.getFilled(pid):
                 continue
-            red, yellow = self._is_red(color), self._is_yellow(color)
+            if typed:
+                red, yellow = types[pid] == "school_zone", types[pid] == "school_zone_line"
+            else:
+                red, yellow = self._is_red(color), self._is_yellow(color)
             if not (red or yellow):
                 continue
             shape = traci.polygon.getShape(pid)
             xs, ys = [p[0] for p in shape], [p[1] for p in shape]
-            if yellow and max(max(xs) - min(xs), max(ys) - min(ys)) < 15.0:
+            if (yellow and not typed
+                    and max(max(xs) - min(xs), max(ys) - min(ys)) < 15.0):
                 continue                                   # 횡단보도 줄무늬 등 짧은 노란 표시 제외
             cx, cy = float(np.mean(xs)), float(np.mean(ys))
             if self._project(geom, cx, cy) is None:        # 내 진행 방향 차로 위가 아님
@@ -443,15 +454,27 @@ class SumoHighwayEnv(gym.Env):
                     limit = 0.0
                 reds.append((min(s), limit))
             else:
-                lines.append((min(s), max(s)))
+                try:
+                    zid = traci.polygon.getParameter(pid, "zone_id") or None
+                except traci.TraCIException:
+                    zid = None
+                lines.append((min(s), max(s), zid))
         # 노란 이중선 조각들을 이어 붙여 구간을 만든다 (횡단보도·지그재그 구간에서 끊겨 있음)
-        lines.sort()
-        merged = []
-        for a, b in lines:
+        # zone_id가 있으면 같은 id끼리, 없으면 40 m 이내 간격끼리
+        by_id = {}
+        for a, b, zid in lines:
+            if zid is not None:
+                lo, hi = by_id.get(zid, (a, b))
+                by_id[zid] = (min(lo, a), max(hi, b))
+        merged = [[a, b] for a, b in by_id.values()]
+        for a, b, zid in sorted(lines):
+            if zid is not None:
+                continue
             if merged and a - merged[-1][1] <= 40.0:
                 merged[-1][1] = max(merged[-1][1], b)
             else:
                 merged.append([a, b])
+        merged.sort()
         for a, b in merged:
             inside = [(s, lim) for s, lim in reds if a - 5.0 <= s <= b]
             if not inside:
@@ -2028,7 +2051,9 @@ class SumoHighwayEnv(gym.Env):
             if spd < 0.5 and any(
                     z[0] == edge and z[1] <= pos <= z[2] for z in self._no_stop_zones):
                 reward -= float(self.rw.get("no_stop_zone_penalty", 0.0))
-            limit = self._school_limits.get(edge)
+            # 노면에서 보호구역을 읽었으면(self._zones) 과속은 구간 기준 zone_overspeed_penalty가
+            # 맡는다 (교차로 안까지 포함). 같은 과속을 두 번 깎지 않도록 엣지 기준 감점은 건너뛴다.
+            limit = None if self._zones else self._school_limits.get(edge)
             if limit is not None and spd > limit:
                 rate = float(self.rw.get("school_zone_speeding_penalty", 0.0))
                 reward -= min(rate * (spd - limit), 0.5)
