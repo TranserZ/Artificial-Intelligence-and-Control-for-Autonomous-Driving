@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<!-- generated on 2026-11-16T11:11:07.252430+09:00 by Eclipse SUMO netconvert 1.25.0
+<!-- generated on 2026-11-16T11:36:10.091261+09:00 by Eclipse SUMO netconvert 1.25.0
 <netconvertConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/netconvertConfiguration.xsd">
 
     <input>
-        <sumo-net-file value="/home/min-gi/Desktop/2026_2/Artificial-Intelligence-and-Control-for-Autonomous-Driving/env/sumo/cgc.net.xml"/>
-        <connection-files value="/home/min-gi/Desktop/2026_2/Artificial-Intelligence-and-Control-for-Autonomous-Driving/env/sumo/cgc.fix.con.xml"/>
+        <sumo-net-file value="env/sumo/cgc.net.xml"/>
+        <connection-files value="env/sumo/cgc.fix.con.xml"/>
     </input>
 
     <output>
-        <output-file value="/home/min-gi/Desktop/2026_2/Artificial-Intelligence-and-Control-for-Autonomous-Driving/env/sumo/cgc.net.xml"/>
+        <output-file value="env/sumo/cgc.net.xml"/>
         <output.street-names value="true"/>
     </output>
 

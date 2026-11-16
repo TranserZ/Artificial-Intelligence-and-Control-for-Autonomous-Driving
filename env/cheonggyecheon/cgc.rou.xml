@@ -1,5 +1,5 @@
 <routes>
-    <vType id="ego_type" accel="1.5" decel="4.0" maxSpeed="5.56" length="12.0" width="2.5" color="1,0,0" vClass="bus" guiShape="bus" boardingDuration="2.5"/>
+    <vType id="ego_type" accel="1.5" decel="4.0" maxSpeed="5.56" length="4.9" width="2.095" mass="2890" personCapacity="8" speedFactor="0.75" emergencyDecel="5.0" color="0.36,0.69,0.15" vClass="bus" guiShape="bus" boardingDuration="2.5"/>
     <vTypeDistribution id="carDist">
         <vType id="car_krauss" probability="0.35" carFollowModel="Krauss" accel="2.0" decel="4.5" tau="1.0" minGap="2.5" maxSpeed="8.3" speedDev="0.1" color="1,1,0" vClass="passenger" guiShape="passenger/sedan" sigma="0.3" lcStrategic="1" lcCooperative="0.5" lcAssertive="1.2" lcImpatience="0.2"/>
         <vType id="car_idm" probability="0.3" carFollowModel="IDM" accel="1.8" decel="3.5" tau="1.2" minGap="2.0" maxSpeed="8.3" speedDev="0.1" color="0,1,1" vClass="passenger" guiShape="passenger/sedan" lcStrategic="1" lcCooperative="0.5" lcAssertive="1.2" lcImpatience="0.2"/>
