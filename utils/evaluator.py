@@ -62,7 +62,7 @@ class DrivingMetrics:
 
 
 def evaluate_policy(policy, env, n_episodes: int = 5,
-                    deterministic: bool = True) -> DrivingMetrics:
+                    deterministic: bool = True, seed_base=None) -> DrivingMetrics:
     """정책을 n_episodes 주행시키고 주행 지표 평균을 반환.
 
     Args:
@@ -71,6 +71,8 @@ def evaluate_policy(policy, env, n_episodes: int = 5,
         env:    SumoHighwayEnv (mean_gap 기본값용 visibility 속성만 사용)
         n_episodes: 평가 에피소드 수. 많을수록 지표가 안정적이지만 느리다
         deterministic: True면 탐험 노이즈 없이 평균 행동만 사용
+        seed_base: 주면 i번째 판을 reset(seed=seed_base+i)로 연다. 평가마다 같은 판이라
+                   체크포인트끼리 운이 아니라 실력 차이로 비교된다 (best 모델 선택용)
 
     Note:
         모든 지표는 env.step()의 info(collided/arrived/speed/gap)에서 읽는다.
@@ -83,8 +85,8 @@ def evaluate_policy(policy, env, n_episodes: int = 5,
     zone_speeds, n_zone_over = [], 0
     ZONE_TOL, ZONE_STEPS = 3.0 / 3.6, 2   # +3 km/h를 연속 2스텝(1초) 넘으면 과속
 
-    for _ in range(n_episodes):
-        obs, _ = env.reset()
+    for i in range(n_episodes):
+        obs, _ = env.reset(seed=None if seed_base is None else seed_base + i)
         done, ep_ret, ep_len = False, 0.0, 0
         ep_lc = 0
         ep_red = False
