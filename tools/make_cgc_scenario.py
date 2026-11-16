@@ -595,8 +595,12 @@ def build(net_path, out_dir, args):
     placed = {}              # sid → (eid, start, end, name)
     for sid, st in line_cfg["stops"].items():
         try:
-            eid, start, end = place_bus_stop(net, (route, west), st["edge"],
-                                             float(st["start"]), float(st["end"]))
+            if st.get("keep_edge"):
+                # 짧은 엣지라도 실측 위치를 지킨다 (다음 엣지로 넘기지 않음)
+                eid, start, end = st["edge"], float(st["start"]), float(st["end"])
+            else:
+                eid, start, end = place_bus_stop(net, (route, west), st["edge"],
+                                                 float(st["start"]), float(st["end"]))
             s, e2 = fit_bus_stop(net.getEdge(eid).getLength(), start, end)
         except Exception:
             print("정류장 배치 실패 (엣지가 net.xml에 없음?):", sid, st.get("edge"))

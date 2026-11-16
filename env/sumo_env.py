@@ -92,6 +92,7 @@ BUS_STOPS_ORDER = ["bs_01", "bs_02", "bs_03", "bs_04", "bs_05"]
 
 # 어린이보호구역(세운상가, 3차로) 구간 — 버스 노선은 가운데 차로를 유지한다.
 SCHOOL_ZONE_CENTER_LANE_EDGES = ("e218924602_1", "e218924602_2", "e218924602_3")
+STOP_DEPART_GRACE = 10.0   # 정류장 출발 후 이 시간(s) 동안 보호구역 가운데 차로 강제를 쉰다
 
 # 프리필: 같은 차로에 두 차를 이 거리(m)보다 가깝게 배치하지 않는다
 # (_prefill_traffic의 최소 배치 간격과 같은 값)
@@ -286,6 +287,8 @@ class SumoHighwayEnv(gym.Env):
         self._stop_stuck = 0
         self._missed_stops = 0
         self._sumo_stop_ctrl = False   # True면 SUMO가 정류장 정차를 관리 중 (setSpeed 금지)
+        self._was_at_stop = False      # 직전 스텝에 정류장 정차 중이었는지
+        self._depart_grace_until = -1.0  # 이 시각(s)까지는 보호구역 가운데 차로 강제를 쉰다
         self._started = False      # SUMO 프로세스가 떠 있는지 여부
 
         # Gymnasium 행동 공간:
@@ -890,6 +893,8 @@ class SumoHighwayEnv(gym.Env):
 
         self._stop_stuck = 0
         self._sumo_stop_ctrl = False
+        self._was_at_stop = False
+        self._depart_grace_until = -1.0
         if self.shield_eval_off:
             self._shield_on = False
         else:
@@ -1795,8 +1800,16 @@ class SumoHighwayEnv(gym.Env):
         # (이미 그 차로면 SUMO가 조용히 무시하므로 매 스텝 호출해도 안전하다).
         if self.ego_id in traci.vehicle.getIDList():
             edge = traci.vehicle.getRoadID(self.ego_id)
-            # 정류장 규칙이 차로를 잡고 있으면(정류장 접근 중) 가운데 차로 유지는 쉰다
-            if edge in SCHOOL_ZONE_CENTER_LANE_EDGES and not stop_ctrl:
+            # 정류장에서 출발한 직후 STOP_DEPART_GRACE초는 정류장 차로에서 속도를 붙이며
+            # 빠져나가는 중이므로 가운데 차로로 끌어당기지 않는다 (관수교 bs_04는 보호구역 안)
+            now = traci.simulation.getTime()
+            at_stop = traci.vehicle.isAtBusStop(self.ego_id)
+            if self._was_at_stop and not at_stop:
+                self._depart_grace_until = now + STOP_DEPART_GRACE
+            self._was_at_stop = at_stop
+            # 정류장 규칙이 차로를 잡고 있으면(접근·정차 중) 또는 출발 직후면 가운데 차로 유지는 쉰다
+            if (edge in SCHOOL_ZONE_CENTER_LANE_EDGES and not stop_ctrl and not at_stop
+                    and now >= self._depart_grace_until):
                 lo, hi = self._car_lanes(edge)
                 if hi - lo >= 3:
                     try:
