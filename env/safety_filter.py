@@ -43,6 +43,12 @@ HOLD = 2.0            # 보행자가 없어져도 더 기다리는 시간 (s). �
 CREEP = 2.0           # 횡단보도에 걸쳤을 때 빠져나가는 속도 (m/s)
 BRAKE = 3.0           # 평소 감속 (뒤차 추돌 방지). 더 필요하면 최대 감속까지 clip으로 허용
 REACT = 0.5           # 반응 시간 (s) = 1스텝
+JUNCTION_SPAN = 20.0  # 정지선에서 이 거리 안의 횡단보도 = 같은 교차로 (진입 전에 함께 판단)
+V_CLEAR = 2.5         # 정지선에서 출발해 교차로를 빠져나가는 평균 속도 (m/s). 우회전 제한은 6.5지만
+                      # 정지 출발이라 실제로는 느리다 (4.0일 땐 남쪽 횡단보도 앞에 서는 판이 남았다)
+ENTRY_CHECK = False   # 교차로 진입 검사 (아래 reach 확장). 앞길 수정(via)만으로 보행자 충돌 0이라 끔
+                      # (1M 모델 4개 × 150판: 켬 완주 97~99%, 끔 97~100%. 켜고 학습하면 정지선 앞에서 출발 못 함)
+PED_V = 1.5           # 진입 판단에 쓰는 보행 속도 (m/s, 관측된 보행자 1.1~1.8)
 
 
 class PedSafetyFilter:
@@ -55,15 +61,21 @@ class PedSafetyFilter:
 
     def _chain(self, lane):
         """lane에서 시작해 경로를 따라가는 차선 id 목록."""
-        if lane in self._chains:
-            return self._chains[lane]
+        # 경로마다 따로 저장한다. 차선만으로 저장하면 직진 판에 만든 길을 우회전 판에도 써서
+        # 우회전 횡단보도를 못 봤다 (학습 중 평가 보행자 충돌 45%, 어느 경로가 먼저 왔느냐에 따라 달라짐).
+        key = (lane, traci.vehicle.getRouteID(self.env.ego_id))
+        if key in self._chains:
+            return self._chains[key]
         chain, total, cur = [lane], traci.lane.getLength(lane), lane
         while total < LOOKAHEAD + 60:
             if cur.startswith(":"):
                 links = traci.lane.getLinks(cur)
                 if not links:
                     break
-                cur = links[0][0]
+                # 내부 교차점(우회전 :n_tl_13 → :n_tl_24)이 있으면 그 내부 차로(via)를 거친다.
+                # [0]만 쓰면 우회전 뒤 4.3 m를 건너뛰어, 모퉁이에서 신호를 기다리는 보행자를
+                # 정지선에서 못 보고 출발한 뒤 횡단보도 위에서 급정지했다 (보행자 충돌의 주원인).
+                cur = links[0][4] or links[0][0]
             else:
                 nxt = self.env._lane_route_link(cur)
                 if nxt is None:
@@ -73,7 +85,7 @@ class PedSafetyFilter:
                 break
             chain.append(cur)
             total += traci.lane.getLength(cur)
-        self._chains[lane] = chain
+        self._chains[key] = chain
         return chain
 
     def _path(self, ego):
@@ -131,12 +143,20 @@ class PedSafetyFilter:
         # 횡단보도로 들어오려는 보행자 (모퉁이를 도는 중이면 지금 방향으로는 예측이 안 된다)
         odo = traci.vehicle.getDistance(ego)
         margin = float(self.env.rw.get("yield_margin", 3.0)) + 1.0
+        ego_len = traci.vehicle.getLength(ego)
         for c in self.env._route_crossings:
             ahead = c["s"] - odo
             if not 0 <= ahead <= LOOKAHEAD:
                 continue
             gap, toward = self.env._crossing_ped_state(c)
-            if gap is not None and gap <= margin and toward:
+            reach = margin
+            if ENTRY_CHECK and before_line and ahead - stopline <= JUNCTION_SPAN:
+                # 교차로 진입 판단: 정지선에서 출발해 이 횡단보도를 다 빠져나가는 동안 보행자가
+                # 내 경로에 올 수 있으면 정지선에서 기다린다. 4 m만 보면 우회전 중 남쪽 횡단보도
+                # 앞에서 서게 되고, 차 뒤가 서쪽 횡단보도에 걸친 채 신호가 바뀌어 보행자와 충돌했다.
+                t_clear = (ahead - stopline + c["width"] + ego_len) / V_CLEAR + 1.0
+                reach = max(margin, PED_V * t_clear)
+            if gap is not None and gap <= reach and toward:
                 best = ahead if best is None else min(best, ahead)
             # 출발 판단: 보행 녹색이면 횡단보도 입구 주변에서 움직이는 사람도 기다린다
             if before_line and c["link"] is not None:
@@ -182,7 +202,8 @@ class PedSafetyFilter:
         elif d < 0.3:
             target = 0.0
         else:
-            target = float(-BRAKE * REACT + np.sqrt((BRAKE * REACT) ** 2 + 2 * BRAKE * d))
+            brake = min(BRAKE, env.max_decel)   # 차가 낼 수 있는 감속까지만 (ROii 2.5)
+            target = float(-brake * REACT + np.sqrt((brake * REACT) ** 2 + 2 * brake * d))
         v = traci.vehicle.getSpeed(ego)
         cmd = accel_raw * (env.max_accel if accel_raw >= 0 else env.max_decel)
         if v + cmd * env.step_length <= target:

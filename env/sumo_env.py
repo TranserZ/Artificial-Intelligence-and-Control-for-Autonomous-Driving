@@ -228,14 +228,16 @@ class SumoHighwayEnv(gym.Env):
         # 차량 안전 필터(shield): 앞차와의 간격으로 계산한 안전 속도를 넘는 가속 명령은 제동으로 바꾼다
         vs = (mdp_sim.get("veh_shield") or {})
         self.veh_shield = bool(vs.get("enabled", False))
-        self.shield_decel = float(vs.get("decel", 3.0))     # 안전 속도 계산에 쓰는 제동 m/s²
+        # 안전 속도 계산에 쓰는 제동 m/s². 차가 낼 수 있는 감속(max_decel)보다 크면 안 된다
+        # (ROii 감속 2.5인데 3.0으로 계산하면 "설 수 있다"고 보고 못 서서 추돌)
+        self.shield_decel = min(float(vs.get("decel", 3.0)), self.max_decel)
         self.shield_margin = float(vs.get("margin", 2.5))   # 정지 후 남길 간격 m
         # 신호 shield: 적색(또는 편하게 설 수 있는 황색)인데 정지선을 넘을 속도면 정지선 앞에 서도록 제동.
         #   이미 최대 제동으로도 못 서는 거리면 개입하지 않는다(어차피 못 막음 → 위반은 그대로 판정).
         self.signal_shield = bool(vs.get("signal", False))
         self.signal_margin = float(vs.get("signal_margin", 1.0))   # 정지선 앞 여유 m
         # 이 감속 이상이 필요하면(급정거) 개입하지 않는다: 뒤차·자전거 추돌 위험이 더 크다
-        self.signal_max_decel = float(vs.get("signal_max_decel", self.max_decel))
+        self.signal_max_decel = min(float(vs.get("signal_max_decel", self.max_decel)), self.max_decel)
         # shield 끄는 판 비율: 학습이 진행될수록 0 → off_prob_max (off_ramp_steps 스텝에 걸쳐).
         #   shield가 항상 켜져 있으면 모델이 충돌 결과를 겪지 못해 shield에 기대게 된다
         #   (1차 모델: shield 켬 충돌 4% / 끔 충돌 94%). 기본값 0 = 항상 켬 (평가·재생용).
@@ -363,6 +365,11 @@ class SumoHighwayEnv(gym.Env):
     #   노란(채움) 긴 선      → 보호구역 범위 (노란 이중 가장자리선, 주정차 금지)
     # 제한속도는 적색 포장에 붙은 speed_limit 값((30) 노면표시와 같은 값)을 읽는다.
     # 위치는 ego 경로상 주행거리(getDistance 기준)로 바꿔 저장한다.
+    #
+    # 다각형에 type이 붙어 있으면 type으로 고른다 (road_builder, tools/zone_markings.py):
+    #   school_zone = 적색 포장, school_zone_line = 노란선, 그 밖의 type(정차금지 빗금·
+    #   정류장 그림 등)은 무시. 노란선에 zone_id가 있으면 간격과 상관없이 같은 구역으로 잇는다
+    #   (청계천로는 구역 사이에 100 m 넘는 교차로가 있다). type이 하나도 없으면 예전처럼 색으로.
     # ==================================================================
     @staticmethod
     def _is_red(c):
@@ -420,16 +427,22 @@ class SumoHighwayEnv(gym.Env):
             return
         geom = self._route_lane_geometry()
         reds, lines = [], []
+        types = {pid: traci.polygon.getType(pid) for pid in poly_ids}
+        typed = any(t in ("school_zone", "school_zone_line") for t in types.values())
         for pid in poly_ids:
             color = traci.polygon.getColor(pid)
             if not traci.polygon.getFilled(pid):
                 continue
-            red, yellow = self._is_red(color), self._is_yellow(color)
+            if typed:
+                red, yellow = types[pid] == "school_zone", types[pid] == "school_zone_line"
+            else:
+                red, yellow = self._is_red(color), self._is_yellow(color)
             if not (red or yellow):
                 continue
             shape = traci.polygon.getShape(pid)
             xs, ys = [p[0] for p in shape], [p[1] for p in shape]
-            if yellow and max(max(xs) - min(xs), max(ys) - min(ys)) < 15.0:
+            if (yellow and not typed
+                    and max(max(xs) - min(xs), max(ys) - min(ys)) < 15.0):
                 continue                                   # 횡단보도 줄무늬 등 짧은 노란 표시 제외
             cx, cy = float(np.mean(xs)), float(np.mean(ys))
             if self._project(geom, cx, cy) is None:        # 내 진행 방향 차로 위가 아님
@@ -445,15 +458,27 @@ class SumoHighwayEnv(gym.Env):
                     limit = 0.0
                 reds.append((min(s), limit))
             else:
-                lines.append((min(s), max(s)))
+                try:
+                    zid = traci.polygon.getParameter(pid, "zone_id") or None
+                except traci.TraCIException:
+                    zid = None
+                lines.append((min(s), max(s), zid))
         # 노란 이중선 조각들을 이어 붙여 구간을 만든다 (횡단보도·지그재그 구간에서 끊겨 있음)
-        lines.sort()
-        merged = []
-        for a, b in lines:
+        # zone_id가 있으면 같은 id끼리, 없으면 40 m 이내 간격끼리
+        by_id = {}
+        for a, b, zid in lines:
+            if zid is not None:
+                lo, hi = by_id.get(zid, (a, b))
+                by_id[zid] = (min(lo, a), max(hi, b))
+        merged = [[a, b] for a, b in by_id.values()]
+        for a, b, zid in sorted(lines):
+            if zid is not None:
+                continue
             if merged and a - merged[-1][1] <= 40.0:
                 merged[-1][1] = max(merged[-1][1], b)
             else:
                 merged.append([a, b])
+        merged.sort()
         for a, b in merged:
             inside = [(s, lim) for s, lim in reds if a - 5.0 <= s <= b]
             if not inside:
@@ -827,6 +852,7 @@ class SumoHighwayEnv(gym.Env):
         #   (켜두면 SUMO가 알아서 브레이크를 밟아줘서 충돌이 거의 안 나고,
         #    그러면 "충돌 회피"라는 학습 신호 자체가 사라진다)
         traci.vehicle.setSpeedMode(self.ego_id, 0)
+        self._sumo_mode = False      # True면 정차를 위해 SUMO 기본 속도 규칙(speedMode 31)을 켠 상태
         # SUMO의 자율 차선변경은 끄고, RL이 내리는 TraCI 차선변경 명령만 사용한다.
         traci.vehicle.setLaneChangeMode(self.ego_id, 0)
 
@@ -1293,6 +1319,20 @@ class SumoHighwayEnv(gym.Env):
         반환: (가속 명령, RL 차로 명령을 막는지)
         """
         self._sumo_stop_ctrl = False
+        out = self._bus_stop_control_inner(accel_raw, v)
+        # 정차를 SUMO에 넘길 때는 SUMO 기본 속도 규칙을 켠다. speedMode 0(전부 끔)이면
+        # SUMO가 정류장 앞 감속도 무시해 가속하다 정차 위치를 지나쳤다
+        # (ROii, 시드 1001: 정류장 5곳 중 3곳 놓침). 넘기지 않을 때는 다시 0으로.
+        want = self._sumo_stop_ctrl
+        if want != getattr(self, "_sumo_mode", False):
+            try:
+                traci.vehicle.setSpeedMode(self.ego_id, 31 if want else 0)
+                self._sumo_mode = want
+            except traci.TraCIException:
+                pass
+        return out
+
+    def _bus_stop_control_inner(self, accel_raw: float, v: float):
         ns = self._next_stop()
         if ns is None:
             self._stop_stuck = 0
@@ -1488,19 +1528,31 @@ class SumoHighwayEnv(gym.Env):
             #  에러 로그를 찍으므로, 범위 검사를 먼저 해서 조용히 건너뛴다)
             if edge.startswith(":") or not self._is_car_lane(edge, li):
                 return None, None
-            lane_id = f"{edge}_{li}"
             my_pos = traci.vehicle.getLanePosition(self.ego_id)
+            # 같은 엣지 + 경로상 바로 앞/뒤 엣지의 같은 번호 차선도 훑는다. 보호구역 때문에
+            # 도로를 여러 엣지로 나눈 뒤, 이음매 바로 너머 옆 차선 차량을 못 봐서
+            # 이음매(x≈100 m) 직전 차선변경 측면충돌이 났다 (1M run 충돌의 절반).
+            scan = [(f"{edge}_{li}", 0.0)]
+            route = traci.vehicle.getRoute(self.ego_id)
+            ri = traci.vehicle.getRouteIndex(self.ego_id)
+            if 0 <= ri < len(route) - 1 and self._is_car_lane(route[ri + 1], li):
+                scan.append((f"{route[ri + 1]}_{li}",
+                             traci.lane.getLength(f"{edge}_{li}")))
+            if ri >= 1 and self._is_car_lane(route[ri - 1], li):
+                prev_lane = f"{route[ri - 1]}_{li}"
+                scan.append((prev_lane, -traci.lane.getLength(prev_lane)))
             front, rear = None, None
-            for vid in traci.lane.getLastStepVehicleIDs(lane_id):
-                d = traci.vehicle.getLanePosition(vid) - my_pos
-                if d >= 0:
-                    g = d - traci.vehicle.getLength(vid)
-                    if front is None or g < front[0]:
-                        front = (g, traci.vehicle.getSpeed(vid))
-                else:
-                    g = -d - traci.vehicle.getLength(self.ego_id)
-                    if rear is None or g < rear[0]:
-                        rear = (g, traci.vehicle.getSpeed(vid))
+            for lane_id, off in scan:
+                for vid in traci.lane.getLastStepVehicleIDs(lane_id):
+                    d = traci.vehicle.getLanePosition(vid) + off - my_pos
+                    if d >= 0:
+                        g = d - traci.vehicle.getLength(vid)
+                        if front is None or g < front[0]:
+                            front = (g, traci.vehicle.getSpeed(vid))
+                    else:
+                        g = -d - traci.vehicle.getLength(self.ego_id)
+                        if rear is None or g < rear[0]:
+                            rear = (g, traci.vehicle.getSpeed(vid))
             return front, rear
         except traci.TraCIException:
             return None, None
@@ -1521,11 +1573,13 @@ class SumoHighwayEnv(gym.Env):
         """
         # 입구 보호는 "차가 새로 나타날 수 있는" 엣지에만: 도로 시작(dead_end)과 신호 교차로에서
         # 나오는 엣지. 보호구역·포켓 때문에 엣지를 나눈 지점까지 막으면 변경 금지 구간이 늘어난다.
-        # gaps_only: 정류장 규칙처럼 꼭 옮겨야 하는 경우 — 입구·정지선 구간 규칙은 건너뛰고
-        # 앞뒤 간격 검사(1)(2)만 한다
+        # gaps_only: 정류장 규칙처럼 꼭 옮겨야 하는 경우 — 정지선 구간 규칙은 건너뛰고
+        # 앞뒤 간격 검사(1)(2)만 한다. 단 입구 보호(0)는 지킨다: 교차로 직후엔 교차로 안
+        # 차가 차선 스캔에 안 잡히는 사각지대라, 정류장 쪽으로 옮기다 교차로에서 나오는 차와
+        # 옆으로 부딪혔다 (ROii, n4203161539 직후 e218924602_1, 시드 1015·1024).
         my_pos = traci.vehicle.getLanePosition(self.ego_id)
         from_node = self._edge_ends.get(traci.vehicle.getRoadID(self.ego_id), (None, None))[0]
-        if (not gaps_only and my_pos < self.lc_spawn_protect
+        if (my_pos < self.lc_spawn_protect
                 and self._junction_type.get(from_node, "dead_end") in ("dead_end", "traffic_light")):
             return False
         # 신호 정지선 앞 구간: 차선변경 금지 (교차로 앞 실선).
@@ -2025,7 +2079,9 @@ class SumoHighwayEnv(gym.Env):
             if spd < 0.5 and any(
                     z[0] == edge and z[1] <= pos <= z[2] for z in self._no_stop_zones):
                 reward -= float(self.rw.get("no_stop_zone_penalty", 0.0))
-            limit = self._school_limits.get(edge)
+            # 노면에서 보호구역을 읽었으면(self._zones) 과속은 구간 기준 zone_overspeed_penalty가
+            # 맡는다 (교차로 안까지 포함). 같은 과속을 두 번 깎지 않도록 엣지 기준 감점은 건너뛴다.
+            limit = None if self._zones else self._school_limits.get(edge)
             if limit is not None and spd > limit:
                 rate = float(self.rw.get("school_zone_speeding_penalty", 0.0))
                 reward -= min(rate * (spd - limit), 0.5)
