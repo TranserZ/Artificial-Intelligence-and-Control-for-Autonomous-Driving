@@ -111,7 +111,7 @@ if __name__ == "__main__":
         import sys
         import traci
         sys.path.insert(0, os.path.join(BASE, "tools"))
-        from live_board import LiveBoard
+        from live_board import LiveBoard, build_map_data
 
         meta_path = os.path.join(BASE, "env", "sumo", "cgc.line_meta.json")
         if not os.path.exists(meta_path):
@@ -122,11 +122,15 @@ if __name__ == "__main__":
         order = list(max((ln["stops"] for ln in meta["lines"].values()), key=len, default=[]))
         order += [s for s in meta["stops"] if s not in order]
         names = {s: meta["stops"][s].get("name", s) for s in order}
+        # 정류장 색·번호: 시나리오 생성기가 meta에 기록 (sumo-gui 정류장 테두리와 같은 색)
+        colors = {s: meta["stops"][s].get("color") or "#2b6570" for s in order}
+        numbers = {s: meta["stops"][s].get("number") or i + 1 for i, s in enumerate(order)}
+        map_data = build_map_data(os.path.join(BASE, "env", "sumo", "cgc.net.xml"), meta)
 
-        board = LiveBoard(order, names)
+        board = LiveBoard(order, names, colors, map_data, numbers)
         url = board.start()
-        print("sumo-gui + 대기 현황 표 창 실행 중 ... sumo-gui 창을 닫거나 Ctrl+C로 종료")
-        print(f"  · 표 창이 안 뜨면 브라우저에서 직접 여세요: {url}")
+        print("sumo-gui + 대기 현황 창 실행 중 ... sumo-gui 창을 닫거나 Ctrl+C로 종료")
+        print(f"  · 대기 현황 창이 안 뜨면 브라우저에서 직접 여세요: {url}")
 
         traci.start([checkBinary("sumo-gui"), "-c", sumocfg, "--start",
                      "--step-length", str(SIMULATION["step_length"]),
@@ -152,10 +156,12 @@ if __name__ == "__main__":
                     state = "신호·정체로 멈춤"
                 else:
                     state = "주행 중"
+                x, y = traci.vehicle.getPosition(vid)          # 지도에 버스 위치 표시
                 rows.append({"id": vid, "onboard": traci.vehicle.getPersonNumber(vid),
                              "capacity": capacity[vtype], "state": state,
                              "next_stop": names.get(nxt[0], nxt[0]) if nxt else "종점",
-                             "speed_kmh": speed * 3.6, "at_stop": at_stop})
+                             "speed_kmh": speed * 3.6, "at_stop": at_stop,
+                             "x": round(x, 1), "y": round(y, 1)})
             return rows
 
         next_t = 0.0
