@@ -17,18 +17,19 @@
 # 정류장별 승객 도착률 (1/s). 0.01 = 약 100초에 1명. 0이면 승객 없음.
 passenger_rate: 0.01
 
+# name_en: 화면 표지판 라벨용 로마자 (sumo-gui 글꼴에 한글이 없어 한글은 깨짐)
 stops:
-  bs_01: {edge: e73541403_2,   start: 22,  end: 37,  name: 청계광장}
-  bs_02: {edge: e73541403_8,   start: 45,  end: 60,  name: 청계1가.광교}
-  bs_03: {edge: e908646367_3,  start: 30,  end: 45,  name: 청계2가.삼일교(동)}
-  bs_04: {edge: e218924602_1,  start: 39,  end: 54,  name: 청계3가.관수교(동)}
-  bs_05: {edge: e218924602_6,  start: 68,  end: 83,  name: 청계4가.배오개다리}
-  bs_06: {edge: e1212424785_1, start: 184, end: 199, name: 청계5가.광장시장}
-  bs_07: {edge: e732213463_1,  start: 113, end: 128, name: 청계4가.세운교}
-  bs_08: {edge: e732213463_4,  start: 43,  end: 58,  name: 청계3가.관수교(서)}
-  bs_09: {edge: e1212424791_3, start: 38,  end: 53,  name: 청계2가.수표교}
-  bs_10: {edge: e908694578_1,  start: 43,  end: 58,  name: 청계2가.삼일교(서)}
-  bs_11: {edge: e908694578_3,  start: 66,  end: 81,  name: 청계1가.장통교}
+  bs_01: {edge: e73541403_2,   start: 22,  end: 37,  name: 청계광장,          name_en: Cheonggye Plaza}
+  bs_02: {edge: e73541403_8,   start: 45,  end: 60,  name: 청계1가.광교,      name_en: Gwanggyo}
+  bs_03: {edge: e908646367_3,  start: 30,  end: 45,  name: 청계2가.삼일교(동), name_en: Samilgyo (E)}
+  bs_04: {edge: e218924602_1,  start: 39,  end: 54,  name: 청계3가.관수교(동), name_en: Gwansugyo (E)}
+  bs_05: {edge: e218924602_6,  start: 68,  end: 83,  name: 청계4가.배오개다리, name_en: Baeogae Bridge}
+  bs_06: {edge: e1212424785_1, start: 184, end: 199, name: 청계5가.광장시장,   name_en: Gwangjang Market}
+  bs_07: {edge: e732213463_1,  start: 113, end: 128, name: 청계4가.세운교,     name_en: Sewoongyo}
+  bs_08: {edge: e732213463_4,  start: 43,  end: 58,  name: 청계3가.관수교(서), name_en: Gwansugyo (W)}
+  bs_09: {edge: e1212424791_3, start: 38,  end: 53,  name: 청계2가.수표교,     name_en: Supyogyo}
+  bs_10: {edge: e908694578_1,  start: 43,  end: 58,  name: 청계2가.삼일교(서), name_en: Samilgyo (W)}
+  bs_11: {edge: e908694578_3,  start: 66,  end: 81,  name: 청계1가.장통교,     name_en: Jangtonggyo}
 
 lines:
   # 청계A01 동행 편도 (현재 학습 노선) — 청계광장 → 광장시장 부근

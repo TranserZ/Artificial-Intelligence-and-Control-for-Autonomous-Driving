@@ -119,6 +119,78 @@ def bus_stop_lane_index(edge):
     return 0
 
 
+def _pos_dir(shape, s):
+    """차로 중심선(shape)을 따라 s(m) 지점의 (x, y, 진행 단위벡터)."""
+    acc = 0.0
+    for (x1, y1), (x2, y2) in zip(shape, shape[1:]):
+        seg = math.hypot(x2 - x1, y2 - y1)
+        if seg > 0 and acc + seg >= s:
+            t = (s - acc) / seg
+            return x1 + (x2 - x1) * t, y1 + (y2 - y1) * t, (x2 - x1) / seg, (y2 - y1) / seg
+        acc += seg
+    (x1, y1), (x2, y2) = shape[-2], shape[-1]
+    seg = math.hypot(x2 - x1, y2 - y1) or 1.0
+    return x2, y2, (x2 - x1) / seg, (y2 - y1) / seg
+
+
+def _rect(cx, cy, dx, dy, nx, ny, half_l, half_w):
+    """중심 (cx,cy), 도로방향 (dx,dy), 보도방향 (nx,ny)인 직사각형 shape 문자열."""
+    pts = [(cx - dx * half_l - nx * half_w, cy - dy * half_l - ny * half_w),
+           (cx + dx * half_l - nx * half_w, cy + dy * half_l - ny * half_w),
+           (cx + dx * half_l + nx * half_w, cy + dy * half_l + ny * half_w),
+           (cx - dx * half_l + nx * half_w, cy - dy * half_l + ny * half_w)]
+    return " ".join(f"{x:.2f},{y:.2f}" for x, y in pts)
+
+
+def stop_shelter_polys(edge, lane_idx, sid, start_pos, end_pos, name, lines):
+    """한국 시내버스 정류장을 본뜬 그림 요소 (school zone의 정평초 모방과 같은 방식).
+
+    위에서 내려다본 모습: 보도 위에 쉘터(반투명 지붕 + 기둥 2개 + 벤치 + 뒷벽 유리),
+    정차 위치 앞머리에 기둥 달린 파란 원형 표지판(POI). 표지판 POI의 name에
+    "정류장 이름 | 노선"을 넣고, cgc.gui.xml에서 poiName을 켜서 글자가 표지판
+    옆에 떠 보이게 한다. 전부 그림일 뿐 시뮬레이션 동작에는 영향이 없다.
+    """
+    lane = edge.getLane(lane_idx)
+    shape = lane.getShape()
+    w_lane = lane.getWidth()
+    w_walk = edge.getLane(lane_idx - 1).getWidth() if lane_idx >= 1 else 2.0
+    # sumo-gui가 busStop을 보도 쪽에 폭 ~3 m 파란 면으로 그리므로, 쉘터는 그보다
+    # 바깥(보도 뒤편)에 둬야 가려지지 않는다. base = 보도 바깥 모서리.
+    base = w_lane / 2 + w_walk
+    off_curb = w_lane / 2 + 0.45                  # 연석 바로 옆 (표지판 기둥)
+    s_mid = (start_pos + end_pos) / 2
+    x, y, dx, dy = _pos_dir(shape, s_mid)
+    nx, ny = dy, -dx                              # 진행방향의 오른쪽 = 보도 쪽
+    P = []
+    # 기둥 2개 (보도 쪽 앞 모서리)
+    for k, sgn in ((0, -1.0), (1, 1.0)):
+        px, py = (x + dx * sgn * 2.6 + nx * (base + 0.15),
+                  y + dy * sgn * 2.6 + ny * (base + 0.15))
+        P.append(f'    <poly id="bsp_{sid}_{k}" color="55,58,64" fill="1" layer="6" '
+                 f'shape="{_rect(px, py, dx, dy, nx, ny, 0.16, 0.16)}"/>')
+    # 벤치 (지붕보다 아래 층이라 반투명 지붕 너머로 비쳐 보인다)
+    P.append(f'    <poly id="bsb_{sid}" color="150,105,60,220" fill="1" layer="6" '
+             f'shape="{_rect(x + nx * (base + 1.15), y + ny * (base + 1.15), dx, dy, nx, ny, 1.9, 0.22)}"/>')
+    # 뒷벽 유리
+    P.append(f'    <poly id="bsw_{sid}" color="150,190,215,200" fill="1" layer="6" '
+             f'shape="{_rect(x + nx * (base + 1.75), y + ny * (base + 1.75), dx, dy, nx, ny, 2.75, 0.12)}"/>')
+    # 지붕 (반투명 — 아래 벤치·사람이 비쳐 보이게)
+    P.append(f'    <poly id="bsr_{sid}" color="64,70,80,150" fill="1" layer="7" '
+             f'shape="{_rect(x + nx * (base + 0.95), y + ny * (base + 0.95), dx, dy, nx, ny, 3.0, 1.0)}"/>')
+    # 표지판: 정차 위치 앞머리(진행방향 끝) 연석 옆 기둥 + 파란 원판(POI).
+    # 글자는 POI의 type에 넣는다 — cgc.gui.xml의 poiType_show가 "이름 | 노선"을
+    # 흰 글씨+파란 바탕으로 띄운다 (poiName은 id를 표시하므로 쓰지 않는다).
+    sx, sy, sdx, sdy = _pos_dir(shape, end_pos - 0.3)
+    snx, sny = sdy, -sdx
+    px, py = sx + snx * off_curb, sy + sny * off_curb
+    P.append(f'    <poly id="bss_{sid}" color="70,70,76" fill="1" layer="8" '
+             f'shape="{_rect(px, py, sdx, sdy, snx, sny, 0.12, 0.12)}"/>')
+    short = " · ".join(sorted({ln.split("_")[0] for ln in lines})) or "-"
+    P.append(f'    <poi id="bsg_{sid}" x="{px:.2f}" y="{py:.2f}" color="30,97,191" '
+             f'layer="9" width="1.1" height="1.1" type="{name} | {short}"/>')
+    return P
+
+
 # ──────────────────────────────────────────────────────────────
 # 버스 노선 설정 (config/lines.yaml). 파일이 없으면 아래 기본값(청계A01)을 쓴다.
 #   stops: 정류장 id → {edge, start, end, name}  (실측 좌표, 자동 보정됨)
@@ -129,17 +201,17 @@ LINES_YAML = os.path.join(ROOT, "config", "lines.yaml")
 DEFAULT_LINE_CONFIG = {
     "passenger_rate": 0.01,   # 정류장별 승객 도착률 (1/s). 약 100초에 1명
     "stops": {
-        "bs_01": {"edge": "e73541403_2", "start": 22, "end": 37, "name": "청계광장"},
-        "bs_02": {"edge": "e73541403_8", "start": 45, "end": 60, "name": "청계1가.광교"},
-        "bs_03": {"edge": "e908646367_3", "start": 30, "end": 45, "name": "청계2가.삼일교(동)"},
-        "bs_04": {"edge": "e218924602_1", "start": 39, "end": 54, "name": "청계3가.관수교(동)"},
-        "bs_05": {"edge": "e218924602_6", "start": 68, "end": 83, "name": "청계4가.배오개다리"},
-        "bs_06": {"edge": "e1212424785_1", "start": 184, "end": 199, "name": "청계5가.광장시장"},
-        "bs_07": {"edge": "e732213463_1", "start": 113, "end": 128, "name": "청계4가.세운교"},
-        "bs_08": {"edge": "e732213463_4", "start": 43, "end": 58, "name": "청계3가.관수교(서)"},
-        "bs_09": {"edge": "e1212424791_3", "start": 38, "end": 53, "name": "청계2가.수표교"},
-        "bs_10": {"edge": "e908694578_1", "start": 43, "end": 58, "name": "청계2가.삼일교(서)"},
-        "bs_11": {"edge": "e908694578_3", "start": 66, "end": 81, "name": "청계1가.장통교"},
+        "bs_01": {"edge": "e73541403_2", "start": 22, "end": 37, "name": "청계광장", "name_en": "Cheonggye Plaza"},
+        "bs_02": {"edge": "e73541403_8", "start": 45, "end": 60, "name": "청계1가.광교", "name_en": "Gwanggyo"},
+        "bs_03": {"edge": "e908646367_3", "start": 30, "end": 45, "name": "청계2가.삼일교(동)", "name_en": "Samilgyo (E)"},
+        "bs_04": {"edge": "e218924602_1", "start": 39, "end": 54, "name": "청계3가.관수교(동)", "name_en": "Gwansugyo (E)"},
+        "bs_05": {"edge": "e218924602_6", "start": 68, "end": 83, "name": "청계4가.배오개다리", "name_en": "Baeogae Bridge"},
+        "bs_06": {"edge": "e1212424785_1", "start": 184, "end": 199, "name": "청계5가.광장시장", "name_en": "Gwangjang Market"},
+        "bs_07": {"edge": "e732213463_1", "start": 113, "end": 128, "name": "청계4가.세운교", "name_en": "Sewoongyo"},
+        "bs_08": {"edge": "e732213463_4", "start": 43, "end": 58, "name": "청계3가.관수교(서)", "name_en": "Gwansugyo (W)"},
+        "bs_09": {"edge": "e1212424791_3", "start": 38, "end": 53, "name": "청계2가.수표교", "name_en": "Supyogyo"},
+        "bs_10": {"edge": "e908694578_1", "start": 43, "end": 58, "name": "청계2가.삼일교(서)", "name_en": "Samilgyo (W)"},
+        "bs_11": {"edge": "e908694578_3", "start": 66, "end": 81, "name": "청계1가.장통교", "name_en": "Jangtonggyo"},
     },
     "lines": {
         "A01_east": {"route_id": "r0",
@@ -611,8 +683,7 @@ def build(net_path, out_dir, args):
         f.write("\n".join(L) + "\n")
 
     # 정류장 11개. 보도가 lane 0이면 승용차 차로(_1)에 둔다.
-    # color: 서울 시내버스 표지판 느낌의 파란색 (기본 초록 상자 대신).
-    # lines: 이 정류장에 서는 노선 이름 — GUI에서 정류장을 클릭하면 보인다.
+    # color: 서울 시내버스 표지판 느낌의 반투명 파란색 (기본 초록 상자 대신).
     stop_lines = {}
     for lname, lc in line_cfg["lines"].items():
         for sid in lc["stops"]:
@@ -623,10 +694,17 @@ def build(net_path, out_dir, args):
         edge = net.getEdge(eid)
         lane = bus_stop_lane_index(edge)
         safe_name = name.replace("&", "&amp;").replace('"', "")
-        served = " ".join(stop_lines.get(sid, []))
+        # lines는 일부러 안 넣는다 — 넣으면 GUI가 노선 글자를 정류장 면 위에
+        # 지저분하게 그린다. 노선 표기는 아래 표지판(POI) 라벨이 담당.
         add.append(
             f'    <busStop id="{sid}" lane="{eid}_{lane}" startPos="{start_pos}" '
-            f'endPos="{end_pos}" name="{safe_name}" color="30,97,191" lines="{served}"/>')
+            f'endPos="{end_pos}" name="{safe_name}" color="30,97,191,170"/>')
+        # 보도 위에 한국식 정류장 쉘터(지붕·기둥·벤치·뒷벽)와 표지판을 그린다.
+        # 표지판 글자는 로마자(name_en) — sumo-gui 내장 글꼴에 한글이 없어
+        # 한글은 □□로 깨진다. (busStop의 name(한글)은 클릭 정보창에는 나온다)
+        label = line_cfg["stops"].get(sid, {}).get("name_en") or sid
+        add += stop_shelter_polys(edge, lane, sid, start_pos, end_pos,
+                                  label, stop_lines.get(sid, []))
         written_stops += 1
     add.append("</additional>")
     with open(os.path.join(out_dir, "cgc.add.xml"), "w", encoding="utf-8", newline="\n") as f:
@@ -646,11 +724,17 @@ def build(net_path, out_dir, args):
     # GUI: 전체 도로가 한 화면에 보이도록 (x 0~2275, y -280~210)
     # persons: 기본값은 사람을 작은 삼각형(화살표)으로 그려서 뭔지 알아보기 어렵다.
     #   personQuality=2 → 사람 모양, person_minSize=2 → 멀리서도 점 이상 크기 보장.
+    # pois: 정류장 표지판(파란 원 POI)의 type에 넣은 "정류장 이름 | 노선"을
+    #   흰 글씨+파란 바탕 라벨로 띄운다 (poiName은 id가 떠서 안 쓴다).
+    #   constantSize=1 → 줌과 무관하게 읽히는 크기.
     with open(os.path.join(out_dir, "cgc.gui.xml"), "w", encoding="utf-8", newline="\n") as f:
         f.write('<viewsettings>\n'
                 '    <scheme name="real world">\n'
                 '        <persons personMode="0" personQuality="2" person_minSize="2.0" '
                 'person_exaggeration="1.5" person_constantSize="0"/>\n'
+                '        <pois poiType_show="1" poiType_size="55" '
+                'poiType_color="255,255,255" poiType_bgColor="20,70,160,235" '
+                'poiType_constantSize="1"/>\n'
                 '    </scheme>\n'
                 f'    <viewport zoom="{args.zoom}" x="{args.view_x}" y="{args.view_y}" angle="0"/>\n'
                 '    <delay value="100"/>\n</viewsettings>\n')
