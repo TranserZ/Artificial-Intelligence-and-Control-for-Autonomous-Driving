@@ -95,6 +95,8 @@ REWARD = {**REWARD_DEFAULTS, **REWARD_OVERRIDES}
 if SIMULATION.get("veh_shield", {}).get("enabled"):
     SIMULATION["veh_shield"] = {**SIMULATION["veh_shield"],
                                 "off_prob_max": 0.7, "off_ramp_steps": 600_000}
+# 학습 중에만: 완주 못 한 판을 30% 확률로 다시 연다 (env/sumo_env.py _update_replay)
+SIMULATION["replay"] = {"prob": 0.3, "size": 200}
 
 
 HPARAMS = dict(
@@ -153,6 +155,7 @@ EVAL_EPISODES = 20      # 평가 1회당 에피소드 수 (5판은 운이 커서
                         #   best_model 성공률 52%). 학습 스텝 대비 평가 비중은 전과 비슷하게 유지
 LOG_INTERVAL = 1        # 몇 번의 업데이트마다 콘솔에 출력할지
 CHECKPOINT_INTERVAL = 10  # 몇 번의 업데이트마다 model.pt/CSV를 중간 저장할지 (0이면 안 함)
+EVAL_SEED_BASE = 900_000  # 평가 판 고정 (시드 900000~900019). 체크포인트끼리 같은 판으로 비교
 RESULTS_DIR = "results" # 결과 저장 폴더
 RUN_NAME = None         # None이면 run_날짜_시각 자동 생성.
                         # 문자열을 주면 그 이름으로 저장 (예: "exp_lr1e-4")
@@ -194,7 +197,20 @@ if __name__ == "__main__":
     parser.add_argument("--timesteps", type=int, default=None, help="TOTAL_TIMESTEPS 덮어쓰기")
     parser.add_argument("--run-name", default=None, help="results/ 아래 폴더 이름")
     parser.add_argument("--lr", type=float, default=None, help="학습률 덮어쓰기 (이어 학습 시 낮춰서)")
+    parser.add_argument("--shield-off-max", type=float, default=None,
+                        help="학습 중 안전 필터 끄는 판 최대 비율 (기본 0.7)")
+    parser.add_argument("--shield-off-ramp", type=int, default=None,
+                        help="그 비율까지 올리는 스텝 수 (기본 600000)")
+    parser.add_argument("--replay-prob", type=float, default=None,
+                        help="실패한 판 다시 열 확률 (기본 0.3, 0이면 끔)")
     args = parser.parse_args()
+    if "off_prob_max" in SIMULATION.get("veh_shield", {}):
+        if args.shield_off_max is not None:
+            SIMULATION["veh_shield"]["off_prob_max"] = args.shield_off_max
+        if args.shield_off_ramp is not None:
+            SIMULATION["veh_shield"]["off_ramp_steps"] = args.shield_off_ramp
+    if args.replay_prob is not None:
+        SIMULATION["replay"]["prob"] = args.replay_prob
     HPARAMS["seed"] = args.seed
     if args.lr:
         HPARAMS["lr"] = args.lr
@@ -287,7 +303,8 @@ if __name__ == "__main__":
                     eval_episodes=EVAL_EPISODES,
                     checkpoint_interval=CHECKPOINT_INTERVAL,
                     checkpoint_fn=checkpoint,
-                    eval_fn=on_eval)
+                    eval_fn=on_eval,
+                    eval_seed_base=EVAL_SEED_BASE)
     finally:
         env.close()
         logger.close()

@@ -1,0 +1,101 @@
+ Retrying in 1 seconds
+ep0 arrived 676s 11.2km/h shield=1% missed=0 hit=None
+ Retrying in 1 seconds
+ep1 arrived 786s 9.6km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep2 arrived 641s 11.8km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep3 arrived 838s 9.0km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep4 arrived 814s 9.3km/h shield=5% missed=0 hit=None
+ Retrying in 1 seconds
+ep5 arrived 633s 11.9km/h shield=1% missed=0 hit=None
+ Retrying in 1 seconds
+ep6 arrived 726s 10.4km/h shield=7% missed=0 hit=None
+ Retrying in 1 seconds
+ep7 arrived 758s 10.0km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep8 arrived 905s 8.3km/h shield=1% missed=0 hit=None
+ Retrying in 1 seconds
+ep9 arrived 1019s 7.4km/h shield=1% missed=0 hit=None
+ Retrying in 1 seconds
+ep10 arrived 734s 10.3km/h shield=7% missed=0 hit=None
+ Retrying in 1 seconds
+ep11 arrived 781s 9.7km/h shield=1% missed=0 hit=None
+ Retrying in 1 seconds
+ep12 arrived 956s 7.9km/h shield=1% missed=0 hit=None
+ Retrying in 1 seconds
+ep13 arrived 589s 12.8km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep14 arrived 878s 8.6km/h shield=2% missed=0 hit=None
+ Retrying in 1 seconds
+ep15 arrived 790s 9.6km/h shield=4% missed=0 hit=None
+ Retrying in 1 seconds
+ep16 arrived 680s 11.1km/h shield=2% missed=0 hit=None
+ Retrying in 1 seconds
+ep17 arrived 691s 10.9km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep18 arrived 754s 10.0km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep19 arrived 886s 8.5km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep20 arrived 842s 9.0km/h shield=8% missed=0 hit=None
+ Retrying in 1 seconds
+ep21 arrived 981s 7.7km/h shield=1% missed=0 hit=None
+ Retrying in 1 seconds
+ep22 arrived 764s 9.9km/h shield=1% missed=0 hit=None
+ Retrying in 1 seconds
+ep23 arrived 648s 11.7km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep24 arrived 761s 9.9km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep25 arrived 839s 9.0km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep26 arrived 668s 11.3km/h shield=8% missed=0 hit=None
+ Retrying in 1 seconds
+ep27 arrived 674s 11.2km/h shield=3% missed=0 hit=None
+ Retrying in 1 seconds
+ep28 arrived 571s 13.2km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep29 arrived 778s 9.7km/h shield=12% missed=0 hit=None
+ Retrying in 1 seconds
+ep30 arrived 592s 12.8km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep31 collided 766s 8.3km/h shield=0% missed=0 hit=('side_e420383141_1.8', 'junction', ':cluster_n5863541381_n871729555_1_0', 'ego_hit', None)
+ Retrying in 1 seconds
+ep32 arrived 799s 9.5km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep33 arrived 900s 8.4km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep34 collided 168s 8.5km/h shield=0% missed=0 hit=('bike_e.0', 'side', 'e73541403_6_1', 'ego_hit', None)
+ Retrying in 1 seconds
+ep35 arrived 610s 12.4km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep36 arrived 802s 9.4km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep37 arrived 784s 9.6km/h shield=1% missed=0 hit=None
+ Retrying in 1 seconds
+ep38 arrived 816s 9.3km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep39 arrived 914s 8.3km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep40 arrived 803s 9.4km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep41 arrived 828s 9.1km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep42 arrived 795s 9.5km/h shield=6% missed=0 hit=None
+ Retrying in 1 seconds
+ep43 arrived 848s 8.9km/h shield=2% missed=0 hit=None
+ Retrying in 1 seconds
+ep44 arrived 788s 9.6km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep45 arrived 800s 9.4km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep46 arrived 725s 10.4km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep47 arrived 902s 8.4km/h shield=6% missed=0 hit=None
+ Retrying in 1 seconds
+ep48 arrived 764s 9.9km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep49 arrived 594s 12.7km/h shield=3% missed=0 hit=None
+RESULT cgc4_ft_s1 {"n": 50, "ends": {"arrived": 48, "collided": 2}, "events": {}, "arrive_rate": 0.96, "collide_rate": 0.04, "mean_time": 761.23, "mean_kmh": 9.89837400678946, "shield": 0.017786062817207928, "missed_stops": 0.0}

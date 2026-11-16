@@ -244,6 +244,16 @@ class SumoHighwayEnv(gym.Env):
         self.shield_eval_off = False   # True면 이번 평가 판들은 shield 끔 (ppo 평가에서 켬)
         self._shield_on = True
         self._train_steps = 0
+        # 실패한 판 다시 연습 (Prioritized Level Replay를 단순화: Jiang et al. 2021).
+        # 학습 중 완주 못 한 판의 시드를 모아 두고 reset 때 replay_prob 확률로 그 판을 다시 연다.
+        # 완주하면 목록에서 뺀다. 같은 시드 = 같은 초기 교통·신호·경로라 어려운 상황을 반복 연습.
+        rp = (mdp_sim.get("replay") or {})
+        self.replay_prob = float(rp.get("prob", 0.0))
+        self.replay_size = int(rp.get("size", 200))
+        self._replay_seeds = []
+        self._ep_seed = None
+        self._ep_replayed = False
+        self._yellow_commit = None     # (신호 id, 정지선까지 거리): 황색 통과로 정한 정지선
         # ego 경로 후보와 확률 (road_config.EGO["routes"]). 네트워크에 없는 route는 reset에서 제외
         self.ego_routes = dict(ego.get("routes") or {"r0": 1.0})
         self.route_depart_lane = dict(ego.get("route_depart_lane") or {})
@@ -630,7 +640,7 @@ class SumoHighwayEnv(gym.Env):
             "--no-warnings", "true",   # 콘솔 경고 끄기
             "--no-step-log", "true",   # 스텝 로그 끄기
             # 매 에피소드 다른 시드 → 배경 교통 패턴이 달라져서 과적합 방지
-            "--seed", str(np.random.randint(0, 100000)),
+            "--seed", str(int(self._scn_rng.integers(0, 100000))),
         ]
         if self.gui:
             cmd += ["--quit-on-end"]      # 에피소드 종료 시 창 정리
@@ -662,7 +672,7 @@ class SumoHighwayEnv(gym.Env):
           "허용속도 초과"로 거부할 수 있는 문제도 함께 피한다.
         배치된 차들은 SUMO의 각자 컨트롤러(IDM 등)가 정상적으로 운전한다.
         """
-        rng = np.random.default_rng()
+        rng = self._scn_rng
         count = 0
         # 차선별 간격 배율 (없으면 전 차선 동일). 인덱스 0 = 맨 오른쪽.
         factors = (self.traffic.get("prefill", {})
@@ -744,7 +754,7 @@ class SumoHighwayEnv(gym.Env):
             logic = next(l for l in traci.trafficlight.getAllProgramLogics(tl_id)
                          if l.programID == program)
             durations = [p.duration for p in logic.phases]
-            t = np.random.uniform(0.0, sum(durations))
+            t = self._scn_rng.uniform(0.0, sum(durations))
             for idx, d in enumerate(durations):
                 if t < d:
                     break
@@ -753,7 +763,21 @@ class SumoHighwayEnv(gym.Env):
             traci.trafficlight.setPhaseDuration(tl_id, durations[idx] - t)
 
     def reset(self, seed=None, options=None):
+        self._ep_replayed = False
+        if seed is None and not self.shield_eval_off:
+            if self._replay_seeds and np.random.random() < self.replay_prob:
+                seed = int(self._replay_seeds[np.random.randint(len(self._replay_seeds))])
+                self._ep_replayed = True
+            else:
+                seed = int(np.random.randint(0, 2**31 - 1))
+        self._ep_seed = seed
+        self._yellow_commit = None
         super().reset(seed=seed)
+        # 시나리오 난수 (SUMO 시드·신호 시작 위상·프리필·ego 경로): reset(seed=k)면 k로 고정해
+        # 같은 시드 = 같은 판이 되게 한다 (평가끼리 같은 판으로 비교). 학습(seed=None)은 전역
+        # np.random에서 뽑아 PPO 시드만 같으면 재현된다. 전엔 seed를 무시해 매번 다른 판이었다.
+        self._scn_rng = np.random.default_rng(
+            seed if seed is not None else int(np.random.randint(0, 2**31 - 1)))
 
         # SUMO 상태를 완전히 초기화하는 가장 확실한 방법은 껐다 켜는 것.
         if self._started:
@@ -773,7 +797,7 @@ class SumoHighwayEnv(gym.Env):
         known = set(traci.route.getIDList())
         routes = {r: float(p) for r, p in self.ego_routes.items() if r in known} or {"r0": 1.0}
         probs = np.array(list(routes.values()))
-        self.ego_route = str(np.random.choice(list(routes), p=probs / probs.sum()))
+        self.ego_route = str(self._scn_rng.choice(list(routes), p=probs / probs.sum()))
 
         # ego 차량 투입 — 반드시 "도로 시작점(0m)"에서 출발
         lane_base = self._car_lanes(traci.route.getEdges(self.ego_route)[0])[0]
@@ -1137,6 +1161,23 @@ class SumoHighwayEnv(gym.Env):
             return float((-v + np.sqrt(v * v + 2.0 * a * d)) / a)
         return float(t_acc + (d - d_acc) / vmax)
 
+    def _stop_leaves_tail_in_junction(self, dist: float) -> bool:
+        """앞범퍼가 dist m 앞 정지선에 서면 꼬리가 방금 지난 정지선 있는 교차로 안에 남는가."""
+        ego = self.ego_id
+        length = traci.vehicle.getLength(ego)
+        lane = traci.vehicle.getLaneID(ego)
+        pos = traci.vehicle.getLanePosition(ego)
+        if lane.startswith(":"):
+            if not self.is_stop_junction(lane):
+                return False
+            space = dist - (traci.lane.getLength(lane) - pos)   # 교차로 출구 ~ 정지선
+        else:
+            edge = traci.lane.getEdgeID(lane)
+            if traci.edge.getFromJunction(edge) not in self._stop_nodes:
+                return False
+            space = pos + dist                                    # 엣지 시작 ~ 정지선
+        return space < length + 1.0
+
     def _next_signal(self, binding: bool = False):
         """ego 경로상 다음 신호를 (신호 id, 정지선까지 거리 m, 신호색, 남은 시간 s)로 반환.
 
@@ -1145,6 +1186,8 @@ class SumoHighwayEnv(gym.Env):
 
         binding=True: 다음 정지선 뒤에 차 길이(+2 m)도 안 되는 간격으로 또 정지선이 있고
         그 신호가 더 엄격하면(예: 녹색 → 6.9 m 뒤 적색), 그 신호색을 "첫 정지선에서" 적용한다.
+        (간격을 "교차로 출구 ~ 다음 정지선"으로 재 38 m 교차로까지 넓히면 두 신호가 엇갈려
+        첫 정지선에서 1~2주기씩 기다리고 완주 96% → 81%로 떨어졌다. 그 경우는 아래 황색 통과로 처리)
         12 m 버스가 두 번째 정지선에서 기다리면 꼬리가 첫 교차로 횡단보도를 막아
         보행 녹색에 건너는 보행자와 부딪혔다 (청계천로 1차 학습 평가의 보행자 충돌 전부).
         """
@@ -1155,6 +1198,27 @@ class SumoHighwayEnv(gym.Env):
             if not upcoming:
                 return None
             tl_id, link, dist, state = upcoming[0]
+            # 이미 교차로에 들어와 짧은 구간(버스보다 짧음)에 있는데 다음 신호가 황색이 되면,
+            # 정지선에 서는 순간 꼬리가 방금 지난 교차로 횡단보도에 남는다 → 황색 안에 지나갈 수
+            # 있으면 녹색처럼 본다 (도로교통법: 이미 교차로에 진입했으면 신속히 통과).
+            # 청계천로 3차 학습 평가의 보행자 충돌: 녹색에 진입 → 6.9 m 구간에서 황색 → 정지
+            # → 꼬리가 출구 횡단보도를 막은 채 보행 녹색 → 출발하며 꼬리로 보행자 충돌.
+            # 한 번 통과로 정하면 그 정지선을 지날 때까지 유지한다. 매 스텝 다시 판단하면 황색 끝
+            # 0.5초에 "못 지나감"으로 바뀌어 정지선 직전에 급제동 → 적색에 넘음 (시드 1014).
+            commit = self._yellow_commit
+            if commit is not None and (commit[0] != tl_id or dist > commit[1] + 0.5):
+                commit = self._yellow_commit = None          # 그 정지선을 지났음
+            if binding and state == "y":
+                if commit is not None:
+                    state = "G"
+                    self._yellow_commit = (tl_id, dist)
+                elif self._stop_leaves_tail_in_junction(dist):
+                    # 지금 속도 그대로 황색 안에 지나갈 때만 (최대 가속으로 계산하면 모델이 그만큼
+                    # 가속하지 않아 적색에 넘었다: 시드 1017, 1042, 1050, 1092)
+                    v0 = traci.vehicle.getSpeed(self.ego_id)
+                    if (dist + 0.5) <= v0 * self._tls_remaining(tl_id, link, state):
+                        state = "G"
+                        self._yellow_commit = (tl_id, dist)
             if binding and len(upcoming) > 1:
                 room = traci.vehicle.getLength(self.ego_id) + 2.0
                 lvl = self._SIGNAL_STOP_LEVEL.get(state, 1.0)
@@ -1965,7 +2029,23 @@ class SumoHighwayEnv(gym.Env):
             if limit is not None and spd > limit:
                 rate = float(self.rw.get("school_zone_speeding_penalty", 0.0))
                 reward -= min(rate * (spd - limit), 0.5)
+        if (terminated or truncated) and not self.shield_eval_off and self.replay_prob > 0:
+            self._update_replay(bool(arrived))
+        info["replayed"] = self._ep_replayed
         return obs, float(reward), terminated, truncated, info
+
+    def _update_replay(self, arrived: bool):
+        """학습 판이 끝날 때: 완주 못 했으면 그 시드를 다시 연습 목록에, 완주했으면 목록에서 뺀다."""
+        s = self._ep_seed
+        if s is None:
+            return
+        if arrived:
+            if s in self._replay_seeds:
+                self._replay_seeds.remove(s)
+        elif s not in self._replay_seeds:
+            self._replay_seeds.append(s)
+            if len(self._replay_seeds) > self.replay_size:
+                self._replay_seeds.pop(0)      # 오래된 것부터 버림
 
     # ==================================================================
     def close(self):
