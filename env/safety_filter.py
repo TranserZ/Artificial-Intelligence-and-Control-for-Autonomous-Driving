@@ -182,7 +182,8 @@ class PedSafetyFilter:
         elif d < 0.3:
             target = 0.0
         else:
-            target = float(-BRAKE * REACT + np.sqrt((BRAKE * REACT) ** 2 + 2 * BRAKE * d))
+            brake = min(BRAKE, env.max_decel)   # 차가 낼 수 있는 감속까지만 (ROii 2.5)
+            target = float(-brake * REACT + np.sqrt((brake * REACT) ** 2 + 2 * brake * d))
         v = traci.vehicle.getSpeed(ego)
         cmd = accel_raw * (env.max_accel if accel_raw >= 0 else env.max_decel)
         if v + cmd * env.step_length <= target:

@@ -224,14 +224,16 @@ class SumoHighwayEnv(gym.Env):
         # 차량 안전 필터(shield): 앞차와의 간격으로 계산한 안전 속도를 넘는 가속 명령은 제동으로 바꾼다
         vs = (mdp_sim.get("veh_shield") or {})
         self.veh_shield = bool(vs.get("enabled", False))
-        self.shield_decel = float(vs.get("decel", 3.0))     # 안전 속도 계산에 쓰는 제동 m/s²
+        # 안전 속도 계산에 쓰는 제동 m/s². 차가 낼 수 있는 감속(max_decel)보다 크면 안 된다
+        # (ROii 감속 2.5인데 3.0으로 계산하면 "설 수 있다"고 보고 못 서서 추돌)
+        self.shield_decel = min(float(vs.get("decel", 3.0)), self.max_decel)
         self.shield_margin = float(vs.get("margin", 2.5))   # 정지 후 남길 간격 m
         # 신호 shield: 적색(또는 편하게 설 수 있는 황색)인데 정지선을 넘을 속도면 정지선 앞에 서도록 제동.
         #   이미 최대 제동으로도 못 서는 거리면 개입하지 않는다(어차피 못 막음 → 위반은 그대로 판정).
         self.signal_shield = bool(vs.get("signal", False))
         self.signal_margin = float(vs.get("signal_margin", 1.0))   # 정지선 앞 여유 m
         # 이 감속 이상이 필요하면(급정거) 개입하지 않는다: 뒤차·자전거 추돌 위험이 더 크다
-        self.signal_max_decel = float(vs.get("signal_max_decel", self.max_decel))
+        self.signal_max_decel = min(float(vs.get("signal_max_decel", self.max_decel)), self.max_decel)
         # shield 끄는 판 비율: 학습이 진행될수록 0 → off_prob_max (off_ramp_steps 스텝에 걸쳐).
         #   shield가 항상 켜져 있으면 모델이 충돌 결과를 겪지 못해 shield에 기대게 된다
         #   (1차 모델: shield 켬 충돌 4% / 끔 충돌 94%). 기본값 0 = 항상 켬 (평가·재생용).
@@ -811,6 +813,7 @@ class SumoHighwayEnv(gym.Env):
         #   (켜두면 SUMO가 알아서 브레이크를 밟아줘서 충돌이 거의 안 나고,
         #    그러면 "충돌 회피"라는 학습 신호 자체가 사라진다)
         traci.vehicle.setSpeedMode(self.ego_id, 0)
+        self._sumo_mode = False      # True면 정차를 위해 SUMO 기본 속도 규칙(speedMode 31)을 켠 상태
         # SUMO의 자율 차선변경은 끄고, RL이 내리는 TraCI 차선변경 명령만 사용한다.
         traci.vehicle.setLaneChangeMode(self.ego_id, 0)
 
@@ -1277,6 +1280,20 @@ class SumoHighwayEnv(gym.Env):
         반환: (가속 명령, RL 차로 명령을 막는지)
         """
         self._sumo_stop_ctrl = False
+        out = self._bus_stop_control_inner(accel_raw, v)
+        # 정차를 SUMO에 넘길 때는 SUMO 기본 속도 규칙을 켠다. speedMode 0(전부 끔)이면
+        # SUMO가 정류장 앞 감속도 무시해 가속하다 정차 위치를 지나쳤다
+        # (ROii, 시드 1001: 정류장 5곳 중 3곳 놓침). 넘기지 않을 때는 다시 0으로.
+        want = self._sumo_stop_ctrl
+        if want != getattr(self, "_sumo_mode", False):
+            try:
+                traci.vehicle.setSpeedMode(self.ego_id, 31 if want else 0)
+                self._sumo_mode = want
+            except traci.TraCIException:
+                pass
+        return out
+
+    def _bus_stop_control_inner(self, accel_raw: float, v: float):
         ns = self._next_stop()
         if ns is None:
             self._stop_stuck = 0
