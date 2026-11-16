@@ -154,14 +154,35 @@ SHELTER = {
     "tactile_from": 0.25,        # 연석 보도 쪽 모서리 → 황색 띠 시작
     "tactile_w": 0.30,           # 황색 띠 폭
     "roof_from": 0.80,           # 연석 보도 쪽 모서리 → 지붕 도로 쪽 끝
-    "roof_len": 4.80,            # 지붕 길이 (연석과 평행)
-    "roof_depth": 1.55,          # 지붕 폭
-    "teal_edge": 0.08,           # 탑뷰에서 보이는 청록 테두리 폭
+    # 시안은 4.80 × 1.55 m. 대기 승객 수에 비해 작아 보여서 길이 ×3, 폭 ×1.5
+    # (사용자 요청 2026-11). 길이 14.40 m는 정차 구간(15 m)에 꼭 맞는다.
+    "roof_len": 14.40,           # 지붕 길이 (연석과 평행)
+    "roof_depth": 2.30,          # 지붕 폭
+    "teal_edge": 0.12,           # 탑뷰에서 보이는 청록 테두리 폭
     "sign_gap": 0.55,            # 쉘터 오른쪽 끝(도로에서 봤을 때) → 표지판
     "sign_in": 0.40,             # 연석 보도 쪽 모서리 → 표지판 기둥 중심
     "sign_plate": (0.40, 0.06),  # 표지판 판 (폭, 두께) — 면이 도로를 향함
     "icon": 0.70,                # 지도 기호 (청록 바탕 흰 버스) 한 변
 }
+
+
+# 정류장별 구분 색 — sumo-gui 정류장 테두리, 대기 현황 표의 이름, 지도 점에 같은 색.
+# 잔디(초록)·보도(회색) 위에서도, 흰 바탕 표의 글자로도 잘 보이는 색으로 골랐다.
+# 정류장 순서(lines.yaml stops 순서)대로 돌아가며 쓰고, stops.<id>.color로 바꿀 수 있다.
+STOP_PALETTE = ["#D7263D", "#F46036", "#B8860B", "#8C5A2B", "#C2187A", "#7B3FBF",
+                "#283593", "#1B65C9", "#00838F", "#E05297", "#2E7D32", "#546E7A"]
+STOP_FRAME = {
+    "line_w": 0.40,              # 테두리 선 폭 (m)
+    "fill_alpha": 50,            # 안쪽 옅은 색면 투명도 (0~255)
+    "pad_s": (1.0, 0.8),         # 표지판 앞 / 지붕 끝 뒤로 더 두는 여유 (m)
+    "pad_road": 0.35,            # 차도 쪽으로 넘어가는 폭 (m) — 버스가 서는 곳까지
+    "pad_back": 0.50,            # 지붕 뒤로 더 두는 여유 (m)
+}
+
+
+def _hex_rgb(h):
+    h = h.lstrip("#")
+    return ",".join(str(int(h[i:i + 2], 16)) for i in (0, 2, 4))
 
 
 def _bus_icon(sid, cx, cy, size, layer):
@@ -190,7 +211,8 @@ def _bus_icon(sid, cx, cy, size, layer):
     ]
 
 
-def stop_shelter_polys(edge, lane_idx, sid, start_pos, end_pos, name, lines):
+def stop_shelter_polys(edge, lane_idx, sid, start_pos, end_pos, name, lines,
+                       color="#2B6570", number=None):
     """서울 도심 가로변 버스정류장 (사용자 시안·제작 지시서)을 탑뷰로 그린다.
 
     차도 → 보도 방향으로: 아스팔트 → 회색 연석 → (0.25 m) → 황색 포장 띠 0.30 m
@@ -199,6 +221,8 @@ def stop_shelter_polys(edge, lane_idx, sid, start_pos, end_pos, name, lines):
     바깥에 독립형 표지판: 얇은 청록 판 + 청록 바탕 흰 버스 지도 기호.
     유리·벤치·기둥은 지붕 아래라 탑뷰에서 보이지 않으므로 그리지 않는다.
     정류장 이름은 지붕 위 라벨(POI type)로 — sumo-gui 글꼴에 한글이 없어 로마자.
+    정류장 구역 테두리: 정류장마다 다른 색(color)의 사각 테두리 + 옅은 색면으로
+    멀리서도 정류장을 찾고 서로 구분할 수 있게 한다 (대기 현황 표·지도와 같은 색).
     전부 그림일 뿐 시뮬레이션 동작에는 영향이 없다.
 
     층(layer): 차로 면이 layer 20 미만 폴리곤을 덮으므로 21 이상에 그린다.
@@ -252,12 +276,28 @@ def stop_shelter_polys(edge, lane_idx, sid, start_pos, end_pos, name, lines):
     P.append(f'    <poly id="bsp_{sid}" color="{S["pole"]}" fill="1" layer="23.1" '
              f'shape="{_rect(cx, cy, dx, dy, nx, ny, 0.035, 0.035)}"/>')
     P += _bus_icon(sid, cx, cy, S["icon"], 24)
+    # 정류장 구역 테두리 (정류장별 색): 옅은 색면 + 사각 테두리.
+    # 표지판부터 지붕 끝까지, 차도 가장자리(버스가 서는 곳)부터 지붕 뒤까지.
+    F = STOP_FRAME
+    rgb = _hex_rgb(color)
+    fs0, fs1 = sign_s - F["pad_s"][0], roof_s1 + F["pad_s"][1]
+    fo0, fo1 = curb_in - S["curb_w"] - F["pad_road"], r1 + F["pad_back"]
+    lw = F["line_w"]
+    P += [
+        strip(f"bsf_{sid}_fill", f"{rgb},{F['fill_alpha']}", fs0, fs1, fo0, fo1, 20.5),
+        strip(f"bsf_{sid}_n", f"{rgb},230", fs0, fs1, fo0, fo0 + lw, 24.5),       # 차도 쪽
+        strip(f"bsf_{sid}_f", f"{rgb},230", fs0, fs1, fo1 - lw, fo1, 24.5),       # 뒤쪽
+        strip(f"bsf_{sid}_a", f"{rgb},230", fs0, fs0 + lw, fo0, fo1, 24.5),       # 앞
+        strip(f"bsf_{sid}_b", f"{rgb},230", fs1 - lw, fs1, fo0, fo1, 24.5),       # 끝
+    ]
     # 정류장 이름: 지붕 한가운데 라벨 (POI 점 자체는 투명, type 글자만 보인다)
     mx, my, mdx, mdy = _pos_dir(shape, (roof_s0 + roof_s1) / 2)
     off = (r0 + r1) / 2
     short = " · ".join(sorted({ln.split("_")[0] for ln in lines})) or "-"
+    num = f"{number}. " if number is not None else ""
     P.append(f'    <poi id="bsg_{sid}" x="{mx + mdy * off:.2f}" y="{my - mdx * off:.2f}" '
-             f'color="0,0,0,0" layer="25" width="0.1" height="0.1" type="{name} | {short}"/>')
+             f'color="0,0,0,0" layer="25" width="0.1" height="0.1" '
+             f'type="{num}{name} | {short}"/>')
     return P
 
 
@@ -760,6 +800,11 @@ def build(net_path, out_dir, args):
     for lname, lc in line_cfg["lines"].items():
         for sid in lc["stops"]:
             stop_lines.setdefault(sid, []).append(lname)
+    # 정류장 번호(1부터)와 구분 색: lines.yaml stops 순서대로 팔레트를 돌려 쓴다
+    stop_number, stop_color = {}, {}
+    for i, sid in enumerate(line_cfg["stops"]):
+        stop_number[sid] = i + 1
+        stop_color[sid] = line_cfg["stops"][sid].get("color") or STOP_PALETTE[i % len(STOP_PALETTE)]
     add = ["<additional>"]
     written_stops = 0
     for sid, eid, start_pos, end_pos, name in placed_stops:
@@ -777,7 +822,9 @@ def build(net_path, out_dir, args):
         # 한글은 □□로 깨진다. (busStop의 name(한글)은 클릭 정보창에는 나온다)
         label = line_cfg["stops"].get(sid, {}).get("name_en") or sid
         add += stop_shelter_polys(edge, lane, sid, start_pos, end_pos,
-                                  label, stop_lines.get(sid, []))
+                                  label, stop_lines.get(sid, []),
+                                  color=stop_color.get(sid, "#2B6570"),
+                                  number=stop_number.get(sid))
         written_stops += 1
     add.append("</additional>")
     with open(os.path.join(out_dir, "cgc.add.xml"), "w", encoding="utf-8", newline="\n") as f:
@@ -788,7 +835,10 @@ def build(net_path, out_dir, args):
         "lines": {route_id: {"line": lname, "stops": sids,
                              "length_m": round(sum(e.getLength() for e in edges), 1)}
                   for lname, (route_id, edges, sids) in line_routes.items()},
-        "stops": {sid: {"edge": eid, "start": s, "end": e2, "name": name}
+        # color·number: 대기 현황 창(tools/live_board.py)이 표·지도에 같은 색을 쓴다
+        "stops": {sid: {"edge": eid, "start": s, "end": e2, "name": name,
+                        "name_en": line_cfg["stops"].get(sid, {}).get("name_en", sid),
+                        "number": stop_number.get(sid), "color": stop_color.get(sid)}
                   for sid, eid, s, e2, name in placed_stops},
     }
     with open(os.path.join(out_dir, "cgc.line_meta.json"), "w", encoding="utf-8", newline="\n") as f:
@@ -799,7 +849,7 @@ def build(net_path, out_dir, args):
     #   personQuality=2 → 사람 모양, person_minSize=2 → 멀리서도 점 이상 크기 보장.
     # pois: 지붕 한가운데 투명 POI의 type에 넣은 "정류장 이름 | 노선"을
     #   밝은 회색 지붕 위에 진한 청록 글씨로 띄운다 (poiName은 id가 떠서 안 쓴다).
-    #   constantSize=0 + size=1.0 → 글자 높이가 실세계 1.0 m로 고정:
+    #   constantSize=0 + size=1.3 → 글자 높이가 실세계 1.3 m로 고정:
     #   줌 인하면 읽히고, 줌 아웃하면 다른 것들과 같이 작아진다.
     #   (constantSize=1은 화면 픽셀 고정이라 줌 아웃 시 세상보다 커 보였음)
     with open(os.path.join(out_dir, "cgc.gui.xml"), "w", encoding="utf-8", newline="\n") as f:
@@ -807,7 +857,7 @@ def build(net_path, out_dir, args):
                 '    <scheme name="real world">\n'
                 '        <persons personMode="0" personQuality="2" person_minSize="2.0" '
                 'person_exaggeration="1.5" person_constantSize="0"/>\n'
-                '        <pois poi_minSize="0" poiType_show="1" poiType_size="1.0" '
+                '        <pois poi_minSize="0" poiType_show="1" poiType_size="1.3" '
                 'poiType_color="28,72,80" poiType_bgColor="0,0,0,0" '
                 'poiType_constantSize="0"/>\n'
                 # busStop의 SUMO 기본 그림(초록 면 + 독일식 H 표지)을 사실상 숨긴다

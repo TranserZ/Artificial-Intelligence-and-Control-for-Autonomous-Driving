@@ -18,6 +18,8 @@
 passenger_rate: 0.01
 
 # name_en: 화면 표지판 라벨용 로마자 (sumo-gui 글꼴에 한글이 없어 한글은 깨짐)
+# color (선택): 정류장 구분 색 "#RRGGBB". 생략하면 순서대로 기본 팔레트를 쓴다.
+#   sumo-gui의 정류장 테두리, 대기 현황 창의 표·지도에 같은 색이 쓰인다.
 stops:
   bs_01: {edge: e73541403_2,   start: 22,  end: 37,  name: 청계광장,          name_en: Cheonggye Plaza}
   bs_02: {edge: e73541403_8,   start: 45,  end: 60,  name: 청계1가.광교,      name_en: Gwanggyo}
