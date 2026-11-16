@@ -1,7 +1,7 @@
 <viewsettings>
     <scheme name="real world">
         <persons personMode="0" personQuality="2" person_minSize="2.0" person_exaggeration="1.5" person_constantSize="0"/>
-        <pois poi_minSize="0" poiType_show="1" poiType_size="1.8" poiType_color="255,255,255" poiType_bgColor="20,70,160,235" poiType_constantSize="0"/>
+        <pois poi_minSize="0" poiType_show="1" poiType_size="1.0" poiType_color="28,72,80" poiType_bgColor="0,0,0,0" poiType_constantSize="0"/>
         <additionals addMode="0" add_minSize="0" add_exaggeration="0.01" addName_show="0" addFullName_show="0"/>
     </scheme>
     <viewport zoom="250" x="1100" y="-30" angle="0"/>

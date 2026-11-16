@@ -142,52 +142,122 @@ def _rect(cx, cy, dx, dy, nx, ny, half_l, half_w):
     return " ".join(f"{x:.2f},{y:.2f}" for x, y in pts)
 
 
-def stop_shelter_polys(edge, lane_idx, sid, start_pos, end_pos, name, lines):
-    """한국 시내버스 정류장을 본뜬 그림 요소 (school zone의 정평초 모방과 같은 방식).
+# 정류장 시안 (사용자 제작 지시서, 2026-11) — 색과 치수
+SHELTER = {
+    "roof": "184,190,194",       # 지붕 상판 무광 밝은 회색 #B8BEC2
+    "teal": "43,101,112",        # 도로 쪽 띠·표지판 청록 #2B6570
+    "curb": "142,144,144",       # 연석 중간 회색 #8E9090
+    "tactile": "210,174,88",     # 황색 포장 띠 #D2AE58
+    "pole": "52,58,62",          # 기둥 차콜 #343A3E
+    "shadow": "0,0,0,45",        # 지붕 그림자 (옅게)
+    "curb_w": 0.15,              # 연석 폭 (SUMO는 연석을 안 그려서 직접 그린다)
+    "tactile_from": 0.25,        # 연석 보도 쪽 모서리 → 황색 띠 시작
+    "tactile_w": 0.30,           # 황색 띠 폭
+    "roof_from": 0.80,           # 연석 보도 쪽 모서리 → 지붕 도로 쪽 끝
+    "roof_len": 4.80,            # 지붕 길이 (연석과 평행)
+    "roof_depth": 1.55,          # 지붕 폭
+    "teal_edge": 0.08,           # 탑뷰에서 보이는 청록 테두리 폭
+    "sign_gap": 0.55,            # 쉘터 오른쪽 끝(도로에서 봤을 때) → 표지판
+    "sign_in": 0.40,             # 연석 보도 쪽 모서리 → 표지판 기둥 중심
+    "sign_plate": (0.40, 0.06),  # 표지판 판 (폭, 두께) — 면이 도로를 향함
+    "icon": 0.70,                # 지도 기호 (청록 바탕 흰 버스) 한 변
+}
 
-    위에서 내려다본 모습: 보도 위에 쉘터(반투명 지붕 + 기둥 2개 + 벤치 + 뒷벽 유리),
-    정차 위치 앞머리에 기둥 달린 파란 원형 표지판(POI). 표지판 POI의 name에
-    "정류장 이름 | 노선"을 넣고, cgc.gui.xml에서 poiName을 켜서 글자가 표지판
-    옆에 떠 보이게 한다. 전부 그림일 뿐 시뮬레이션 동작에는 영향이 없다.
+
+def _bus_icon(sid, cx, cy, size, layer):
+    """청록 바탕 정사각형 + 흰 버스 정면 픽토그램 (화면 기준 똑바로 선 지도 기호)."""
+    S = SHELTER
+    h = size / 2
+
+    def box(name, x0, y0, x1, y1, color, lay):
+        # 아이콘 좌표 (-1~1, 위가 +y) → 세계 좌표
+        pts = [(cx + x0 * h, cy + y0 * h), (cx + x1 * h, cy + y0 * h),
+               (cx + x1 * h, cy + y1 * h), (cx + x0 * h, cy + y1 * h)]
+        shape = " ".join(f"{x:.2f},{y:.2f}" for x, y in pts)
+        return (f'    <poly id="bsi_{sid}_{name}" color="{color}" fill="1" '
+                f'layer="{lay}" shape="{shape}"/>')
+
+    w = "255,255,255"
+    return [
+        box("bg", -1.00, -1.00, 1.00, 1.00, S["teal"], layer),
+        box("body", -0.56, -0.52, 0.56, 0.72, w, layer + 0.1),       # 버스 몸통
+        box("roof", -0.44, 0.72, 0.44, 0.80, w, layer + 0.1),        # 지붕 둥근 느낌
+        box("glass", -0.44, 0.08, 0.44, 0.58, S["teal"], layer + 0.2),  # 앞유리
+        box("lampL", -0.42, -0.30, -0.24, -0.14, S["teal"], layer + 0.2),
+        box("lampR", 0.24, -0.30, 0.42, -0.14, S["teal"], layer + 0.2),
+        box("wheelL", -0.50, -0.78, -0.26, -0.52, w, layer + 0.1),   # 바퀴
+        box("wheelR", 0.26, -0.78, 0.50, -0.52, w, layer + 0.1),
+    ]
+
+
+def stop_shelter_polys(edge, lane_idx, sid, start_pos, end_pos, name, lines):
+    """서울 도심 가로변 버스정류장 (사용자 시안·제작 지시서)을 탑뷰로 그린다.
+
+    차도 → 보도 방향으로: 아스팔트 → 회색 연석 → (0.25 m) → 황색 포장 띠 0.30 m
+    → 보도 여백 → 청록 테두리가 있는 밝은 회색 지붕 4.80 × 1.55 m.
+    도로에서 쉘터를 봤을 때 오른쪽 끝(= 버스가 들어오는 쪽, 상류)에서 0.55 m
+    바깥에 독립형 표지판: 얇은 청록 판 + 청록 바탕 흰 버스 지도 기호.
+    유리·벤치·기둥은 지붕 아래라 탑뷰에서 보이지 않으므로 그리지 않는다.
+    정류장 이름은 지붕 위 라벨(POI type)로 — sumo-gui 글꼴에 한글이 없어 로마자.
+    전부 그림일 뿐 시뮬레이션 동작에는 영향이 없다.
+
+    층(layer): 차로 면이 layer 20 미만 폴리곤을 덮으므로 21 이상에 그린다.
+    (노면 지그재그는 없음 — 실제 청계천로 정류장 위성사진에 없다)
     """
-    lane = edge.getLane(lane_idx)
-    shape = lane.getShape()
-    w_lane = lane.getWidth()
-    w_walk = edge.getLane(lane_idx - 1).getWidth() if lane_idx >= 1 else 2.0
-    base = w_lane / 2 + w_walk                    # 보도 바깥 모서리 (쉘터 위치)
-    off_curb = w_lane / 2 + 0.45                  # 연석 바로 옆 (표지판 기둥)
-    s_mid = (start_pos + end_pos) / 2
-    x, y, dx, dy = _pos_dir(shape, s_mid)
-    nx, ny = dy, -dx                              # 진행방향의 오른쪽 = 보도 쪽
-    P = []
-    # (노면 지그재그는 넣지 않는다 — 실제 청계천로 정류장 위성사진에 없음.
-    #  폴리곤 layer는 21 이상: 차로 면이 layer 20 미만 폴리곤을 덮는다)
-    # 기둥 2개 (보도 쪽 앞 모서리)
-    for k, sgn in ((0, -1.0), (1, 1.0)):
-        px, py = (x + dx * sgn * 2.6 + nx * (base + 0.15),
-                  y + dy * sgn * 2.6 + ny * (base + 0.15))
-        P.append(f'    <poly id="bsp_{sid}_{k}" color="55,58,64" fill="1" layer="21" '
-                 f'shape="{_rect(px, py, dx, dy, nx, ny, 0.16, 0.16)}"/>')
-    # 벤치 (지붕보다 아래 층이라 반투명 지붕 너머로 비쳐 보인다)
-    P.append(f'    <poly id="bsb_{sid}" color="150,105,60,220" fill="1" layer="21" '
-             f'shape="{_rect(x + nx * (base + 1.15), y + ny * (base + 1.15), dx, dy, nx, ny, 1.9, 0.22)}"/>')
-    # 뒷벽 유리
-    P.append(f'    <poly id="bsw_{sid}" color="150,190,215,200" fill="1" layer="21" '
-             f'shape="{_rect(x + nx * (base + 1.75), y + ny * (base + 1.75), dx, dy, nx, ny, 2.75, 0.12)}"/>')
-    # 지붕 (반투명 — 아래 벤치·사람이 비쳐 보이게)
-    P.append(f'    <poly id="bsr_{sid}" color="64,70,80,150" fill="1" layer="22" '
-             f'shape="{_rect(x + nx * (base + 0.95), y + ny * (base + 0.95), dx, dy, nx, ny, 3.0, 1.0)}"/>')
-    # 표지판: 정차 위치 앞머리(진행방향 끝) 연석 옆 기둥 + 파란 원판(POI).
-    # 글자는 POI의 type에 넣는다 — cgc.gui.xml의 poiType_show가 "이름 | 노선"을
-    # 흰 글씨+파란 바탕으로 띄운다 (poiName은 id를 표시하므로 쓰지 않는다).
-    sx, sy, sdx, sdy = _pos_dir(shape, end_pos - 0.3)
-    snx, sny = sdy, -sdx
-    px, py = sx + snx * off_curb, sy + sny * off_curb
-    P.append(f'    <poly id="bss_{sid}" color="70,70,76" fill="1" layer="23" '
-             f'shape="{_rect(px, py, sdx, sdy, snx, sny, 0.12, 0.12)}"/>')
+    S = SHELTER
+    shape = edge.getLane(lane_idx).getShape()
+    curb_in = edge.getLane(lane_idx).getWidth() / 2 + S["curb_w"]   # 차로 중심 → 연석 보도 쪽 모서리
+
+    def strip(pid, color, s0, s1, off0, off1, layer):
+        """차로를 따라 s0~s1, 차로 중심에서 보도 쪽으로 off0~off1 m인 띠.
+        차로가 휘어도 따라가도록 1 m 간격으로 점을 찍는다."""
+        n = max(1, int(math.ceil(abs(s1 - s0))))
+        near, far = [], []
+        for i in range(n + 1):
+            px, py, dx, dy = _pos_dir(shape, max(s0 + (s1 - s0) * i / n, 0.05))
+            nx, ny = dy, -dx                                # 진행방향 오른쪽 = 보도 쪽
+            near.append((px + nx * off0, py + ny * off0))
+            far.append((px + nx * off1, py + ny * off1))
+        pts = near + far[::-1]
+        return (f'    <poly id="{pid}" color="{color}" fill="1" layer="{layer}" '
+                f'shape="{" ".join(f"{x:.2f},{y:.2f}" for x, y in pts)}"/>')
+
+    # 쉘터 위치: 버스 앞머리가 서는 end_pos 바로 뒤에 지붕 (버스 출입문 옆)
+    roof_s1 = end_pos - 0.2
+    roof_s0 = roof_s1 - S["roof_len"]
+    r0 = curb_in + S["roof_from"]
+    r1 = r0 + S["roof_depth"]
+    t0 = curb_in + S["tactile_from"]
+    sign_s = roof_s0 - S["sign_gap"]                       # 상류 쪽 = 도로에서 봤을 때 오른쪽
+    P = [
+        # 연석: 정차 구간 + 표지판까지
+        strip(f"bsc_{sid}", S["curb"], min(start_pos, sign_s - 0.3), end_pos,
+              curb_in - S["curb_w"], curb_in, 21),
+        # 황색 포장 띠: 쉘터 길이에 맞춰 끝낸다
+        strip(f"bst_{sid}", S["tactile"], roof_s0, roof_s1, t0, t0 + S["tactile_w"], 21),
+        # 지붕 그림자 (옅고 짧게, 뒤쪽으로 살짝)
+        strip(f"bsh_{sid}", S["shadow"], roof_s0 + 0.15, roof_s1 + 0.15, r0 + 0.2, r1 + 0.2, 21.5),
+        # 지붕 상판
+        strip(f"bsr_{sid}", S["roof"], roof_s0, roof_s1, r0, r1, 22),
+        # 도로 쪽 청록 테두리 (상판 가장자리 0.08 m)
+        strip(f"bse_{sid}", S["teal"], roof_s0, roof_s1, r0, r0 + S["teal_edge"], 22.1),
+    ]
+    # 독립형 표지판: 기둥 + 도로를 향한 얇은 청록 판 + 지도 기호
+    px, py, dx, dy = _pos_dir(shape, max(sign_s, 0.05))
+    nx, ny = dy, -dx
+    cx, cy = px + nx * (curb_in + S["sign_in"]), py + ny * (curb_in + S["sign_in"])
+    pw, pt = S["sign_plate"]
+    P.append(f'    <poly id="bss_{sid}" color="{S["teal"]}" fill="1" layer="23" '
+             f'shape="{_rect(cx, cy, dx, dy, nx, ny, pw / 2, pt / 2)}"/>')
+    P.append(f'    <poly id="bsp_{sid}" color="{S["pole"]}" fill="1" layer="23.1" '
+             f'shape="{_rect(cx, cy, dx, dy, nx, ny, 0.035, 0.035)}"/>')
+    P += _bus_icon(sid, cx, cy, S["icon"], 24)
+    # 정류장 이름: 지붕 한가운데 라벨 (POI 점 자체는 투명, type 글자만 보인다)
+    mx, my, mdx, mdy = _pos_dir(shape, (roof_s0 + roof_s1) / 2)
+    off = (r0 + r1) / 2
     short = " · ".join(sorted({ln.split("_")[0] for ln in lines})) or "-"
-    P.append(f'    <poi id="bsg_{sid}" x="{px:.2f}" y="{py:.2f}" color="30,97,191" '
-             f'layer="24" width="0.9" height="0.9" type="{name} | {short}"/>')
+    P.append(f'    <poi id="bsg_{sid}" x="{mx + mdy * off:.2f}" y="{my - mdx * off:.2f}" '
+             f'color="0,0,0,0" layer="25" width="0.1" height="0.1" type="{name} | {short}"/>')
     return P
 
 
@@ -727,9 +797,9 @@ def build(net_path, out_dir, args):
     # GUI: 전체 도로가 한 화면에 보이도록 (x 0~2275, y -280~210)
     # persons: 기본값은 사람을 작은 삼각형(화살표)으로 그려서 뭔지 알아보기 어렵다.
     #   personQuality=2 → 사람 모양, person_minSize=2 → 멀리서도 점 이상 크기 보장.
-    # pois: 정류장 표지판(파란 원 POI)의 type에 넣은 "정류장 이름 | 노선"을
-    #   흰 글씨+파란 바탕 라벨로 띄운다 (poiName은 id가 떠서 안 쓴다).
-    #   constantSize=0 + size=1.8 → 글자 높이가 실세계 1.8 m로 고정:
+    # pois: 지붕 한가운데 투명 POI의 type에 넣은 "정류장 이름 | 노선"을
+    #   밝은 회색 지붕 위에 진한 청록 글씨로 띄운다 (poiName은 id가 떠서 안 쓴다).
+    #   constantSize=0 + size=1.0 → 글자 높이가 실세계 1.0 m로 고정:
     #   줌 인하면 읽히고, 줌 아웃하면 다른 것들과 같이 작아진다.
     #   (constantSize=1은 화면 픽셀 고정이라 줌 아웃 시 세상보다 커 보였음)
     with open(os.path.join(out_dir, "cgc.gui.xml"), "w", encoding="utf-8", newline="\n") as f:
@@ -737,8 +807,8 @@ def build(net_path, out_dir, args):
                 '    <scheme name="real world">\n'
                 '        <persons personMode="0" personQuality="2" person_minSize="2.0" '
                 'person_exaggeration="1.5" person_constantSize="0"/>\n'
-                '        <pois poi_minSize="0" poiType_show="1" poiType_size="1.8" '
-                'poiType_color="255,255,255" poiType_bgColor="20,70,160,235" '
+                '        <pois poi_minSize="0" poiType_show="1" poiType_size="1.0" '
+                'poiType_color="28,72,80" poiType_bgColor="0,0,0,0" '
                 'poiType_constantSize="0"/>\n'
                 # busStop의 SUMO 기본 그림(초록 면 + 독일식 H 표지)을 사실상 숨긴다
                 # (크기 배율 0.01). 정류장 겉모습은 쉘터·표지판 폴리곤이 담당.
