@@ -30,6 +30,9 @@ import sumolib  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NO_STOP_CSV = os.path.join(ROOT, "data", "road_data", "no_stop_zones.csv")
+# 노상주차 줄: 주행 차로가 아닌 연석 쪽 주차 공간 (edge_id, start_pos, end_pos)
+ROADSIDE_PARKING_CSV = os.path.join(ROOT, "data", "road_data", "roadside_parking.csv")
+ROADSIDE_SLOT = 6.5   # 노상주차 한 칸 길이 (m): 승용차 5 m + 앞뒤 여유
 
 START_EDGE = "e73541403_1"      # 청계광장 (동행 첫 구간)
 END_EDGE = "e1212424783_4"      # 청계5가·광장시장 부근 (동행 마지막 구간)
@@ -63,6 +66,15 @@ def load_no_stop_zones(path=NO_STOP_CSV):
         for row in csv.DictReader(f):
             zones.append((row["edge_id"].strip(), float(row["start_pos"]), float(row["end_pos"])))
     return zones
+
+
+def load_roadside_parking(path=ROADSIDE_PARKING_CSV):
+    """노상주차 줄 (edge_id, start_pos, end_pos). 파일이 없으면 빈 목록."""
+    if not os.path.exists(path):
+        return []
+    with open(path, encoding="utf-8-sig", newline="") as f:
+        return [(row["edge_id"].strip(), float(row["start_pos"]), float(row["end_pos"]))
+                for row in csv.DictReader(f)]
 
 
 def in_no_stop(zones, edge_id, pos):
@@ -809,11 +821,16 @@ def build(net_path, out_dir, args):
     # (기존 엣지당 1~2곳 방식 대비 밀도 약 2배). 제외: 정류장 엣지,
     # 정차금지지대, 승용차 1차로 엣지(이미 좁아 중복 안 함).
     PARK_SPACING = 30.0
+    # 노상주차 줄이 있는 엣지: 주차는 연석 쪽 parkingArea가 맡고 주행 차로는 비워 둔다
+    roadside = [z for z in load_roadside_parking() if net.hasEdge(z[0])]
+    roadside_edges = {z[0] for z in roadside}
     park_spots = []
     for edges, route_name in ((route, "main_east"), (west, "main_west")):
         for e in edges:
             eid = e.getID()
             if eid in stop_edges:    # 정류장 엣지는 뺀다 (버스가 댈 자리)
+                continue
+            if eid in roadside_edges:   # 노상주차 줄 구간은 주행 차로에 세우지 않는다
                 continue
             lanes = passenger_lane_indexes(e)
             if len(lanes) < 2:
@@ -829,6 +846,29 @@ def build(net_path, out_dir, args):
                  f'departLane="{lane}" departSpeed="max">'
                  f'<stop lane="{e.getID()}_{lane}" endPos="{pos:.1f}" duration="{rng.randint(25, 50)}" '
                  f'parking="false"/></flow>')
+    # 노상주차 줄 (roadside_parking.csv): 주행 차로 옆 연석 쪽 parkingArea(차로 밖)에
+    # 0초부터 끝까지 차를 채워 둔다. parkingArea에 선 차는 차로에서 빠지므로 주행을
+    # 막지 않고 관측에도 잡히지 않는다 (실제 주차 줄은 주행 차로가 아님).
+    roadside_areas = []
+    n_roadside = 0
+    for zi, (eid, z0, z1) in enumerate(roadside):
+        e = net.getEdge(eid)
+        lanes = passenger_lane_indexes(e)
+        if not lanes:
+            continue
+        z1 = min(z1, e.getLength() - 1.0)
+        cap = int((z1 - z0) // ROADSIDE_SLOT)
+        if cap <= 0:
+            continue
+        pa = f"roadside_{eid}_{zi}"
+        roadside_areas.append((pa, eid, lanes[0], z0, z1, cap))
+        for k in range(cap):
+            L.append(f'    <vehicle id="roadside_park_{n_roadside}" type="parked_car" depart="0" '
+                     f'departLane="{lanes[0]}" departPos="stop" departSpeed="0">'
+                     f'<route edges="{eid}"/>'
+                     f'<stop parkingArea="{pa}" until="100000" parking="true"/></vehicle>')
+            n_roadside += 1
+    print(f"노상주차 줄 {len(roadside_areas)}곳, 주차 차량 {n_roadside}대")
     L.append("</routes>")
     L = sort_demand_by_begin(L)
     with open(os.path.join(out_dir, "cgc.rou.xml"), "w", encoding="utf-8", newline="\n") as f:
@@ -866,6 +906,9 @@ def build(net_path, out_dir, args):
                                   color=stop_color.get(sid, "#2B6570"),
                                   number=stop_number.get(sid))
         written_stops += 1
+    for pa, eid, lane, z0, z1, cap in roadside_areas:
+        add.append(f'    <parkingArea id="{pa}" lane="{eid}_{lane}" startPos="{z0:.1f}" endPos="{z1:.1f}" '
+                   f'roadsideCapacity="{cap}" onRoad="false" friendlyPos="true"/>')
     add.append("</additional>")
     with open(os.path.join(out_dir, "cgc.add.xml"), "w", encoding="utf-8", newline="\n") as f:
         f.write("\n".join(add) + "\n")
