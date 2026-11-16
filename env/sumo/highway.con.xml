@@ -1,8 +1,13 @@
 <connections>
-    <connection from="e0" to="e0b" fromLane="0" toLane="0"/>
-    <connection from="e0" to="e0b" fromLane="1" toLane="1"/>
-    <connection from="e0" to="e0b" fromLane="2" toLane="2"/>
-    <connection from="e0" to="e0b" fromLane="2" toLane="3"/>
+    <crossing node="n_tl" edges="n_out n_inb"/>
+    <crossing node="n_tl" edges="e1 e1_rb"/>
+    <crossing node="n_tl" edges="s_out s_inb"/>
+    <crossing node="n_tl" edges="e0_r e0b"/>
+    <crossing node="sz_c" edges="e0_szz e0_r_sz2" priority="true" width="4"/>
+    <connection from="e0_a" to="e0b" fromLane="0" toLane="0"/>
+    <connection from="e0_a" to="e0b" fromLane="1" toLane="1"/>
+    <connection from="e0_a" to="e0b" fromLane="2" toLane="2"/>
+    <connection from="e0_a" to="e0b" fromLane="2" toLane="3"/>
     <connection from="e0b" to="e1" fromLane="0" toLane="0"/>
     <connection from="e0b" to="e1" fromLane="1" toLane="1"/>
     <connection from="e0b" to="e1" fromLane="2" toLane="2"/>

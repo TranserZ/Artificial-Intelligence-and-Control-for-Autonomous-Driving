@@ -8,7 +8,7 @@ export PATH="$SUMO_HOME/bin:$PATH"
 python tools/osm_to_sumo.py
 # --offset.disable-normalization: 좌표 평행이동을 끄지 않으면 GUI 시점·경로 좌표가 어긋난다
 netconvert --node-files env/cheonggyecheon/cgc.nod.xml --edge-files env/cheonggyecheon/cgc.edg.xml \
-  -o env/cheonggyecheon/cgc.net.xml --no-turnarounds true --junctions.join true --tls.join true \
+  -o env/cheonggyecheon/cgc.net.xml --no-turnarounds true --junctions.join true --tls.join true --tls.join-dist 30 \
   --junctions.corner-detail 5 --output.street-names true --offset.disable-normalization true \
   --sidewalks.guess true --sidewalks.guess.max-speed 14 --crossings.guess true --crossings.guess.speed-threshold 14
 python tools/make_cgc_scenario.py "$@"

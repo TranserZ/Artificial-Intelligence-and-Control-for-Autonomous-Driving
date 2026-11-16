@@ -39,6 +39,22 @@ SIMULATION = {
     "gui_track_ego": True,
 }
 
+# 청계천로(2.1 km, 경로 위 신호 6곳, 정류장 5곳)는 600초로는 시간초과가 난다.
+#   주행 ~250초(버스 가속 1.2 m/s², 자전거 뒤 서행) + 신호 6곳 대기 + 정류장 5곳 × 15초
+#   + 정차 감속 + 보행자·끼어들기 여유 → 1200초(2400스텝).
+from env.road_config import CHEONGGYECHEON as _CGC  # noqa: E402
+if _CGC["enabled"]:
+    SIMULATION["max_steps"] = 2400
+    # 차량 안전 필터(shield): 앞차 간격 기준 안전 속도를 넘는 가속은 제동으로 바꾼다.
+    #   천호 모델을 청계천로에 그대로 돌렸을 때 충돌 39/40 (대부분 추돌·교차로 진입 충돌).
+    #   학습 중에도 켜 두고, 개입한 스텝은 shield_penalty로 감점한다 (shield + punishment).
+    #   signal=True: 적색 신호 정지선도 같은 방식으로 지킨다. 학습 1차(100만 스텝, 시드 3개)에서
+    #   실패의 대부분이 느린 자전거·차를 따라가다 적색에 정지선을 넘는 경우였다 (같은 감점 적용).
+    SIMULATION["veh_shield"] = {"enabled": True, "decel": 3.0, "margin": 2.5,
+                                "signal": True, "signal_margin": 1.0, "signal_max_decel": 3.0}
+    #   signal_max_decel: 4.0(최대 제동)까지 허용하면 적색 급정거 때 뒤 자전거가 추돌해 충돌이 늘었다
+    #   (50판 평가: 4.0 → 충돌 8%, 3.0 → 충돌 6%·자전거 추돌 0, 둘 다 신호 위반 0)
+
 # ──────────────────────────────────────────────────────────────
 # 2) 관측 (Observation, 상태 S) — 31차원, 범위 [-1, 1]
 #
@@ -96,6 +112,12 @@ SIMULATION = {
 #            (구간 안에 있거나, 보행 녹색에 진입 대기 중인 경우 포함)
 #     · "내 경로 구간" = 횡단보도 중 내 진행 방향 차로들 위의 부분
 #     · 대상 보행자 = 그 횡단보도 위 + (보행 녹색일 때) 진입 대기 중인 보행자
+#
+#   어린이 보호구역 × 2  (OBSERVATION["school_zone"]["enabled"]일 때만 → 총 42차원)
+#   노면 색으로 인식한다: 내 진행 방향 차로 위의 적색 포장(시점부) = 시작,
+#   노란 이중 가장자리선 = 범위. 제한속도는 노면 (30) 표시와 같은 값.
+#   [40]     보호구역 입구까지 거리 / school_zone.visibility (0~1, 안이면 0, 없거나 멀면 1)
+#   [41]     적용 제한속도 / vmax (안이거나 visibility 안에 있으면 0.6(30 km/h), 아니면 1)
 # ──────────────────────────────────────────────────────────────
 OBSERVATION = {
     "visibility": 50.0,          # 관측 가능 거리 W (m). 앞뒤 차량 감지와
@@ -113,7 +135,15 @@ OBSERVATION = {
         "visibility": 50.0,      # 횡단보도 관측 거리 (m)
         "num_crossings": 2,      # 경로상 앞으로 볼 횡단보도 수
     },
+    "school_zone": {
+        "enabled": True,         # False면 보호구역 항목 없이 40차원 (보호구역 없는 기존 모델용)
+        "visibility": 100.0,     # 보호구역 관측 거리 (m). 50→30 km/h를 2 m/s²로 줄이는 데 ~31 m
+    },
 }
+
+# 청계천로: 버스정류장 관측(+2 → 44차원)과 정류장 앞 규칙 동작 (sumo_env._bus_stop_control)
+if _CGC["enabled"]:
+    OBSERVATION["bus_stop"] = {"enabled": True, "visibility": 150.0, "approach": 300.0}
 
 # ──────────────────────────────────────────────────────────────
 # 3) 행동 (Action, A) — [종방향 가감속, 차선 변경] 2차원
@@ -173,6 +203,11 @@ ACTION = {
     "lane_change_threshold": 0.5,   # raw <= -0.5→-1, >=+0.5→+1, 그 사이→0
     "lane_change_duration": 1.0,    # SUMO에 차선 변경 명령을 유지하는 시간(초)
 }
+
+# 청계천로: 신호 교차로 사이 엣지가 짧아(대부분 60 m 미만) 입구 보호 60 m면 차로변경이
+# 거의 막힌다. 교차로를 건너온 차가 갑자기 나타나는 사각지대만 피하도록 20 m로 줄인다.
+if _CGC["enabled"]:
+    ACTION["lane_change_safety"]["spawn_protect"] = 20.0
 
 # ──────────────────────────────────────────────────────────────
 # 4) 보상 (Reward, R)
@@ -280,10 +315,26 @@ REWARD = {
     "approach_overspeed_penalty": 0.0,
     "approach_decel": 2.0,
     "approach_penalty_cap": 0.2,
+
+    # ---- 어린이 보호구역 ----
+    # 안: (속도 - 제한속도 - tol) 1 m/s당 스텝 감점, 최대 cap
+    # 앞: 편한 감속(zone_approach_decel)으로 입구에서 제한속도가 될 수 있는 속도보다
+    #     빠르면 초과 1 m/s당 스텝 감점, 최대 cap (신호 접근 감속과 같은 방식)
+    # 지그재그 구간 차로변경 금지는 감점이 아니라 환경이 막는다 (invalid_action_penalty).
+    "zone_overspeed_penalty": 0.0,
+    "zone_overspeed_tol": 0.3,
+    "zone_overspeed_cap": 0.5,
+    "zone_approach_penalty": 0.0,
+    "zone_approach_decel": 2.0,
+    "zone_approach_cap": 0.2,
     # 정차금지지대에서 속도 0.5 m/s 미만이면 스텝당 이 값만큼 감점
     "no_stop_zone_penalty": 0.1,
     # 어린이보호구역 제한 초과 1 m/s당 감점. 한 스텝 상한은 0.5 (sumo_env).
     "school_zone_speeding_penalty": 0.1,
+    # 차량 안전 필터가 개입한 스텝 감점 (SIMULATION["veh_shield"])
+    "shield_penalty": 0.0,
+    # + 개입 세기(모델 명령 − 필터 명령, 최대 감속으로 나눈 값) × 이 값
+    "shield_penalty_scale": 0.0,
 }
 # 보상 스케일에 대한 메모 (수업에서 다뤄볼 만한 지점):
 #   처음엔 speed_weight=1.0, collision=-10, arrival=+5 였는데,

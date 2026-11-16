@@ -16,6 +16,7 @@
 import argparse
 import os
 import shutil
+import torch
 from datetime import datetime
 
 from env.road_config import ROAD, EGO, TRAFFIC
@@ -79,10 +80,21 @@ REWARD_OVERRIDES = dict(
                                    #   0.05 한 가지일 땐 정지선 30~50 m 앞에서 미리 섰음
     approach_overspeed_penalty=0.02,  # 정지 신호 접근 시 편한 감속 곡선 초과 1 m/s당 스텝 감점
                                       #   (없을 땐 가까이 서는 모델일수록 신호위반 5~6%)
+    zone_overspeed_penalty=0.1,    # 어린이 보호구역 안 30 km/h(+0.3 m/s) 초과 1 m/s당 스텝 감점
+                                   #   (최대 0.5). 50 km/h로 달리면 속도 보상 +0.04, 감점 -0.5
+    zone_approach_penalty=0.05,    # 보호구역 입구에서 30 km/h가 되도록 감속 곡선 초과 1 m/s당 감점
     no_stop_zone_penalty=0.1,         # 정차금지지대에서 서 있으면 스텝당 감점
     school_zone_speeding_penalty=0.1, # 어린이보호구역 초과 1 m/s당 감점 (상한 0.5)
+    shield_penalty=0.1,               # 안전 필터(차량·신호)가 개입한 스텝 고정 감점 (청계천로에서만 켜짐)
+    shield_penalty_scale=1.0,         # + 개입 세기(명령과 필터 감속 차 / 최대 감속) × 이 값
+                                      #   0.05 고정만 줬을 때 모델이 필터에 기댐 (필터 끄면 충돌 94%)
 )
 REWARD = {**REWARD_DEFAULTS, **REWARD_OVERRIDES}
+# 학습 중에만: 안전 필터를 끄는 판을 점점 늘린다 (0 → 70%, 60만 스텝에 걸쳐).
+# 필터가 늘 켜져 있으면 충돌을 겪지 못해 필터 없이 운전하는 법을 못 배운다.
+if SIMULATION.get("veh_shield", {}).get("enabled"):
+    SIMULATION["veh_shield"] = {**SIMULATION["veh_shield"],
+                                "off_prob_max": 0.7, "off_ramp_steps": 600_000}
 
 
 HPARAMS = dict(
@@ -176,8 +188,21 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="PPO 학습")
     parser.add_argument("--seed", type=int, default=HPARAMS["seed"],
                         help="시드만 다르게 여러 번 학습해 운의 영향을 본다")
+    parser.add_argument("--init", default=None,
+                        help="이 모델 가중치에서 이어서 학습 (예: 천호사거리 모델 → 청계천로). "
+                             "관측 차원이 늘었으면 새 입력 가중치는 0으로 채워 기존 행동을 유지한다")
+    parser.add_argument("--timesteps", type=int, default=None, help="TOTAL_TIMESTEPS 덮어쓰기")
+    parser.add_argument("--run-name", default=None, help="results/ 아래 폴더 이름")
+    parser.add_argument("--lr", type=float, default=None, help="학습률 덮어쓰기 (이어 학습 시 낮춰서)")
     args = parser.parse_args()
     HPARAMS["seed"] = args.seed
+    if args.lr:
+        HPARAMS["lr"] = args.lr
+    if args.timesteps:
+        TOTAL_TIMESTEPS = args.timesteps
+        MIDPOINT_TIMESTEPS = int(TOTAL_TIMESTEPS * 0.7)
+    if args.run_name:
+        RUN_NAME = args.run_name
 
     # 1) 도로 생성 (env/road_config.py 기준으로 매번 재생성)
     sumocfg = road_builder.build(ROAD, EGO, TRAFFIC,
@@ -212,6 +237,15 @@ if __name__ == "__main__":
         buffer=buffer,
         **HPARAMS,
     )
+    if args.init:
+        sd = torch.load(args.init, map_location=agent.device)
+        w = sd["trunk.0.weight"]
+        own = agent.policy.state_dict()["trunk.0.weight"]
+        if w.shape[1] < own.shape[1]:   # 예: 40차원 모델 → 42차원(보호구역 2개 추가)
+            pad = torch.zeros(w.shape[0], own.shape[1] - w.shape[1], dtype=w.dtype, device=w.device)
+            sd["trunk.0.weight"] = torch.cat([w, pad], dim=1)
+        agent.policy.load_state_dict(sd)
+        print(f"초기 가중치: {args.init} (입력 {w.shape[1]} → {own.shape[1]})")
     print(f"obs_dim={env.observation_space.shape[0]}, "
           f"act_dim={env.action_space.shape[0]}, device={agent.device}")
 

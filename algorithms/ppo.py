@@ -374,7 +374,15 @@ class PPO:
 
             # 4) 주기적 평가 (utils/evaluator.py 사용)
             if eval_interval > 0 and n_updates % eval_interval == 0:
-                m = evaluate_policy(self, env, n_episodes=eval_episodes)
+                # 평가(best 모델 선택)는 안전 필터(차량·신호 shield) 끄고: 필터 없이 잘 달리는 모델을 고른다
+                had = hasattr(env, "shield_eval_off")
+                if had:
+                    env.shield_eval_off = True
+                try:
+                    m = evaluate_policy(self, env, n_episodes=eval_episodes)
+                finally:
+                    if had:
+                        env.shield_eval_off = False
                 if logger is not None:
                     logger.log_eval(self.num_timesteps, m.as_dict(),
                                     m.summary(), eval_episodes)
