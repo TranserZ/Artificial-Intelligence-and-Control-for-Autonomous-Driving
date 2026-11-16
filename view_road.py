@@ -72,7 +72,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # 1) road_config 기준으로 SUMO 파일 (재)생성 — 수정사항이 즉시 반영된다
-    sumocfg = road_builder.build(ROAD, EGO, TRAFFIC, os.path.join(BASE, "env", "sumo"))
+    #    demo_ego=True: 구경용이므로 SUMO가 스스로 모는 데모 버스를 넣는다 (청계천 한정).
+    #    (train/test는 ego를 TraCI로 직접 투입하므로 데모 버스 없음 — 여기서만 켠다)
+    sumocfg = road_builder.build(ROAD, EGO, TRAFFIC, os.path.join(BASE, "env", "sumo"),
+                                 demo_ego=True)
     net_file = os.path.join(BASE, "env", "sumo", "highway.net.xml")
     print(f"도로 생성 완료: {sumocfg}")
     print_summary()
@@ -107,6 +110,8 @@ if __name__ == "__main__":
         #                 GUI 상단 Delay 입력칸에서 실행 중에도 바꿀 수 있다.
         print("sumo-gui 실행 중...")
         print("  · 창이 뜨면 도로만 보입니다. ▶(플레이) 버튼을 눌러야 차가 움직입니다.")
+        print("  · (청계천) 데모 버스는 60초에 처음 출발, 이후 5분마다 1대씩 노선을 돕니다.")
+        print("    주황색 사람 = 버스 승객, 파란색 사람 = 일반 보행자.")
         print(f"  · 확대: env/mdp_config.py의 gui_zoom={SIMULATION['gui_zoom']}")
         print("  · 속도 조절: 상단 Delay(ms) 값을 조정 (크게 = 느리게)")
         print("  · 종료하려면 창을 닫으세요.")
