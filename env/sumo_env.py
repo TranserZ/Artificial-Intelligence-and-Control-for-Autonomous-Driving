@@ -236,6 +236,7 @@ class SumoHighwayEnv(gym.Env):
         self._replay_seeds = []
         self._ep_seed = None
         self._ep_replayed = False
+        self._yellow_commit = None     # (신호 id, 정지선까지 거리): 황색 통과로 정한 정지선
         # ego 경로 후보와 확률 (road_config.EGO["routes"]). 네트워크에 없는 route는 reset에서 제외
         self.ego_routes = dict(ego.get("routes") or {"r0": 1.0})
         self.route_depart_lane = dict(ego.get("route_depart_lane") or {})
@@ -740,6 +741,7 @@ class SumoHighwayEnv(gym.Env):
             else:
                 seed = int(np.random.randint(0, 2**31 - 1))
         self._ep_seed = seed
+        self._yellow_commit = None
         super().reset(seed=seed)
         # 시나리오 난수 (SUMO 시드·신호 시작 위상·프리필·ego 경로): reset(seed=k)면 k로 고정해
         # 같은 시드 = 같은 판이 되게 한다 (평가끼리 같은 판으로 비교). 학습(seed=None)은 전역
@@ -1109,10 +1111,9 @@ class SumoHighwayEnv(gym.Env):
             remaining += phases[k].duration
         return float(max(remaining, 0.0))
 
-    def _time_to_cover(self, v: float, d: float, accel: float = None) -> float:
-        """속도 v에서 가속 accel(기본 max_accel)로 거리 d를 가는 시간 (도로 제한속도 vmax까지)."""
-        a = max(self.max_accel if accel is None else accel, 1e-3)
-        vmax = max(self.vmax, v, 1e-3)
+    def _time_to_cover(self, v: float, d: float) -> float:
+        """속도 v에서 최대 가속(max_accel)으로 거리 d를 가는 시간 (도로 제한속도 vmax까지)."""
+        a, vmax = max(self.max_accel, 1e-3), max(self.vmax, v, 1e-3)
         t_acc = (vmax - v) / a
         d_acc = v * t_acc + 0.5 * a * t_acc * t_acc
         if d <= d_acc:
@@ -1136,37 +1137,16 @@ class SumoHighwayEnv(gym.Env):
             space = pos + dist                                    # 엣지 시작 ~ 정지선
         return space < length + 1.0
 
-    def _junction_length_after(self, dist: float) -> float:
-        """앞 dist m의 정지선이 지금 차로 끝이면, 그 뒤 교차로를 지나는 내부 차로 길이 (아니면 0)."""
-        ego = self.ego_id
-        lane = traci.vehicle.getLaneID(ego)
-        if lane.startswith(":"):
-            return 0.0
-        if dist > traci.lane.getLength(lane) - traci.vehicle.getLanePosition(ego) + 1.0:
-            return 0.0
-        link = self._lane_route_link(lane)
-        if link is None or not link[4]:
-            return 0.0
-        total, cur, seen = 0.0, link[4], set()
-        while cur.startswith(":") and cur not in seen:
-            seen.add(cur)
-            total += traci.lane.getLength(cur)
-            nxt = traci.lane.getLinks(cur)
-            if not nxt:
-                break
-            cur = nxt[0][0]
-        return total
-
     def _next_signal(self, binding: bool = False):
         """ego 경로상 다음 신호를 (신호 id, 정지선까지 거리 m, 신호색, 남은 시간 s)로 반환.
 
         traci getNextTLS는 ego가 앞으로 지날 신호들을 가까운 순으로 돌려준다
         (거리는 ego 앞범퍼 → 정지선). 신호를 이미 지났거나 ego가 없으면 None.
 
-        binding=True: 다음 교차로를 빠져나간 뒤 차 길이(+2 m)도 안 되는 곳에 또 정지선이 있고
-        그 신호가 더 엄격하면(예: 녹색 → 교차로 출구 6.9 m 뒤 적색), 그 신호색을 "첫 정지선에서"
-        적용한다. 간격은 정지선끼리가 아니라 "교차로 출구 ~ 다음 정지선"으로 잰다
-        (38 m짜리 교차로 뒤 6.9 m 구간을 정지선 간격 45 m로 보고 놓쳤다, 3차 학습 평가).
+        binding=True: 다음 정지선 뒤에 차 길이(+2 m)도 안 되는 간격으로 또 정지선이 있고
+        그 신호가 더 엄격하면(예: 녹색 → 6.9 m 뒤 적색), 그 신호색을 "첫 정지선에서" 적용한다.
+        (간격을 "교차로 출구 ~ 다음 정지선"으로 재 38 m 교차로까지 넓히면 두 신호가 엇갈려
+        첫 정지선에서 1~2주기씩 기다리고 완주 96% → 81%로 떨어졌다. 그 경우는 아래 황색 통과로 처리)
         12 m 버스가 두 번째 정지선에서 기다리면 꼬리가 첫 교차로 횡단보도를 막아
         보행 녹색에 건너는 보행자와 부딪혔다 (청계천로 1차 학습 평가의 보행자 충돌 전부).
         """
@@ -1182,25 +1162,35 @@ class SumoHighwayEnv(gym.Env):
             # 있으면 녹색처럼 본다 (도로교통법: 이미 교차로에 진입했으면 신속히 통과).
             # 청계천로 3차 학습 평가의 보행자 충돌: 녹색에 진입 → 6.9 m 구간에서 황색 → 정지
             # → 꼬리가 출구 횡단보도를 막은 채 보행 녹색 → 출발하며 꼬리로 보행자 충돌.
-            if binding and state == "y" and self._stop_leaves_tail_in_junction(dist):
-                v0 = traci.vehicle.getSpeed(self.ego_id)
-                if self._time_to_cover(v0, dist + 0.5) <= self._tls_remaining(tl_id, link, state) + 0.5:
+            # 한 번 통과로 정하면 그 정지선을 지날 때까지 유지한다. 매 스텝 다시 판단하면 황색 끝
+            # 0.5초에 "못 지나감"으로 바뀌어 정지선 직전에 급제동 → 적색에 넘음 (시드 1014).
+            commit = self._yellow_commit
+            if commit is not None and (commit[0] != tl_id or dist > commit[1] + 0.5):
+                commit = self._yellow_commit = None          # 그 정지선을 지났음
+            if binding and state == "y":
+                if commit is not None:
                     state = "G"
+                    self._yellow_commit = (tl_id, dist)
+                elif self._stop_leaves_tail_in_junction(dist):
+                    # 지금 속도 그대로 황색 안에 지나갈 때만 (최대 가속으로 계산하면 모델이 그만큼
+                    # 가속하지 않아 적색에 넘었다: 시드 1017, 1042, 1050, 1092)
+                    v0 = traci.vehicle.getSpeed(self.ego_id)
+                    if (dist + 0.5) <= v0 * self._tls_remaining(tl_id, link, state):
+                        state = "G"
+                        self._yellow_commit = (tl_id, dist)
             if binding and len(upcoming) > 1:
                 room = traci.vehicle.getLength(self.ego_id) + 2.0
                 lvl = self._SIGNAL_STOP_LEVEL.get(state, 1.0)
                 v = traci.vehicle.getSpeed(self.ego_id)
-                junction = self._junction_length_after(dist)
                 for tl2, link2, dist2, state2 in upcoming[1:]:
-                    if dist2 - dist - junction >= room:
+                    if dist2 - dist >= room:
                         break
                     rem2 = self._tls_remaining(tl2, link2, state2)
                     if self._SIGNAL_STOP_LEVEL.get(state2, 1.0) > lvl:
                         return (tl2, float(dist), state2, rem2)
                     # 둘째 신호가 녹색이어도 그 정지선을 넘기 전에 바뀔 것 같으면 첫 정지선에서
                     # 황색처럼 본다 (교차로 사이에 갇혀 꼬리로 횡단보도를 막지 않게: "꼬리 물기 금지")
-                    # 걸리는 시간은 최대 가속의 절반으로 넉넉히 잡는다 (모델은 보통 최대로 가속하지 않음)
-                    if lvl == 0.0 and rem2 < self._time_to_cover(v, dist2 + 1.0, 0.5 * self.max_accel) + 1.0:
+                    if lvl == 0.0 and rem2 < self._time_to_cover(v, dist2 + 1.0) + 1.0:
                         return (tl2, float(dist), "y", rem2)
             return tl_id, float(dist), state, self._tls_remaining(tl_id, link, state)
         except traci.TraCIException:
