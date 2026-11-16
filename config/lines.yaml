@@ -1,0 +1,50 @@
+# ════════════════════════════════════════════════════════════════
+# 청계천 자율주행 버스 노선 정의 (tools/make_cgc_scenario.py가 읽음)
+#
+# 노선을 바꾸는 법
+#   1) 정류장 순서만 바꾸면 된다: lines.<노선>.stops 목록 수정
+#      → 경로(지나는 도로)는 정류장 순서대로 자동 계산된다.
+#   2) 새 정류장은 stops에 추가 (edge: SUMO 엣지 id, start/end: 엣지 위 m).
+#      좌표가 엣지 밖이거나 교차로에 너무 가까우면 스크립트가 자동 보정한다.
+#   3) 학습에 쓰는 노선 = route_id가 "r0"인 노선 (env/road_config.py EGO["routes"]).
+#
+# 사전 조사 (2026-11 기준)
+#   실제 운행 노선은 청계A01 하나다: 청계광장 ↔ 청계5가(광장시장) 왕복,
+#   정류장 11곳 (동행 6곳 + 서행 5곳). 아래 좌표는 실측 조사값 (김희영).
+#   bs_06(광장시장)은 서행 도로에 있어 동행 편도 노선(A01_east)에서는 뺀다.
+# ════════════════════════════════════════════════════════════════
+
+# 정류장별 승객 도착률 (1/s). 0.01 = 약 100초에 1명. 0이면 승객 없음.
+passenger_rate: 0.01
+
+# name_en: 화면 표지판 라벨용 로마자 (sumo-gui 글꼴에 한글이 없어 한글은 깨짐)
+# color (선택): 정류장 구분 색 "#RRGGBB". 생략하면 순서대로 기본 팔레트를 쓴다.
+#   sumo-gui의 정류장 테두리, 대기 현황 창의 표·지도에 같은 색이 쓰인다.
+stops:
+  bs_01: {edge: e73541403_2,   start: 22,  end: 37,  name: 청계광장,          name_en: Cheonggye Plaza}
+  bs_02: {edge: e73541403_8,   start: 45,  end: 60,  name: 청계1가.광교,      name_en: Gwanggyo}
+  bs_03: {edge: e908646367_3,  start: 30,  end: 45,  name: 청계2가.삼일교(동), name_en: Samilgyo (E)}
+  bs_04: {edge: e218924602_1,  start: 39,  end: 54,  name: 청계3가.관수교(동), name_en: Gwansugyo (E)}
+  bs_05: {edge: e218924602_6,  start: 68,  end: 83,  name: 청계4가.배오개다리, name_en: Baeogae Bridge}
+  bs_06: {edge: e1212424785_1, start: 184, end: 199, name: 청계5가.광장시장,   name_en: Gwangjang Market}
+  bs_07: {edge: e732213463_1,  start: 113, end: 128, name: 청계4가.세운교,     name_en: Sewoongyo}
+  bs_08: {edge: e732213463_4,  start: 43,  end: 58,  name: 청계3가.관수교(서), name_en: Gwansugyo (W)}
+  bs_09: {edge: e1212424791_3, start: 38,  end: 53,  name: 청계2가.수표교,     name_en: Supyogyo}
+  bs_10: {edge: e908694578_1,  start: 43,  end: 58,  name: 청계2가.삼일교(서), name_en: Samilgyo (W)}
+  bs_11: {edge: e908694578_3,  start: 66,  end: 81,  name: 청계1가.장통교,     name_en: Jangtonggyo}
+
+lines:
+  # 청계A01 동행 편도 (현재 학습 노선) — 청계광장 → 광장시장 부근
+  A01_east:
+    route_id: r0              # SUMO route id. 학습 환경이 이 id로 노선을 찾는다
+    stops: [bs_01, bs_02, bs_03, bs_04, bs_05]
+    start_edge: e73541403_1   # 노선 시작 엣지 (생략하면 첫 정류장 엣지)
+    end_edge: e1212424783_4   # 노선 끝 엣지 (생략하면 마지막 정류장 엣지)
+
+  # 청계A01 왕복 — 청계광장 → 청계5가 회차 → 청계광장. 전 정류장 11곳 정차
+  A01_loop:
+    route_id: r0_loop
+    stops: [bs_01, bs_02, bs_03, bs_04, bs_05,
+            bs_06, bs_07, bs_08, bs_09, bs_10, bs_11]
+    start_edge: e73541403_1
+    end_edge: e183272596_1    # 청계광장 회차 구간

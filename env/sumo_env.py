@@ -19,6 +19,7 @@
 import os
 import sys
 import csv
+import json
 
 import numpy as np
 import gymnasium as gym
@@ -85,8 +86,8 @@ def _load_zone_rows(filename, columns):
     return rows
 
 
-# 편도(동행) route에서 ego가 서는 순서. 정차 시간은 reset에서 15초.
-# bs_06(광장시장)은 서행 엣지(e1212424785_1)에 있어 편도 동행 route(r0)에서는 제외한다.
+# 노선별 정차 순서는 시나리오 생성 시 cgc.line_meta.json으로 저장된다 (config/lines.yaml).
+# 아래는 메타 파일이 없는 구버전 시나리오용 fallback (청계A01 동행 5곳).
 BUS_STOPS_ORDER = ["bs_01", "bs_02", "bs_03", "bs_04", "bs_05"]
 
 # 어린이보호구역(세운상가, 3차로) 구간 — 버스 노선은 가운데 차로를 유지한다.
@@ -121,6 +122,18 @@ class SumoHighwayEnv(gym.Env):
         self.cfg_path = cfg_path
         self.gui = gui
         self.gui_autostart = gui_autostart
+        # 노선 메타 (route id → 정차할 정류장 순서). make_cgc_scenario가 만든다.
+        self._line_stops = {}
+        meta_path = os.path.join(os.path.dirname(os.path.abspath(cfg_path)),
+                                 "cgc.line_meta.json")
+        self._line_names = {}
+        if os.path.exists(meta_path):
+            with open(meta_path, encoding="utf-8") as f:
+                lines_meta = json.load(f)["lines"]
+            self._line_stops = {route_id: d.get("stops", [])
+                                for route_id, d in lines_meta.items()}
+            self._line_names = {route_id: d.get("line")
+                                for route_id, d in lines_meta.items()}
 
         # ----- 도로/차량 설정에서 필요한 값들 -----
         self.vmax = float(road["speed_limit"])   # 속도 정규화 기준
@@ -266,6 +279,7 @@ class SumoHighwayEnv(gym.Env):
         self.step_count = 0
         self._stop_stuck = 0
         self._missed_stops = 0
+        self._sumo_stop_ctrl = False   # True면 SUMO가 정류장 정차를 관리 중 (setSpeed 금지)
         self._started = False      # SUMO 프로세스가 떠 있는지 여부
 
         # Gymnasium 행동 공간:
@@ -777,10 +791,20 @@ class SumoHighwayEnv(gym.Env):
                                       if depart_lane.isdigit() else depart_lane),
                           departPos="0",
                           departSpeed=self.ego_depart_speed)
-        # 편도(동행) route면 정류장 5곳에 정차. 정차 시간 15초 (TODO: 노션 조사값 들어오면 교체)
-        if self.ego_route in ("r0", "r0_loop"):
-            for bs_id in BUS_STOPS_ORDER:
+        # 이 route의 노선 정류장에 순서대로 정차 (cgc.line_meta.json).
+        # 정차 시간 15초 (TODO: 노션 조사값 들어오면 교체)
+        line_stops = self._line_stops.get(self.ego_route)
+        if line_stops is None and self.ego_route in ("r0", "r0_loop"):
+            line_stops = BUS_STOPS_ORDER   # 구버전 시나리오(메타 없음) 호환
+        for bs_id in line_stops or []:
+            try:
                 traci.vehicle.setBusStop(self.ego_id, bs_id, duration=15)
+            except traci.TraCIException:
+                print("정류장 지정 실패 (add.xml에 없음):", bs_id)
+        # 노선 이름을 달아 줘야 그 노선 승객(personFlow의 ride lines=...)이 탄다
+        line_name = self._line_names.get(self.ego_route)
+        if line_name:
+            traci.vehicle.setLine(self.ego_id, line_name)
 
         # ★ 중요: speedMode=0 → SUMO의 내장 안전장치(자동 안전제동 등)를 전부 끔.
         #   이걸 꺼야 RL이 속도를 온전히 제어하고, 잘못 배우면 실제로 충돌한다.
@@ -823,6 +847,7 @@ class SumoHighwayEnv(gym.Env):
                 pass
 
         self._stop_stuck = 0
+        self._sumo_stop_ctrl = False
         if self.shield_eval_off:
             self._shield_on = False
         else:
@@ -1251,6 +1276,7 @@ class SumoHighwayEnv(gym.Env):
         - 다른 차로면 끼어들 틈을 만들도록 merge_speed 이하로 줄인다.
         반환: (가속 명령, RL 차로 명령을 막는지)
         """
+        self._sumo_stop_ctrl = False
         ns = self._next_stop()
         if ns is None:
             self._stop_stuck = 0
@@ -1270,9 +1296,19 @@ class SumoHighwayEnv(gym.Env):
             self._stop_stuck = 0
             return accel_raw, False
         if traci.vehicle.isAtBusStop(self.ego_id):
+            self._sumo_stop_ctrl = True   # SUMO가 정차(15초)를 관리 중 — setSpeed 금지
             return accel_raw, True
         cur_edge = traci.vehicle.getRoadID(self.ego_id)
         cur = traci.vehicle.getLaneIndex(self.ego_id)
+        # 정차 직전(정류장 엣지의 정류장 차로, 15 m 안)에는 SUMO에 속도 제어를 넘긴다.
+        #   RL이 setSpeed로 속도를 쥔 채로는 SUMO가 '정류장 정차'를 시작하지 못해
+        #   isAtBusStop이 영영 켜지지 않고, endPos 직전에서 영원히 서 있게 된다.
+        #   (감속 곡선이 이미 속도를 충분히 줄여 둔 상태라 SUMO가 편하게 세운다)
+        if cur_edge == edge and cur == idx and d <= 15.0:
+            traci.vehicle.setSpeed(self.ego_id, -1.0)
+            self._sumo_stop_ctrl = True
+            self._stop_stuck = 0
+            return accel_raw, True
         # 목표: 정류장 엣지에서는 정류장 차로, 그 전 엣지에서는 맨 오른쪽 승용차 차로
         # (청계천로 정류장은 모두 맨 오른쪽 승용차 차로에 있다)
         want = idx if cur_edge == edge else None
@@ -1669,8 +1705,11 @@ class SumoHighwayEnv(gym.Env):
             accel_cmd = (accel_raw * self.max_accel
                          if accel_raw >= 0.0 else accel_raw * self.max_decel)
             dv = accel_cmd * self.step_length
-            traci.vehicle.setSpeed(
-                self.ego_id, float(np.clip(v + dv, 0.0, self.vmax)))
+            # 정류장 정차를 SUMO가 관리 중이면 속도 명령을 보내지 않는다
+            # (보내면 SUMO의 정차 등록·15초 대기가 깨진다)
+            if not self._sumo_stop_ctrl:
+                traci.vehicle.setSpeed(
+                    self.ego_id, float(np.clip(v + dv, 0.0, self.vmax)))
 
             # 정류장 규칙이 차로를 잡고 있으면 RL 차로 명령(유지 포함)을 보내지 않는다
             #   (유지 명령도 changeLane(현재 차로)라서 정류장 차로 이동을 취소해 버린다)

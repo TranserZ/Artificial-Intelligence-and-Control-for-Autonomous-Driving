@@ -13,6 +13,24 @@
 """
 import numpy as np
 import traci
+import traci.constants as tc
+
+
+def walking_persons():
+    """지금 '걷는 중'인 사람만 돌려준다.
+
+    정류장에서 버스를 기다리는 승객(waiting)과 버스에 타고 있는 승객(driving)은
+    차도로 들어오지 않는데, 위치가 버스 범퍼 바로 옆/안이라 보행자 필터가
+    이들 때문에 영구 제동을 걸어 버린다 (버스가 정류장에서 못 떠남).
+    """
+    out = []
+    for pid in traci.person.getIDList():
+        try:
+            if traci.person.getStage(pid).type == tc.STAGE_WALKING:
+                out.append(pid)
+        except traci.TraCIException:
+            pass
+    return out
 
 HORIZON, DT_PRED = 3.0, 0.5
 HORIZON_ENTRY = 6.0   # 정지선 앞: 교차로를 빠져나갈 시간까지 본다
@@ -93,7 +111,7 @@ class PedSafetyFilter:
         before_line = stopline is not None
         times = np.arange(0.0, (HORIZON_ENTRY if before_line else HORIZON) + 1e-6, DT_PRED)
         ex, ey = traci.vehicle.getPosition(ego)
-        persons = traci.person.getIDList()
+        persons = walking_persons()   # 정류장 대기·탑승 승객은 제외 (차도로 안 들어옴)
         best, near_now = None, False
         for pid in persons:
             x, y = traci.person.getPosition(pid)

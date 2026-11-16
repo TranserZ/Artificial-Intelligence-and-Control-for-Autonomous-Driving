@@ -290,6 +290,12 @@ TRAFFIC = {
 CHEONGGYECHEON = {
     "enabled": True,
     "route_length": 2146,   # 버스 경로 청계광장 → 광장시장 (m). prefill 범위·완주 판정 기준
+    # 실제 청계A01 셔틀(ROii, 오토노머스에이투지) 제원 사용 — 차체 4.9×2.1 m,
+    # 최고 40 km/h, 승객 정원 8명(시험운전자 제외, 서울시 2025-09 보도),
+    # 가속 1.0 / 감속 2.5 (비상 5.0). False면 예전 12 m 가상 버스.
+    # ⚠ True/False 전환 시 차체·물리가 달라져 학습 환경이 바뀐다.
+    #   관측 정규화(vmax=도로 제한속도 13.89)는 그대로라 이어 학습은 가능.
+    "roii": True,
 }
 
 if CHEONGGYECHEON["enabled"]:
@@ -297,7 +303,9 @@ if CHEONGGYECHEON["enabled"]:
             "length": CHEONGGYECHEON["route_length"],
             "num_lanes": 2}                 # 청계천 양쪽 일방통행, 각 편도 2차로
     EGO = {**EGO,
-           "routes": {"r0": 1.0},          # 편도(동행) route만 학습/평가
+           # 편도(동행) 노선만 학습/평가. 노선·정류장 정의는 config/lines.yaml
+           # (A01_east → r0, A01_loop → r0_loop). 왕복을 학습하려면 {"r0_loop": 1.0}.
+           "routes": {"r0": 1.0},
            "depart_lane": 0,               # 맨 오른쪽 차로에서 출발 (정류장 쪽)
            "route_depart_lane": {},
            # 자율주행 셔틀(버스) 물리 특성 — 일반 승용차보다 가감속이 완만하다.
@@ -307,3 +315,7 @@ if CHEONGGYECHEON["enabled"]:
            # (12 m)로 10 m/s 출발을 넣으면 "Departure speed too high"로 삽입이
            # 거부된다. 정류장에서 막 출발하는 상황이 더 현실적이기도 해서 낮춘다.
            "depart_speed": 2.0}
+    if CHEONGGYECHEON.get("roii"):
+        # ROii 실측·가정 제원 (cheonggye_A01 명세 §1): 가속·감속은 [가정],
+        # 최고속도 40 km/h는 [사실]. 차체·정원은 make_cgc_scenario --roii가 적용.
+        EGO = {**EGO, "roii": True, "accel": 1.0, "decel": 2.5, "max_speed": 11.11}
