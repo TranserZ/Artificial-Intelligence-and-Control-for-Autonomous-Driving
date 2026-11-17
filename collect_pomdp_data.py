@@ -3,9 +3,11 @@
 저장 단위는 POMDP transition 하나다:
     (o_t, a_t, r_t, o_{t+1}, terminated, truncated, s_t, s_{t+1})
 
-- o_t / o_{t+1}: agent가 실제로 보는 부분관측 (42차원, env/mdp_config.py OBSERVATION)
+- o_t / o_{t+1}: agent가 실제로 보는 부분관측 (env-v1 청계천로 67차원, env/mdp_config.py
+  OBSERVATION 주석. 블록 범위는 env.obs_blocks). 학습에 쓰는 입력은 이것뿐이다
 - a_t: [가감속 raw, 차선변경 raw] (action_raw = 정책 출력 원본,
-  action.accel_raw = 환경에 적용된 값. 보행자 필터가 덮어쓰면 event.filter_active가 True)
+  action.accel_raw = 환경에 적용된 값. shield 감시 모드라 정책 출력과 같고, 개입했을 스텝은
+  event.shield_vehicle / shield_signal / shield_ped / shield_lc_gate가 True)
 - lane_change: 실제 환경에 적용된 {-1, 0, +1}
 - s_t / s_{t+1}: SUMO 내부의 privileged simulator state.
   정책 입력에는 쓰지 않고 데이터 검증/representation/belief 학습용으로만 저장한다.
@@ -57,7 +59,7 @@ import numpy as np
 from env.road_config import ROAD, EGO, TRAFFIC
 from env.mdp_config import SIMULATION, OBSERVATION, ACTION
 from env import road_builder
-from env.sumo_env import SumoHighwayEnv
+from env.sumo_env import SumoHighwayEnv, SIGNAL_COLORS
 from train import HPARAMS, REWARD  # 학습과 같은 보상 조건 + PPO 네트워크 구조
 
 BASE = os.path.dirname(os.path.abspath(__file__))
@@ -180,7 +182,9 @@ def collect(args, sumocfg, episodes, worker_id, jsonl_path, npz_path, tag=""):
     env = SumoHighwayEnv(
         cfg_path=sumocfg,
         road=ROAD, ego=EGO,
-        mdp_sim=SIMULATION, mdp_obs=OBSERVATION,
+        # shield 감시 모드: 운전은 정책 혼자, 개입했을지만 event.shield_*에 기록
+        mdp_sim={**SIMULATION, "shield": {**SIMULATION["shield"], "mode": "shadow"}},
+        mdp_obs=OBSERVATION,
         action=ACTION, reward=REWARD,
         traffic=TRAFFIC,
         gui=args.gui,
@@ -249,6 +253,14 @@ def collect(args, sumocfg, episodes, worker_id, jsonl_path, npz_path, tag=""):
                             "ped_collision": bool(info["ped_collision"]),
                             "yield_violation": bool(info["yield_violation"]),
                             "filter_active": bool(info["filter_active"]),
+                            # shield 유형별 개입(감시 모드면 "개입했을지") — 수동개입률 계산용
+                            "shield_vehicle": bool(info["shield_vehicle"]),
+                            "shield_signal": bool(info["shield_signal"]),
+                            "shield_ped": bool(info["shield_ped"]),
+                            "shield_lc_gate": bool(info["shield_lc_gate"]),
+                            "lc_forbidden": bool(info["lc_forbidden"]),
+                            "stop_success": int(info["stop_success"]),
+                            "stop_missed": int(info["stop_missed"]),
                             "lane_before": info["lane_before"],
                             "lane_after": info["lane_after"],
                         },
@@ -260,9 +272,9 @@ def collect(args, sumocfg, episodes, worker_id, jsonl_path, npz_path, tag=""):
                                      else round(float(info["zone_dist"]), args.ndigits)),
                             "limit": info["zone_limit"],
                         },
-                        # 행동 결정 시점의 전방 신호 (없으면 None)
+                        # 행동 결정 시점의 전방 신호. 색은 숫자 one-hot (문자열 대신), 신호 없으면 전부 0
                         "signal": {
-                            "state": info["signal_state"],
+                            **{c: int(info["signal_color"] == c) for c in SIGNAL_COLORS},
                             "dist": (None if info["signal_dist"] is None
                                      else round(float(info["signal_dist"]), args.ndigits)),
                         },

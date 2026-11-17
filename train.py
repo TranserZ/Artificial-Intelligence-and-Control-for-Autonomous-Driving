@@ -39,8 +39,10 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 #  (무엇을 왜 바꿨는지 + 이전 결과의 어떤 문제를 고치려는지를 쉬운 말로)
 # ══════════════════════════════════════════════════════════════════
 TRAIN_PURPOSE = """
-학습 설정은 직전(11/13 보호구역 과속 감점 0.25)과 같다.
-train.py 백업 기능(train_file_backup/, 머리말 자동 작성)만 추가했다.
+env-v1 기본 설정 (experiment_protocol.md). 규칙·SUMO 안전모드를 모두 빼고 모델 혼자 운전한다.
+shield(차량·신호·보행자 필터·차선변경 게이트)는 학습 내내 끄고, 평가는 감시 모드로 수동개입률을 잰다.
+정류장은 모델이 직접 선다 (정차 성공 +5, 놓침 -5). 차선변경 금지 구간은 막지 않고 -1.
+best 모델 = 검증 판(900000~)에서 완주율 95% 이상 중 수동개입률이 가장 낮은 것.
 """
 
 # ══════════════════════════════════════════════════════════════════
@@ -50,6 +52,8 @@ TOTAL_TIMESTEPS = 1_000_000  # 총 학습 스텝 수 (신호등 200k → 500k, �
                              #   1.5M은 1M보다 신호위반이 늘어 다시 1M. 어린이 보호구역 1.5M run도
                              #   1M 시점 모델이 이미 같은 수준이라 효과 없음 → 1M)
 MIDPOINT_TIMESTEPS = 700_000  # 이 시점의 모델을 model_mid.pt로 따로 저장 (학습 길이 효과 비교용)
+# 이 스텝 수를 처음 넘을 때 그 시점 모델을 step{N}.pt로 저장 (best가 아님 — 같은 step끼리 모델 비교용)
+SAVE_STEPS = (300_000, 500_000, 1_000_000)
 
 # ══════════════════════════════════════════════════════════════════
 #  보상 튜닝 — env/mdp_config.py 의 기본값을 여기서 덮어쓴다.
@@ -100,16 +104,15 @@ REWARD_OVERRIDES = dict(
     zone_approach_penalty=0.05,    # 보호구역 입구에서 30 km/h가 되도록 감속 곡선 초과 1 m/s당 감점
     no_stop_zone_penalty=0.1,         # 정차금지지대에서 서 있으면 스텝당 감점
     school_zone_speeding_penalty=0.1, # 어린이보호구역 초과 1 m/s당 감점 (상한 0.5)
-    shield_penalty=0.1,               # 안전 필터(차량·신호)가 개입한 스텝 고정 감점 (청계천로에서만 켜짐)
-    shield_penalty_scale=1.0,         # + 개입 세기(명령과 필터 감속 차 / 최대 감속) × 이 값
-                                      #   0.05 고정만 줬을 때 모델이 필터에 기댐 (필터 끄면 충돌 94%)
+    shield_penalty=0.0,               # shield 개입 감점 — env-v1은 학습 중 shield off라 쓰지 않음
+    shield_penalty_scale=0.0,
+    stop_success_bonus=5.0,           # 정류장 정차 성공 (정류장 구간에서 10초 정지) +
+    missed_stop_penalty=5.0,          # 정류장 놓침 −
+    lc_forbidden_penalty=1.0,         # 차선변경 금지 구간(정지선 앞 30 m·교차로 직후 20 m·지그재그)에서 변경 −
 )
 REWARD = {**REWARD_DEFAULTS, **REWARD_OVERRIDES}
-# 학습 중에만: 안전 필터를 끄는 판을 점점 늘린다 (0 → 70%, 60만 스텝에 걸쳐).
-# 필터가 늘 켜져 있으면 충돌을 겪지 못해 필터 없이 운전하는 법을 못 배운다.
-if SIMULATION.get("veh_shield", {}).get("enabled"):
-    SIMULATION["veh_shield"] = {**SIMULATION["veh_shield"],
-                                "off_prob_max": 0.7, "off_ramp_steps": 600_000}
+# 학습 중 shield는 끈다 (env-v1: 규칙 없이 모델 혼자). 평가 때만 evaluator가 감시 모드로 바꾼다.
+SIMULATION["shield"] = {**SIMULATION["shield"], "mode": "off"}
 # 학습 중에만: 완주 못 한 판을 30% 확률로 다시 연다 (env/sumo_env.py _update_replay)
 SIMULATION["replay"] = {"prob": 0.3, "size": 200}
 
@@ -215,18 +218,13 @@ if __name__ == "__main__":
     parser.add_argument("--timesteps", type=int, default=None, help="TOTAL_TIMESTEPS 덮어쓰기")
     parser.add_argument("--run-name", default=None, help="results/ 아래 폴더 이름")
     parser.add_argument("--lr", type=float, default=None, help="학습률 덮어쓰기 (이어 학습 시 낮춰서)")
-    parser.add_argument("--shield-off-max", type=float, default=None,
-                        help="학습 중 안전 필터 끄는 판 최대 비율 (기본 0.7)")
-    parser.add_argument("--shield-off-ramp", type=int, default=None,
-                        help="그 비율까지 올리는 스텝 수 (기본 600000)")
     parser.add_argument("--replay-prob", type=float, default=None,
                         help="실패한 판 다시 열 확률 (기본 0.3, 0이면 끔)")
+    parser.add_argument("--save-steps", default=None,
+                        help="그 시점 모델을 따로 저장할 스텝 (쉼표, 기본 300000,500000,1000000)")
     args = parser.parse_args()
-    if "off_prob_max" in SIMULATION.get("veh_shield", {}):
-        if args.shield_off_max is not None:
-            SIMULATION["veh_shield"]["off_prob_max"] = args.shield_off_max
-        if args.shield_off_ramp is not None:
-            SIMULATION["veh_shield"]["off_ramp_steps"] = args.shield_off_ramp
+    if args.save_steps:
+        SAVE_STEPS = tuple(int(s) for s in args.save_steps.split(",") if s.strip())
     if args.replay_prob is not None:
         SIMULATION["replay"]["prob"] = args.replay_prob
     HPARAMS["seed"] = args.seed
@@ -281,9 +279,11 @@ if __name__ == "__main__":
         sd = torch.load(args.init, map_location=agent.device)
         w = sd["trunk.0.weight"]
         own = agent.policy.state_dict()["trunk.0.weight"]
-        if w.shape[1] < own.shape[1]:   # 예: 40차원 모델 → 42차원(보호구역 2개 추가)
-            pad = torch.zeros(w.shape[0], own.shape[1] - w.shape[1], dtype=w.dtype, device=w.device)
-            sd["trunk.0.weight"] = torch.cat([w, pad], dim=1)
+        if w.shape[1] != own.shape[1]:
+            # env-v1에서 관측 블록 순서와 의미가 바뀌어(44 → 67차원) 예전 모델은 이어 학습할 수 없다.
+            # 뒤에 0을 붙이는 방식은 "뒤에 블록만 추가된" 경우에만 맞다.
+            raise SystemExit(f"--init 모델 입력 {w.shape[1]}차원 ≠ 현재 관측 {own.shape[1]}차원. "
+                             "env-v1 이전 모델은 이어 학습할 수 없습니다 (관측 구성이 바뀜).")
         agent.policy.load_state_dict(sd)
         print(f"초기 가중치: {args.init} (입력 {w.shape[1]} → {own.shape[1]})")
     print(f"obs_dim={env.observation_space.shape[0]}, "
@@ -308,15 +308,24 @@ if __name__ == "__main__":
         print(f"    [checkpoint @{agent.num_timesteps}] {model_path}", flush=True)
 
     def on_eval(m):
-        # 평가 기준이 충돌률과 완주율이므로 (완주율 - 충돌률 - 양보위반율)이 높은 모델을
-        # 따로 저장한다. 동점이면 평균 보상으로 비교. 후반에 정책이
-        # 무너져도(지난 run: 300k 근처가 최선) 최선의 시점이 남는다.
-        score = (m.success_rate - m.collision_rate - m.yield_violation_rate, m.ep_return)
+        # best 기준 (experiment_protocol.md A10): 검증 판에서 감시 모드로
+        #   완주율(도착 + 정류장 놓침 0) 95% 이상인 것 중 수동개입률이 가장 낮은 것.
+        #   아직 95%가 없으면 완주율 높은 순, 같으면 수동개입률 낮은 순.
+        reached = m.completion_rate >= 0.95 - 1e-9
+        score = (reached, -m.intervention_rate if reached else m.completion_rate,
+                 -m.intervention_rate)
         if best["score"] is None or score > best["score"]:
             best["score"] = score
             agent.save(best_path)
-            print(f"    [best @{agent.num_timesteps}] 완주-충돌-양보위반={score[0]:+.2f} "
-                  f"보상={score[1]:.1f} → {best_path}", flush=True)
+            print(f"    [best @{agent.num_timesteps}] 완주율={m.completion_rate:.0%} "
+                  f"수동개입률={m.intervention_rate:.1%} → {best_path}", flush=True)
+
+    def save_step(step):
+        name = (f"step{step // 1_000_000}m.pt" if step % 1_000_000 == 0
+                else f"step{step // 1000}k.pt")
+        path = os.path.join(run_dir, name)
+        agent.save(path)
+        print(f"    [step {step} 체크포인트 @{agent.num_timesteps}] {path}", flush=True)
 
     try:
         agent.learn(env,
@@ -328,7 +337,9 @@ if __name__ == "__main__":
                     checkpoint_interval=CHECKPOINT_INTERVAL,
                     checkpoint_fn=checkpoint,
                     eval_fn=on_eval,
-                    eval_seed_base=EVAL_SEED_BASE)
+                    eval_seed_base=EVAL_SEED_BASE,
+                    save_steps=SAVE_STEPS,
+                    save_fn=save_step)
     finally:
         env.close()
         logger.close()

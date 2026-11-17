@@ -37,7 +37,7 @@ def collect(model_path, episodes, out_dir, no_filter=False):
     sumocfg = road_builder.build(ROAD, EGO, TRAFFIC, os.path.join(ROOT, "env", "sumo"))
     env = SumoHighwayEnv(
         cfg_path=sumocfg, road=ROAD, ego=EGO,
-        mdp_sim={**SIMULATION, "ped_filter": not no_filter}, mdp_obs=OBSERVATION,
+        mdp_sim={**SIMULATION, "shield": {**SIMULATION["shield"], "mode": "off" if no_filter else "on"}}, mdp_obs=OBSERVATION,
         action=ACTION, reward=REWARD, traffic=TRAFFIC, gui=False)
     agent = load_agent(model_path, env.observation_space.shape[0],
                        env.action_space.shape[0], "auto")

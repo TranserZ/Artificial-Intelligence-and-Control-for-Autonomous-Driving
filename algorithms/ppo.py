@@ -330,7 +330,8 @@ class PPO:
     def learn(self, env, total_timesteps: int, logger=None,
               log_interval: int = 1, eval_interval: int = 0,
               eval_episodes: int = 5, checkpoint_interval: int = 0,
-              checkpoint_fn=None, eval_fn=None, eval_seed_base=None):
+              checkpoint_fn=None, eval_fn=None, eval_seed_base=None,
+              save_steps=(), save_fn=None):
         """학습 실행.
 
         Args:
@@ -341,7 +342,10 @@ class PPO:
                 체크포인트까지의 모델이 남는다. (0이면 안 함)
             eval_fn: 평가마다 eval_fn(metrics)를 부른다 (best 모델 저장용).
             eval_seed_base: 주면 평가마다 같은 판(seed_base, seed_base+1, ...)으로 평가.
+            save_steps: 이 스텝 수들을 처음 넘는 업데이트 직후 save_fn(스텝)을 부른다
+                (예: 30만/50만/100만 step 체크포인트를 그 시점 모델 그대로 저장).
         """
+        pending_saves = sorted(int(s) for s in save_steps)
         obs, _ = env.reset()
         ep_stats = [0.0, 0]                    # [현재 에피소드 보상, 길이]
         recent_returns = deque(maxlen=20)
@@ -373,18 +377,17 @@ class PPO:
                 logger.log_train(self.num_timesteps, metrics,
                                  verbose=(n_updates % log_interval == 0))
 
+            # 3-1) step 체크포인트 (best가 아니라 그 시점 모델 그대로)
+            while pending_saves and self.num_timesteps >= pending_saves[0]:
+                if save_fn is not None:
+                    save_fn(pending_saves[0])
+                pending_saves.pop(0)
+
             # 4) 주기적 평가 (utils/evaluator.py 사용)
             if eval_interval > 0 and n_updates % eval_interval == 0:
-                # 평가(best 모델 선택)는 안전 필터(차량·신호 shield) 끄고: 필터 없이 잘 달리는 모델을 고른다
-                had = hasattr(env, "shield_eval_off")
-                if had:
-                    env.shield_eval_off = True
-                try:
-                    m = evaluate_policy(self, env, n_episodes=eval_episodes,
-                                        seed_base=eval_seed_base)
-                finally:
-                    if had:
-                        env.shield_eval_off = False
+                # 평가(best 모델 선택): 평가 전용 모드 + shield 감시 모드 (모델 혼자 운전, 개입했을지만 셈)
+                m = evaluate_policy(self, env, n_episodes=eval_episodes,
+                                    seed_base=eval_seed_base, shield_mode="shadow")
                 if logger is not None:
                     logger.log_eval(self.num_timesteps, m.as_dict(),
                                     m.summary(), eval_episodes)

@@ -40,6 +40,10 @@ class DrivingMetrics:
     zone_overspeed_rate: float = 0.0   # 어린이 보호구역에서 제한속도+3 km/h를 1초 넘게 넘긴 에피소드 비율
     zone_mean_speed: float = float("nan")  # 보호구역 안 평균 속도 (m/s)
     zone_p85_speed: float = float("nan")   # 보호구역 안 85퍼센타일 속도 (m/s)
+    # ---- env-v1 목표 지표 (experiment_protocol.md 3-1) ----
+    completion_rate: float = 0.0       # 완주율: 도착 + 놓친 정류장 0인 판 비율 (목표 ≥ 95%)
+    intervention_rate: float = 0.0     # 수동개입률: shield가 개입했을(감시)/개입한 스텝 / 전체 스텝
+    missed_stop_rate: float = 0.0      # 정류장을 하나라도 놓친 판 비율
 
     def as_dict(self) -> dict:
         return asdict(self)
@@ -53,7 +57,9 @@ class DrivingMetrics:
                 f"양보위반={self.yield_violation_rate:.0%}  "
                 f"구역과속={self.zone_overspeed_rate:.0%}  "
                 f"차로오류={self.wrong_lane_rate:.0%}  "
-                f"필터개입={self.filter_rate:.1%}  "
+                f"완주(정류장 포함)={self.completion_rate:.0%}  "
+                f"수동개입률={self.intervention_rate:.1%}  "
+                f"정류장놓침={self.missed_stop_rate:.0%}  "
                 f"평균속도={self.mean_speed:.1f}m/s  "
                 f"평균차간={self.mean_gap:.1f}m  "
                 f"최소차간={self.min_gap:.1f}m  "
@@ -62,7 +68,8 @@ class DrivingMetrics:
 
 
 def evaluate_policy(policy, env, n_episodes: int = 5,
-                    deterministic: bool = True, seed_base=None) -> DrivingMetrics:
+                    deterministic: bool = True, seed_base=None,
+                    shield_mode: str = "shadow") -> DrivingMetrics:
     """정책을 n_episodes 주행시키고 주행 지표 평균을 반환.
 
     Args:
@@ -73,13 +80,32 @@ def evaluate_policy(policy, env, n_episodes: int = 5,
         deterministic: True면 탐험 노이즈 없이 평균 행동만 사용
         seed_base: 주면 i번째 판을 reset(seed=seed_base+i)로 연다. 평가마다 같은 판이라
                    체크포인트끼리 운이 아니라 실력 차이로 비교된다 (best 모델 선택용)
+        shield_mode: 평가 동안 쓸 shield 모드. 기본 "shadow" = 모델 혼자 운전하고 개입했을지만 센다.
+                   평가가 끝나면 env의 원래 모드로 되돌린다.
+
+    평가 동안 env.eval_mode를 켠다: 실패 판 다시 열기 목록을 바꾸지 않는다 (평가 전용 모드).
 
     Note:
         모든 지표는 env.step()의 info(collided/arrived/speed/gap)에서 읽는다.
         관측(obs) 벡터의 구성과 무관하므로, 관측을 바꿔도 이 코드는 안 깨진다.
     """
+    had_mode = hasattr(env, "shield_mode")
+    old_mode, old_eval = getattr(env, "shield_mode", None), getattr(env, "eval_mode", False)
+    if had_mode:
+        env.shield_mode = shield_mode
+        env.eval_mode = True
+    try:
+        return _evaluate(policy, env, n_episodes, deterministic, seed_base)
+    finally:
+        if had_mode:
+            env.shield_mode = old_mode
+            env.eval_mode = old_eval
+
+
+def _evaluate(policy, env, n_episodes, deterministic, seed_base) -> DrivingMetrics:
     n_collide, n_arrive, n_timeout, n_red = 0, 0, 0, 0
     n_ped, n_yield, n_wrong, n_filter = 0, 0, 0, 0
+    n_complete, n_missed_ep, n_shield = 0, 0, 0
     route_runs = {"straight": [0, 0], "right": [0, 0]}   # [완주, 에피소드]
     speeds, gaps, returns, lengths, lane_changes = [], [], [], [], []
     zone_speeds, n_zone_over = [], 0
@@ -89,6 +115,7 @@ def evaluate_policy(policy, env, n_episodes: int = 5,
         obs, _ = env.reset(seed=None if seed_base is None else seed_base + i)
         done, ep_ret, ep_len = False, 0.0, 0
         ep_lc = 0
+        missed = 0
         ep_red = False
         ep_ped, ep_yield = False, False
         ended_by = None
@@ -111,6 +138,8 @@ def evaluate_policy(policy, env, n_episodes: int = 5,
             ep_ped = ep_ped or bool(info.get("ped_collision"))
             ep_yield = ep_yield or bool(info.get("yield_violation"))
             n_filter += int(bool(info.get("filter_active")))
+            n_shield += int(bool(info.get("shield_active")))
+            missed = int(info.get("missed_stops", 0) or 0)
             route = info.get("route", route)
             if info.get("in_school_zone") and info.get("speed") is not None:
                 zone_speeds.append(float(info["speed"]))
@@ -138,6 +167,8 @@ def evaluate_policy(policy, env, n_episodes: int = 5,
                 gaps.append(float(info["gap"]))
 
         n_red += int(ep_red)
+        n_complete += int(ended_by == "arrival" and missed == 0)
+        n_missed_ep += int(missed > 0)
         n_ped += int(ep_ped)
         n_yield += int(ep_yield)
         n_zone_over += int(ep_zone_over)
@@ -179,4 +210,7 @@ def evaluate_policy(policy, env, n_episodes: int = 5,
         zone_overspeed_rate=n_zone_over / n_episodes,
         zone_mean_speed=float(np.mean(zone_speeds)) if zone_speeds else float("nan"),
         zone_p85_speed=float(np.percentile(zone_speeds, 85)) if zone_speeds else float("nan"),
+        completion_rate=n_complete / n_episodes,
+        intervention_rate=n_shield / max(sum(lengths), 1),
+        missed_stop_rate=n_missed_ep / n_episodes,
     )

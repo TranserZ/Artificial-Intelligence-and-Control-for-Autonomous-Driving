@@ -769,7 +769,7 @@ def main():
              f"구간을 읽는데, 청계천로 add.xml의 폴리곤 {len(polys)}개는 모두 정류장 그림(id `bs*`)이고 "
              f"그 밖의 폴리곤은 {n_zone_poly}개다. "
              "그래서 청계천로에서는 관측이 항상 '보호구역 없음'(1, 1)이다 "
-             "(`data/merge_check.npz` 1622스텝에서 obs[40] < 1인 스텝 0개로 확인).")
+             "(`data/merge_check.npz` 1622스텝에서 보호구역 거리 관측(예전 obs[40], env-v1 `obs_index(\"school_zone\")`) < 1인 스텝 0개로 확인).")
     L.append("\n### 정차금지지대\n")
     L.append("| 엣지 | 엣지 내 구간 (m) | 현재 엣지 길이 (m) | SUMO 경로상 위치 (m) | 실제 노선 거리 | 비고 |")
     L.append("|---|---|---|---|---|---|")
