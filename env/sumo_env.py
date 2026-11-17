@@ -855,6 +855,45 @@ class SumoHighwayEnv(gym.Env):
             traci.trafficlight.setPhase(tl_id, idx)
             traci.trafficlight.setPhaseDuration(tl_id, durations[idx] - t)
 
+    def start_scene(self, seed):
+        """ego 없이 판 시작 장면까지만 만든다 — view_road.py --live(GUI 구경)용.
+
+        reset(seed=k)와 같은 순서·같은 난수로 SUMO 실행(옵션·SUMO 시드) → setup_scene()을
+        하므로, GUI에 보이는 시작 장면이 학습/평가 판 seed=k의 시작 장면과 같다.
+        """
+        self._scn_rng = np.random.default_rng(seed)
+        if self._started:
+            traci.close()
+            self._started = False
+        self._start_sumo()
+        self.setup_scene()
+
+    def setup_scene(self):
+        """판 시작 장면을 만든다: 신호 시작 위상, 불법주정차 다발지점, 배경차 프리필, 정착.
+
+        reset()과 start_scene()(GUI 구경)이 같이 쓴다. SUMO(TraCI)가 이미 떠 있어야 한다.
+        """
+        self._randomize_signal_phase()
+
+        # 불법주정차 다발지점: 프리필보다 먼저 세워 배경차가 그 자리를 피하게 한다
+        self._place_illegal_parking()
+        # 도로 전 구간에 배경차를 미리 배치 (첫 스텝부터 실제 교통류 상태)
+        if self.prefill_enabled:
+            self._prefill_traffic()
+        # 배치된 차들이 자리를 잡도록 몇 스텝만 정착시킨다.
+        for _ in range(self.warmup_steps):
+            traci.simulationStep()
+        # 끝내 못 들어간 다발지점 차량은 지운다 (삽입 대기열에 남으면 같은 엣지 삽입을 막는다)
+        for vid in traci.simulation.getPendingVehicles():
+            if vid.startswith("hs_"):
+                try:
+                    traci.vehicle.remove(vid)
+                except traci.TraCIException:
+                    pass
+        self._hotspot_placed = [
+            (hid, edge, sum(1 for v in traci.vehicle.getIDList() if v.startswith(f"hs_{hid}_")))
+            for hid, edge, _ in self._hotspot_placed]
+
     def reset(self, seed=None, options=None):
         self._ep_replayed = False
         if seed is None and not self.shield_eval_off:
@@ -877,26 +916,8 @@ class SumoHighwayEnv(gym.Env):
             traci.close()
             self._started = False
         self._start_sumo()
-        self._randomize_signal_phase()
-
-        # 불법주정차 다발지점: 프리필보다 먼저 세워 배경차가 그 자리를 피하게 한다
-        self._place_illegal_parking()
-        # 도로 전 구간에 배경차를 미리 배치 (첫 스텝부터 실제 교통류 상태)
-        if self.prefill_enabled:
-            self._prefill_traffic()
-        # 배치된 차들이 자리를 잡도록 몇 스텝만 정착시킨다.
-        for _ in range(self.warmup_steps):
-            traci.simulationStep()
-        # 끝내 못 들어간 다발지점 차량은 지운다 (삽입 대기열에 남으면 같은 엣지 삽입을 막는다)
-        for vid in traci.simulation.getPendingVehicles():
-            if vid.startswith("hs_"):
-                try:
-                    traci.vehicle.remove(vid)
-                except traci.TraCIException:
-                    pass
-        self._hotspot_placed = [
-            (hid, edge, sum(1 for v in traci.vehicle.getIDList() if v.startswith(f"hs_{hid}_")))
-            for hid, edge, _ in self._hotspot_placed]
+        # 신호 위상·불법주정차 다발지점·프리필·정착 (view_road.py --live도 같은 코드: start_scene)
+        self.setup_scene()
 
         # ego 경로 선택 (EGO["routes"] 확률, 네트워크에 있는 route만)
         known = set(traci.route.getIDList())

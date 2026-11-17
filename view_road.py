@@ -8,6 +8,9 @@ sumo-gui 화면으로 빠르게 확인하는 용도.
     python view_road.py             # sumo-gui로 도로를 띄운다 (정적 — 자동 재생 안 함)
     python view_road.py --netedit   # netedit(SUMO 도로 편집기)로 도로망 열기
     python view_road.py --nogui     # 화면 없이 설정 검증만 (GUI 없는 서버용)
+    python view_road.py --live [--seed 32]
+                                    # 학습 판 reset(seed)과 같은 시작 장면(불법주정차·배경차·
+                                    # 신호 위상)으로 바로 재생 + 정류장 대기 현황 창
 
 기본 모드(sumo-gui) 동작:
     창이 뜨면 도로만 정적으로 보인다. 차를 움직이려면 상단의 ▶(플레이) 버튼을
@@ -32,7 +35,7 @@ import os
 import subprocess
 
 from env.road_config import ROAD, EGO, TRAFFIC
-from env.mdp_config import SIMULATION
+from env.mdp_config import SIMULATION, OBSERVATION, ACTION, REWARD
 from env import road_builder
 # sumo_env를 import하면 SUMO_HOME 자동 감지 로직이 함께 실행된다
 from env.sumo_env import SumoHighwayEnv  # noqa: F401  (자동 감지 목적의 import)
@@ -69,6 +72,9 @@ if __name__ == "__main__":
     parser.add_argument("--live", action="store_true",
                         help="(청계천) sumo-gui와 함께 '정류장 대기 현황' 표 창(브라우저 새 창)을 "
                              "띄운다. 정류장별 대기 인원·버스 탑승 인원이 1초마다 갱신된다")
+    parser.add_argument("--seed", type=int, default=None,
+                        help="--live 판 시작 장면(신호 위상·불법주정차·배경차) 시드. "
+                             "train/test의 reset(seed=k)와 같은 장면. 안 주면 무작위")
     parser.add_argument("--seconds", type=int, default=120,
                         help="--nogui 검증 시 시뮬레이션 길이(초). 기본 120초. "
                              "(GUI 모드는 시간 제한 없이 사용자가 직접 제어)")
@@ -132,9 +138,20 @@ if __name__ == "__main__":
         print("sumo-gui + 대기 현황 창 실행 중 ... sumo-gui 창을 닫거나 Ctrl+C로 종료")
         print(f"  · 대기 현황 창이 안 뜨면 브라우저에서 직접 여세요: {url}")
 
-        traci.start([checkBinary("sumo-gui"), "-c", sumocfg, "--start",
-                     "--step-length", str(SIMULATION["step_length"]),
-                     "--delay", str(SIMULATION["gui_delay"])])
+        # sumo-gui 실행 + 판 시작 장면 — 학습 env의 reset(seed)과 같은 코드(start_scene)로:
+        # SUMO 실행 옵션·SUMO 시드, 신호 시작 위상, 불법주정차 다발지점(지점마다 prob 확률),
+        # 배경차 프리필, 정착까지 같다. 다른 점은 ego 대신 SUMO가 모는 데모 버스뿐.
+        import numpy as np
+        seed = args.seed if args.seed is not None else int(np.random.randint(0, 2**31 - 1))
+        scene = SumoHighwayEnv(cfg_path=sumocfg, road=ROAD, ego=EGO, mdp_sim=SIMULATION,
+                               mdp_obs=OBSERVATION, action=ACTION, reward=REWARD,
+                               traffic=TRAFFIC, gui=True)
+        scene.start_scene(seed)
+        print(f"  · 판 시작 장면 seed={seed} (같은 장면 다시 보기: --live --seed {seed})")
+        for hid, edge, n in scene._hotspot_placed:
+            print(f"  · 불법주정차 다발지점 {hid} ({edge}) {n}대")
+        if not scene._hotspot_placed:
+            print("  · 불법주정차 다발지점: 이번 판은 생성 안 됨 (지점마다 확률 prob)")
         capacity = {}
 
         def bus_rows():
