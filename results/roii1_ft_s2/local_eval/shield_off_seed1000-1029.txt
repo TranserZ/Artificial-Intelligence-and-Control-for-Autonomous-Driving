@@ -1,0 +1,61 @@
+ Retrying in 1 seconds
+ep0 other 346s 10.7km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep1 collided 105s 8.0km/h shield=0% missed=0 hit=('bike_e.0', 'collision', 'e73541403_4_1', 'ego_hit', None)
+ Retrying in 1 seconds
+ep2 arrived 787s 9.6km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep3 arrived 832s 9.1km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep4 arrived 738s 10.2km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep5 arrived 676s 11.2km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep6 timeout 1200s 6.3km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep7 timeout 1200s 5.3km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep8 arrived 851s 8.9km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep9 arrived 819s 9.2km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep10 arrived 820s 9.2km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep11 arrived 788s 9.6km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep12 other 322s 11.5km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep13 other 342s 10.8km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep14 arrived 792s 9.5km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep15 arrived 740s 10.2km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep16 arrived 858s 8.8km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep17 arrived 786s 9.6km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep18 arrived 610s 12.4km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep19 arrived 822s 9.2km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep20 arrived 668s 11.3km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep21 other 125s 10.2km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep22 arrived 832s 9.1km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep23 arrived 1098s 6.9km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep24 other 366s 10.1km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep25 arrived 706s 10.7km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep26 arrived 624s 12.1km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep27 arrived 765s 9.9km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep28 timeout 1200s 5.3km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep29 other 337s 11.0km/h shield=0% missed=0 hit=None
+RESULT roii1_ft_s2 {"n": 30, "ends": {"other": 6, "collided": 1, "arrived": 20, "timeout": 3}, "events": {"red_violation": 6}, "arrive_rate": 0.6666666666666666, "collide_rate": 0.03333333333333333, "mean_time": 705.1833333333333, "mean_kmh": 9.533179558755496, "shield": 0.0, "missed_stops": 0.0}

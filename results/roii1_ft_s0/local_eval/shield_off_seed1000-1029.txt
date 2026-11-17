@@ -1,0 +1,61 @@
+ Retrying in 1 seconds
+ep0 collided 250s 10.1km/h shield=0% missed=0 hit=('bike_e.1', 'side', 'e1536659790_2_1', 'ego_was_hit', None)
+ Retrying in 1 seconds
+ep1 arrived 848s 8.9km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep2 collided 642s 9.8km/h shield=0% missed=0 hit=('bike_e.1', 'collision', 'e218924602_6_1', 'ego_hit', None)
+ Retrying in 1 seconds
+ep3 arrived 842s 9.0km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep4 arrived 748s 10.1km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep5 arrived 764s 9.9km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep6 arrived 686s 11.0km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep7 arrived 762s 9.9km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep8 arrived 836s 9.1km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep9 arrived 938s 8.1km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep10 arrived 826s 9.2km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep11 arrived 698s 10.8km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep12 arrived 782s 9.7km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep13 arrived 854s 8.8km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep14 collided 730s 8.7km/h shield=0% missed=0 hit=('side_e233651275_1b.6', 'collision', 'e218924602_6_1', 'ego_hit', None)
+ Retrying in 1 seconds
+ep15 collided 668s 9.5km/h shield=0% missed=0 hit=('through_e.8', 'collision', 'e218924602_6_1', 'ego_hit', None)
+ Retrying in 1 seconds
+ep16 arrived 862s 8.8km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep17 arrived 824s 9.2km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep18 arrived 625s 12.1km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep19 arrived 742s 10.2km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep20 arrived 682s 11.1km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep21 arrived 816s 9.3km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep22 arrived 802s 9.4km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep23 arrived 738s 10.2km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep24 other 364s 10.2km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep25 arrived 719s 10.5km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep26 other 276s 10.7km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep27 arrived 780s 9.7km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep28 arrived 721s 10.5km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep29 arrived 786s 9.6km/h shield=0% missed=0 hit=None
+RESULT roii1_ft_s0 {"n": 30, "ends": {"collided": 4, "arrived": 24, "other": 2}, "events": {"yield_violation": 1, "red_violation": 2}, "arrive_rate": 0.8, "collide_rate": 0.13333333333333333, "mean_time": 720.4333333333333, "mean_kmh": 9.79806344833379, "shield": 0.0, "missed_stops": 0.0}

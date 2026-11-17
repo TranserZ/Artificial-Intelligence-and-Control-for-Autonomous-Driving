@@ -1,0 +1,41 @@
+ Retrying in 1 seconds
+ep0 arrived 868s 8.7km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep1 arrived 1030s 7.3km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep2 arrived 768s 9.8km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep3 arrived 792s 9.5km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep4 arrived 740s 10.2km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep5 arrived 804s 9.4km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep6 arrived 719s 10.5km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep7 collided 1200s 5.3km/h shield=0% missed=0 hit=('through_e.7', 'collision', 'e218924602_6_1', 'ego_hit', None)
+ Retrying in 1 seconds
+ep8 arrived 794s 9.5km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep9 arrived 765s 9.9km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep10 arrived 854s 8.8km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep11 arrived 968s 7.8km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep12 arrived 661s 11.4km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep13 arrived 772s 9.8km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep14 arrived 842s 9.0km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep15 arrived 977s 7.7km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep16 arrived 1008s 7.5km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep17 arrived 742s 10.2km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep18 arrived 1054s 7.2km/h shield=0% missed=0 hit=None
+ Retrying in 1 seconds
+ep19 arrived 688s 11.0km/h shield=0% missed=0 hit=None
+RESULT cgc4_ft_s2 {"n": 20, "ends": {"arrived": 19, "collided": 1}, "events": {"yield_violation": 1}, "arrive_rate": 0.95, "collide_rate": 0.05, "mean_time": 852.25, "mean_kmh": 9.033552872380168, "shield": 0.0, "missed_stops": 0.0}
