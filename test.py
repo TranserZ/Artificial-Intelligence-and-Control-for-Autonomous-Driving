@@ -81,8 +81,9 @@ if __name__ == "__main__":
                         help="화면 없이 주행 지표만 측정 (빠름)")
     parser.add_argument("--algorithm", choices=["auto", "ppo", "bc"], default="auto",
                         help="기본은 모델 파일에서 PPO/BC 자동 판별")
-    parser.add_argument("--no-filter", action="store_true",
-                        help="보행자 안전 필터를 끄고 PPO만으로 평가")
+    parser.add_argument("--shield", choices=["shadow", "on", "off"], default="shadow",
+                        help="shield(수동개입) 모드: shadow=모델 혼자 운전하고 개입했을지만 셈(기본), "
+                             "on=위험한 명령을 덮어씀(참고용), off=계산 안 함")
     args = parser.parse_args()
     if args.episodes < 1:
         parser.error("--episodes는 1 이상이어야 합니다.")
@@ -101,7 +102,7 @@ if __name__ == "__main__":
     env = SumoHighwayEnv(
         cfg_path=sumocfg,
         road=ROAD, ego=EGO,
-        mdp_sim={**SIMULATION, "ped_filter": not args.no_filter}, mdp_obs=OBSERVATION,
+        mdp_sim=SIMULATION, mdp_obs=OBSERVATION,
         action=ACTION, reward=REWARD,
         traffic=TRAFFIC,
         gui=not args.nogui,
@@ -116,19 +117,22 @@ if __name__ == "__main__":
         agent = load_agent(model_path, env.observation_space.shape[0],
                            env.action_space.shape[0], args.algorithm)
         metrics = evaluate_policy(agent, env, n_episodes=args.episodes,
-                                  deterministic=True)
+                                  deterministic=True, shield_mode=args.shield)
     finally:
         env.close()
 
     print(f"\n─── 주행 지표 ({args.episodes} 에피소드 평균) ───")
     print(f"  충돌률       : {metrics.collision_rate:.0%}")
-    print(f"  완주율       : {metrics.success_rate:.0%}")
+    print(f"  완주율       : {metrics.completion_rate:.0%}  (도착 + 정류장 놓침 0)")
+    print(f"  도착률       : {metrics.success_rate:.0%}")
+    print(f"  수동개입률   : {metrics.intervention_rate:.1%}  (shield {args.shield})")
+    print(f"  정류장 놓침  : {metrics.missed_stop_rate:.0%}  (하나라도 놓친 판)")
     print(f"  시간초과율   : {metrics.timeout_rate:.0%}")
     print(f"  신호위반율   : {metrics.red_violation_rate:.0%}")
     print(f"  보행자충돌률 : {metrics.ped_collision_rate:.0%}  (충돌률에 포함)")
     print(f"  양보위반율   : {metrics.yield_violation_rate:.0%}")
     print(f"  차로오류율   : {metrics.wrong_lane_rate:.0%}")
-    print(f"  필터 개입    : {metrics.filter_rate:.1%} (전체 스텝 중)")
+    print(f"  보행자 필터  : {metrics.filter_rate:.1%} (전체 스텝 중)")
     print(f"  직진 완주율  : {metrics.straight_success_rate:.0%}")
     print(f"  우회전 완주율: {metrics.right_success_rate:.0%}")
     print(f"  보호구역 과속: {metrics.zone_overspeed_rate:.0%}  (+3 km/h를 1초 넘게)")

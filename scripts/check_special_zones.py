@@ -38,7 +38,8 @@ def state(env, obs):
     return dict(odo=traci.vehicle.getDistance(EGO_ID), edge=traci.vehicle.getRoadID(EGO_ID),
                 pos=traci.vehicle.getLanePosition(EGO_ID), lane=traci.vehicle.getLaneIndex(EGO_ID),
                 v=traci.vehicle.getSpeed(EGO_ID), o9=float(obs[9]) * 50.0,
-                o40=float(obs[40]), o41=float(obs[41]),
+                o40=float(obs[env.obs_index("school_zone")][0]),   # 보호구역 거리 (예전 obs[40])
+                o41=float(obs[env.obs_index("school_zone")][1]),   # 제한속도 (예전 obs[41])
                 lead=(ld[0] if ld else None), lead_gap=(float(ld[1]) if ld else None))
 
 
@@ -47,9 +48,8 @@ def drive(env, seed, controller, hotspot_prob=None, drop_stops=False, max_steps=
     if hotspot_prob is not None:
         env._hotspots = [(h, e, a, b, v, hotspot_prob) for h, e, a, b, v, _ in env._hotspots_orig]
     obs, _ = env.reset(seed=seed)
-    if drop_stops:   # 보호구역 속도 시험: 정류장 정차 없이 통과 (정류장 규칙이 속도를 잡지 않게)
-        while traci.vehicle.getStops(EGO_ID, 1):
-            traci.vehicle.replaceStop(EGO_ID, 0, "")
+    if drop_stops:   # 보호구역 속도 시험: 정류장 정차 없이 통과 (env-v1은 정류장 규칙이 없어 정류장 목록만 비운다)
+        env._stops = []
     recs, mem, acts = [], {}, []
     for t in range(max_steps):
         st = state(env, obs)
