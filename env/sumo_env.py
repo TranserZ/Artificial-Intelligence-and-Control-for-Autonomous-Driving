@@ -351,6 +351,44 @@ class SumoHighwayEnv(gym.Env):
         lo, hi = self.obs_blocks[name]
         return slice(lo, hi)
 
+    _LANE_TAGS = ("L2", "L1", "C", "R1", "R2")   # obs_offsets(+2,+1,0,-1,-2) 순서의 차로 이름
+
+    def obs_names(self) -> list:
+        """관측 벡터 각 칸의 컬럼 이름 (데이터셋 obs.* 컬럼, 길이 = obs_dim).
+
+        차로 이름: L2/L1 = 왼쪽 두/한 칸, C = 현재 차로, R1/R2 = 오른쪽 한/두 칸."""
+        names = []
+        for block in self.obs_blocks:
+            if block == "speed":
+                names.append("obs.speed")
+            elif block == "neighbors":
+                for tag in self._LANE_TAGS:
+                    names += [f"obs.{tag}.lead_gap", f"obs.{tag}.lead_dv",
+                              f"obs.{tag}.follow_gap", f"obs.{tag}.follow_dv"]
+            elif block in ("lane_end", "density"):
+                names += [f"obs.{tag}.{block}" for tag in self._LANE_TAGS]
+            elif block == "signal":
+                names += (["obs.signal.dist"] + [f"obs.signal.{c}" for c in SIGNAL_COLORS]
+                          + ["obs.signal.visible"])
+            elif block == "turn":
+                names += ["obs.turn.left", "obs.turn.straight", "obs.turn.right"]
+            elif block == "lane_arrows":
+                for tag in self._LANE_TAGS:
+                    names += [f"obs.{tag}.arrow_left", f"obs.{tag}.arrow_straight",
+                              f"obs.{tag}.arrow_right"]
+            elif block == "crossings":
+                for k in range(self.ped_num_crossings):
+                    names += [f"obs.crossing{k}.dist", f"obs.crossing{k}.ped_gap",
+                              f"obs.crossing{k}.ped_toward"]
+            elif block == "school_zone":
+                names += ["obs.school_zone.dist", "obs.school_zone.limit"]
+            elif block == "bus_stop":
+                names += ["obs.bus_stop.dist", "obs.bus_stop.lane_diff", "obs.bus_stop.dwell"]
+            elif block == "lc_zone":
+                names.append("obs.lc_zone")
+        assert len(names) == self.obs_dim
+        return names
+
     def _load_net_crossings(self):
         """net.xml에서 (횡단보도 → 가로지르는 엣지들, 일반 엣지 → (from, to) 노드)를 읽는다.
 
@@ -1477,6 +1515,7 @@ class SumoHighwayEnv(gym.Env):
         경로에 없는 정류장은 뺀다."""
         self._stops, self._stop_i, self._dwell_steps = [], 0, 0
         self._missed_stops, self._stops_done, self._stop_errors = 0, 0, []
+        self._stop_status = []     # 정류장별 0 남음 / 1 정차 성공 / -1 놓침 (데이터 컬럼용)
         self._onboard = []
         route = list(traci.vehicle.getRoute(self.ego_id))
         for bs in self._line_stop_ids:
@@ -1490,6 +1529,7 @@ class SumoHighwayEnv(gym.Env):
                     "ri": route.index(edge)})
             except (traci.TraCIException, ValueError):
                 print("정류장 정보 없음 또는 경로 밖:", bs)
+        self._stop_status = [0] * len(self._stops)
 
     def _current_stop(self):
         return self._stops[self._stop_i] if self._stop_i < len(self._stops) else None
@@ -1555,6 +1595,8 @@ class SumoHighwayEnv(gym.Env):
         ok, missed = 0, 0
         if arrived:
             missed = len(self._stops) - self._stop_i
+            for k in range(self._stop_i, len(self._stops)):
+                self._stop_status[k] = -1
             self._stop_i = len(self._stops)
         if not alive:
             self._missed_stops += missed
@@ -1571,6 +1613,7 @@ class SumoHighwayEnv(gym.Env):
             passed = ri > st["ri"] or (edge == st["edge"] and pos > st["end"] + self.stop_overshoot)
             if passed:
                 missed += 1
+                self._stop_status[self._stop_i] = -1
                 self._stop_i += 1
                 self._dwell_steps = 0
                 st = self._current_stop()
@@ -1581,6 +1624,7 @@ class SumoHighwayEnv(gym.Env):
                     ok += 1
                     self._stop_errors.append(float(st["end"] - pos))
                     self._exchange_passengers(st["id"], edge, pos)
+                    self._stop_status[self._stop_i] = 1
                     self._stop_i += 1
                     self._dwell_steps = 0
             else:
@@ -1985,6 +2029,75 @@ class SumoHighwayEnv(gym.Env):
             }
         except traci.TraCIException:
             return {"ego_alive": False}
+
+    def get_state_columns(self) -> dict:
+        """데이터셋 state.* 컬럼: 3인칭(시뮬레이터) 상태를 숫자 컬럼 하나씩으로 편 것.
+
+        도로 상황을 알 수 있을 정도로만 모은다 (모든 차 좌표 같은 재현용 목록은 state 딕셔너리에).
+        학습 입력이 아니다 — 학습에는 obs.* 컬럼만 쓴다 (docs/data_columns.md).
+        - 신호등은 경로가 지나는 순서대로 하나당 독립 컬럼: sig{k}.red/yellow/green/stop (0/1),
+          sig{k}.time_to_switch (s), sig{k}.dist (정지선까지 경로상 거리 m, 지났으면 -1)
+        - 정류장은 하나당: stop{k}.status (0 남음 / 1 정차 성공 / -1 놓침), stop{k}.dist (m, 지났으면 -1)
+        - 값이 없으면 -1 (예: 앞차 없음)
+        ego가 없으면(종료 뒤) 빈 dict.
+        """
+        e = self.ego_id
+        if e not in traci.vehicle.getIDList():
+            return {}
+        col = {}
+        try:
+            x, y = traci.vehicle.getPosition(e)
+            col.update({
+                "state.ego.x": float(x), "state.ego.y": float(y),
+                "state.ego.speed": float(traci.vehicle.getSpeed(e)),
+                "state.ego.accel": float(traci.vehicle.getAcceleration(e)),
+                "state.ego.angle": float(traci.vehicle.getAngle(e)),
+                "state.ego.lane": int(self._car_lane_index(e)),
+                "state.ego.lane_pos": float(traci.vehicle.getLanePosition(e)),
+                "state.ego.route_index": int(traci.vehicle.getRouteIndex(e)),
+                "state.ego.odometer": float(traci.vehicle.getDistance(e)),
+                "state.ego.in_junction": int(traci.vehicle.getRoadID(e).startswith(":")),
+            })
+            lead = traci.vehicle.getLeader(e, 100.0)
+            col["state.lead.gap"] = float(lead[1]) if lead and lead[0] else -1.0
+            col["state.lead.speed"] = (float(traci.vehicle.getSpeed(lead[0]))
+                                       if lead and lead[0] else -1.0)
+            near = 0
+            for vid in traci.vehicle.getIDList():
+                if vid == e:
+                    continue
+                vx, vy = traci.vehicle.getPosition(vid)
+                near += int((vx - x) ** 2 + (vy - y) ** 2 <= 50.0 ** 2)
+            col["state.traffic.n_vehicles"] = int(traci.vehicle.getIDCount()) - 1
+            col["state.traffic.n_near50"] = near
+            col["state.traffic.n_persons"] = int(traci.person.getIDCount())
+            now = traci.simulation.getTime()
+            for k, (tl_id, idx, e_in) in enumerate(getattr(self, "_route_signals", [])):
+                state = traci.trafficlight.getRedYellowGreenState(tl_id)[idx]
+                color = _COLOR_OF_STATE.get(state, "red")
+                for c in SIGNAL_COLORS:
+                    col[f"state.sig{k}.{c}"] = int(c == color)
+                col[f"state.sig{k}.time_to_switch"] = float(traci.trafficlight.getNextSwitch(tl_id) - now)
+                lo = self._car_lanes(e_in)[0]
+                d = traci.vehicle.getDrivingDistance(e, e_in, traci.lane.getLength(f"{e_in}_{lo}"), lo)
+                col[f"state.sig{k}.dist"] = float(d) if d > -1e5 else -1.0
+            for k, st in enumerate(self._stops):
+                col[f"state.stop{k}.status"] = int(self._stop_status[k])
+                d = -1.0
+                if self._stop_status[k] == 0:
+                    d = traci.vehicle.getDrivingDistance(e, st["edge"], st["end"], st["lane"])
+                    d = float(d) if d > -1e5 else -1.0
+                col[f"state.stop{k}.dist"] = d
+            zs = self._zone_state()
+            col["state.school_zone.inside"] = int(zs is not None and zs[0] <= 0.0)
+            col["state.school_zone.dist"] = -1.0 if zs is None else float(zs[0])
+            col["state.pax.onboard"] = len(self._onboard)
+            st = self._current_stop()
+            col["state.pax.waiting_next_stop"] = (len(traci.busstop.getPersonIDs(st["id"]))
+                                                  if st is not None else 0)
+        except traci.TraCIException:
+            pass
+        return col
 
     def _shield_check(self, accel_raw: float, v: float):
         """shield 네 종류(보행자 필터·차량·신호·차선변경 게이트 중 앞의 셋)를 모델 명령에 적용해 본다.

@@ -46,6 +46,7 @@
     xy_i = d["detected_xy"][off[i]:off[i + 1]]  # 스텝 i의 감지 차량 (N_i, 2)
 """
 import argparse
+import csv
 import gzip
 import json
 import multiprocessing
@@ -163,6 +164,41 @@ def iter_transitions(jsonl_path: str):
             yield prev
 
 
+def table_path_of(jsonl_path: str) -> str:
+    """JSONL 경로 → 같은 이름의 컬럼 표 경로 (*.table.csv.gz)."""
+    return jsonl_path[: -len(".jsonl.gz")] + ".table.csv.gz"
+
+
+EVENT_COLUMNS = ("collided", "arrived", "red_violation", "ped_collision", "yield_violation",
+                 "wrong_lane", "shield_vehicle", "shield_signal", "shield_ped", "shield_lc_gate",
+                 "shield_active", "lc_forbidden", "stop_success", "stop_missed",
+                 "lane_before", "lane_after")
+
+
+def table_row(env, ep, seed, t, obs, obs_names, action, info, reward, terminated, truncated,
+              state_cols, ndigits):
+    """컬럼 표 한 줄 (한 스텝). 학습 입력은 obs.* 뿐이고 나머지는 행동·결과·3인칭 상태다.
+
+    컬럼 설명: docs/data_columns.md"""
+    r = lambda v: round(float(v), ndigits)  # noqa: E731
+    row = {"episode": int(ep), "seed": int(seed), "t": int(t), "route": info["route"]}
+    row.update({n: r(v) for n, v in zip(obs_names, obs)})
+    a = np.asarray(action, dtype=float).reshape(-1)
+    row.update({
+        "action_raw.accel": r(a[0]), "action_raw.lane_change": r(a[1]),
+        "action.accel_raw": r(info["accel_raw"]),
+        "action.lane_change_raw": r(info["lane_change_raw"]),
+        "action.lane_change": int(info["lane_change"]),
+        "action.lane_change_applied": int(bool(info["lane_change_applied"])),
+        "reward": r(reward), "terminated": int(bool(terminated)), "truncated": int(bool(truncated)),
+    })
+    for k in EVENT_COLUMNS:
+        v = info.get(k)
+        row[f"event.{k}"] = -1 if v is None else int(v)
+    row.update({k: (r(v) if isinstance(v, float) else v) for k, v in state_cols.items()})
+    return row
+
+
 def collect(args, sumocfg, episodes, worker_id, jsonl_path, npz_path, tag=""):
     """SUMO 인스턴스 하나로 episodes(전역 에피소드 번호 목록)를 수집해 두 파일로 저장한다.
 
@@ -206,6 +242,10 @@ def collect(args, sumocfg, episodes, worker_id, jsonl_path, npz_path, tag=""):
     detected_xy_buf, detected_offsets = [], [0]
 
     total = 0
+    obs_names = env.obs_names()
+    table_f = gzip.open(table_path_of(jsonl_path), "wt", encoding="utf-8", newline="",
+                        compresslevel=6)
+    table_w = None
     try:
         # compresslevel 6: 9와 크기 차이는 거의 없고 훨씬 빠르다.
         # 더 줄이고 싶으면 gzip.open 대신 lzma.open(..., "wt") (.jsonl.xz) —
@@ -222,6 +262,7 @@ def collect(args, sumocfg, episodes, worker_id, jsonl_path, npz_path, tag=""):
                     # 이번 관측 시점에 시야(W) 안에 들어온 차량들의 좌표.
                     # 관측 벡터와 별도로 저장하는 부가 데이터 (분석/시각화용).
                     detected = env.get_detected_vehicles()
+                    state_cols = env.get_state_columns()   # 시점 t의 3인칭 상태 컬럼
                     action = act(obs)
                     next_obs, reward, terminated, truncated, info = env.step(action)
                     state_tp1 = env.get_privileged_state()
@@ -304,6 +345,13 @@ def collect(args, sumocfg, episodes, worker_id, jsonl_path, npz_path, tag=""):
                     detected_xy_buf.extend((d["x"], d["y"]) for d in detected)
                     detected_offsets.append(len(detected_xy_buf))
 
+                    row = table_row(env, ep, args.seed + ep, t, obs, obs_names, action, info,
+                                    reward, terminated, truncated, state_cols, args.ndigits)
+                    if table_w is None:
+                        table_w = csv.DictWriter(table_f, fieldnames=list(row))
+                        table_w.writeheader()
+                    table_w.writerow(row)
+
                     total += 1
                     ep_return += reward
                     t += 1
@@ -314,6 +362,7 @@ def collect(args, sumocfg, episodes, worker_id, jsonl_path, npz_path, tag=""):
                       f"steps={t:4d} return={ep_return:8.3f}", flush=True)
     finally:
         env.close()
+        table_f.close()
 
     np.savez_compressed(
         npz_path,
@@ -341,6 +390,20 @@ def collect(args, sumocfg, episodes, worker_id, jsonl_path, npz_path, tag=""):
 
 def merge_parts(parts, jsonl_path, npz_path):
     """워커별 부분 파일들을 하나로 합치고 부분 파일은 지운다."""
+    # 컬럼 표: 첫 부분의 머리줄만 남기고 이어 붙인다 (워커마다 컬럼 순서가 같음)
+    with gzip.open(table_path_of(jsonl_path), "wt", encoding="utf-8", newline="") as out:
+        header = None
+        for part_jsonl, _ in parts:
+            part = table_path_of(part_jsonl)
+            with gzip.open(part, "rt", encoding="utf-8", newline="") as f:
+                first = f.readline()
+                if header is None:
+                    header = first
+                    out.write(first)
+                elif first != header:
+                    raise ValueError(f"워커 표 컬럼이 다릅니다: {part}")
+                shutil.copyfileobj(f, out)
+            os.remove(part)
     # gzip은 멤버를 이어 붙인 파일도 유효하므로 바이트 그대로 연결한다.
     with open(jsonl_path, "wb") as out:
         for part_jsonl, _ in parts:
@@ -436,6 +499,8 @@ def main():
           f"workers={workers})")
     print(f"  JSONL(full POMDP + privileged state): {jsonl_path} ({mb(jsonl_path):.1f} MB)")
     print(f"  NPZ(training-friendly):               {npz_path} ({mb(npz_path):.1f} MB)")
+    tp = table_path_of(jsonl_path)
+    print(f"  컬럼 표(obs.*·action·event.*·state.*): {tp} ({mb(tp):.1f} MB) — docs/data_columns.md")
 
 
 if __name__ == "__main__":

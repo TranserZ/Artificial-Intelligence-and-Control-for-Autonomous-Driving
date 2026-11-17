@@ -98,6 +98,10 @@
   - 2만 step 모델 18판(튜닝 판 900100~, 시드별 6판)의 충돌 18건은 전부 같은 차로 추돌이었다 (자전거·합류 차량). **측면 충돌 0건**. 2만 step(약 15판)은 아직 감속을 못 배운 단계라 추돌은 예상대로다.
   - 감시 모드 평가(`test.py --shield shadow`)가 수동개입률(8.6%)과 정류장 놓침을 집계했다.
 
-## 8. 바뀐 파일
+## 8. 데이터 컬럼
+
+수집 데이터를 컬럼 하나씩으로 나눈 표(`*.table.csv.gz`, 161개 컬럼)와 각 컬럼의 뜻, 학습에 쓰는 컬럼(`obs.*` 67개)은 `docs/data_columns.md`에 있다.
+
+## 9. 바뀐 파일
 
 `env/sumo_env.py`, `env/mdp_config.py`, `train.py`, `algorithms/ppo.py`, `utils/evaluator.py`, `test.py` (`--no-filter` → `--shield shadow|on|off`), `collect_pomdp_data.py` (shadow 모드로 수집, shield 유형·정류장 이벤트·신호 숫자 컬럼 추가), `scripts/check_special_zones.py`, `scripts/validate_geometry.py`, `scripts/rule_based_expert.py`, `scripts/collect_trajectories.py`, `data/road_data/illegal_parking_hotspots.csv`
