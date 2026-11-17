@@ -963,6 +963,9 @@ class SumoHighwayEnv(gym.Env):
 
     def reset(self, seed=None, options=None):
         self._ep_replayed = False
+        # 시뮬레이션 시각 기준 캐시는 판이 바뀌면 시각이 0부터 다시 시작하므로 비운다
+        self._sig_cache = None
+        self.__dict__.pop("_ped_cache", None)
         if seed is None:
             # 학습 판. 실패한 판 다시 열기(replay) 목록도 학습 판 시드만 담는다
             if (not self.eval_mode and self._replay_seeds
@@ -1343,16 +1346,22 @@ class SumoHighwayEnv(gym.Env):
         남은 시간은 판정·보상·데이터용이고 관측에는 넣지 않는다.
         신호를 이미 지났거나 ego가 없으면 None.
         """
-        if self.ego_id not in traci.vehicle.getIDList():
-            return None
-        try:
-            upcoming = traci.vehicle.getNextTLS(self.ego_id)
-            if not upcoming:
-                return None
-            tl_id, link, dist, state = upcoming[0]
-            return tl_id, float(dist), state, self._tls_remaining(tl_id, link, state)
-        except traci.TraCIException:
-            return None
+        # 같은 시뮬레이션 시각엔 결과가 같으므로 한 번만 계산한다 (한 스텝에 여러 번 불림)
+        now = traci.simulation.getTime()
+        cached = getattr(self, "_sig_cache", None)
+        if cached is not None and cached[0] == now:
+            return cached[1]
+        out = None
+        if self.ego_id in traci.vehicle.getIDList():
+            try:
+                upcoming = traci.vehicle.getNextTLS(self.ego_id)
+                if upcoming:
+                    tl_id, link, dist, state = upcoming[0]
+                    out = (tl_id, float(dist), state, self._tls_remaining(tl_id, link, state))
+            except traci.TraCIException:
+                out = None
+        self._sig_cache = (now, out)
+        return out
 
     def _first_in_line(self, dist: float) -> bool:
         """ego와 정지선(dist m 앞) 사이 같은 진행 차로에 다른 차가 없는가 = 신호를 직접 보는 선두 차량."""
