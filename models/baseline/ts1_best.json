@@ -1,0 +1,9 @@
+{
+ "branch": "model/baseline-ppo",
+ "env": "env-v1",
+ "commit": "db722ef",
+ "step": 204800,
+ "train_seed": 1,
+ "kaggle": "kangdongyeonsoftware/cgc-baseline-v1",
+ "note": "best = 검증 판 기준 best (A10 기준, 완주 0%라 개입률 최저 = 서 있는 모델)"
+}

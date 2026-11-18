@@ -1,0 +1,9 @@
+{
+ "branch": "model/baseline-ppo",
+ "env": "env-v1",
+ "commit": "db722ef",
+ "step": 301056,
+ "train_seed": 0,
+ "kaggle": "kangdongyeonsoftware/cgc-baseline-v1",
+ "note": ""
+}

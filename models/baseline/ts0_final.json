@@ -1,0 +1,9 @@
+{
+ "branch": "model/baseline-ppo",
+ "env": "env-v1",
+ "commit": "db722ef",
+ "step": 471040,
+ "train_seed": 0,
+ "kaggle": "kangdongyeonsoftware/cgc-baseline-v1",
+ "note": "final = 마지막 체크포인트 (Kaggle 11.5시간 제한으로 중단)"
+}
