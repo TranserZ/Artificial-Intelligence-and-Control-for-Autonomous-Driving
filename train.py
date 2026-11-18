@@ -16,10 +16,14 @@
 import argparse
 import json
 import os
+import platform
 import shutil
 import subprocess
+import sys
+import tempfile
 import torch
 from datetime import datetime
+from importlib.metadata import PackageNotFoundError, version
 
 from env.road_config import ROAD, EGO, TRAFFIC
 from env.mdp_config import SIMULATION, OBSERVATION, ACTION
@@ -228,6 +232,27 @@ def _git_ok(*args):
         return False
 
 
+def runtime_versions():
+    packages = {}
+    for name in ("gymnasium", "matplotlib", "numpy", "tensorboard", "torch", "traci"):
+        try:
+            packages[name] = version(name)
+        except PackageNotFoundError:
+            packages[name] = None
+    try:
+        sumo = subprocess.check_output(
+            ["sumo", "--version"], text=True,
+            stderr=subprocess.STDOUT).splitlines()[0]
+    except (OSError, subprocess.CalledProcessError):
+        sumo = None
+    return {
+        "python": platform.python_version(),
+        "python_executable": sys.executable,
+        "sumo": sumo,
+        "packages": packages,
+    }
+
+
 def write_run_config(run_dir, *, seed, requested_steps, actual_steps,
                      status, tensorboard_enabled, resume_source=None):
     """재현에 필요한 환경·학습 설정을 config.json 하나에 기록한다."""
@@ -236,6 +261,7 @@ def write_run_config(run_dir, *, seed, requested_steps, actual_steps,
         "schema_version": 2,
         "updated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
         "status": status,
+        "runtime": runtime_versions(),
         "git": {
             "commit": _git("rev-parse", "HEAD"),
             "exact_tag": exact_tag,
@@ -329,9 +355,12 @@ if __name__ == "__main__":
     if args.run_name:
         RUN_NAME = args.run_name
 
-    # 1) 도로 생성 (env/road_config.py 기준으로 매번 재생성)
-    sumocfg = road_builder.build(ROAD, EGO, TRAFFIC,
-                                 os.path.join(BASE, "env", "sumo"))
+    # 1) 도로 생성. 프로세스별 임시 폴더를 써서 같은 clone에서 여러 학습을
+    # 동시에 실행해도 env/sumo 파일을 서로 덮어쓰지 않는다.
+    sumo_workspace = tempfile.TemporaryDirectory(
+        prefix=f"cheonggye_train_{os.getpid()}_")
+    sumocfg = road_builder.build(
+        ROAD, EGO, TRAFFIC, sumo_workspace.name)
     print(f"도로 생성 완료: {sumocfg}")
     print(f"  길이 {ROAD['length']}m, {ROAD['num_lanes']}차선, "
           f"교통량 {TRAFFIC['vehs_per_hour']}대/시간")
@@ -454,6 +483,7 @@ if __name__ == "__main__":
         completed = True
     finally:
         env.close()
+        sumo_workspace.cleanup()
         logger.close()
         agent.save(model_path)
         agent.save_training_state(os.path.join(run_dir, "model.resume.pt"))

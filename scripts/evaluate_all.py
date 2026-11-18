@@ -1,15 +1,15 @@
-"""여러 정책(민기 PPO, 규칙 기반 전문가, 추후 HRL 하위 정책)을 같은 편도
-환경에서 N 에피소드씩 평가하고 비교 표(Markdown)를 만든다.
+"""env-v2 공통 평가 진입점.
 
-계획서(cheonggye_A01_SUMO_spec v2) §6의 보행자 상호작용 지표도 함께 잰다:
-  보행자 근접 통과(<3 m에서 >1 m/s), 에피소드별 보행자 최소거리, 급제동/km,
-  jerk RMS, 양보·신호 위반, 정류장 정차율(건너뛴 정류장), 완주 시간.
-지표는 평가에서만 계산하므로 학습 환경·보상에는 영향이 없다.
-
-사용법:
-    py -3.13 scripts/evaluate_all.py --episodes 100
-    py -3.13 scripts/evaluate_all.py --episodes 20 --models minki_ppo rule_based
+사용법은 `py -3.13 scripts/evaluate_all.py --help` 또는
+`experiment_protocol.md` 2-6을 따른다. 실제 구현은 common_eval.py에 있다.
+아래의 구버전 함수들은 이전 결과를 읽는 코드와의 import 호환용으로 남긴다.
 """
+if __name__ == "__main__":
+    # env-v2 공통 진입점. 먼저 실행해 --help/병합은 SUMO 의존성 없이도 쓸 수 있다.
+    from common_eval import main
+    main()
+    raise SystemExit
+
 import argparse
 import math
 import os
@@ -260,40 +260,3 @@ def to_markdown(results: dict) -> str:
         cp = r["checkpoint_pass_rate"]
         lines.append(f"| {name} | " + " | ".join(f"{cp[c]:.0%}" for c in ALL_CODES) + " |")
     return "\n".join(lines) + "\n"
-
-
-if __name__ == "__main__":
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--episodes", type=int, default=100)
-    ap.add_argument("--models", nargs="*", default=list(MODEL_REGISTRY.keys()),
-                    help="MODEL_REGISTRY 키 중 평가할 것만 지정 (기본: 전부)")
-    ap.add_argument("--out", default=None)
-    a = ap.parse_args()
-
-    env = build_env()
-    results = {}
-    try:
-        for name in a.models:
-            kind, path = MODEL_REGISTRY[name]
-            print(f"=== {name} ({kind}) {a.episodes} 에피소드 평가 중 ===")
-            policy = make_policy(kind, path, env)
-            results[name] = run_episodes(policy, env, a.episodes)
-            print(f"  완주율={results[name]['success_rate']:.0%} "
-                 f"충돌률={results[name]['collision_rate']:.0%}")
-    finally:
-        env.close()
-
-    out = a.out or os.path.join(
-        ROOT, "data_huiyoung", "eval_logs",
-        f"comparison_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md")
-    os.makedirs(os.path.dirname(out), exist_ok=True)
-    md = to_markdown(results)
-    with open(out, "w", encoding="utf-8") as f:
-        f.write(md)
-    print(f"\n저장: {out}")
-    try:
-        print(md)
-    except UnicodeEncodeError:
-        # Windows 콘솔(cp949)이 일부 기호(em dash 등)를 못 그려도 파일 저장은
-        # 이미 끝났으므로 스크립트를 실패시키지 않는다.
-        print(md.encode("utf-8", "replace").decode("ascii", "replace"))

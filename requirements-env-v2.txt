@@ -1,0 +1,8 @@
+# env-v2 검증 환경 (Windows, Python 3.13.15, SUMO 1.27.1)
+# 설치: py -3.13 -m pip install -r requirements-env-v2.txt
+gymnasium==1.4.0
+matplotlib==3.11.2
+numpy==2.5.4
+tensorboard==2.21.0
+torch==2.15.0
+traci==1.28.0

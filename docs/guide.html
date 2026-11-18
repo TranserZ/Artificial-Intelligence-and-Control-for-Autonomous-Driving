@@ -1,0 +1,726 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>청계천로 모델 실험 실전 가이드</title>
+  <style>
+    :root {
+      --bg: #f5f7f6;
+      --paper: #ffffff;
+      --ink: #18201d;
+      --muted: #61706a;
+      --line: #dbe3df;
+      --green: #176b52;
+      --green-2: #e7f4ee;
+      --blue: #1d5f8a;
+      --blue-2: #eaf3f9;
+      --amber: #8a5a00;
+      --amber-2: #fff4d9;
+      --red: #a13a32;
+      --red-2: #fff0ed;
+      --code: #111916;
+      --code-ink: #dff5ea;
+      --shadow: 0 10px 30px rgba(28, 48, 40, .08);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--bg);
+      font-family: "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
+      line-height: 1.65;
+    }
+    a { color: var(--blue); text-underline-offset: 3px; }
+    code, pre { font-family: Consolas, "SFMono-Regular", monospace; }
+    .layout { display: grid; grid-template-columns: 290px minmax(0, 1fr); min-height: 100vh; }
+    aside {
+      position: sticky; top: 0; height: 100vh; overflow: auto;
+      padding: 24px 20px; color: #edf8f3;
+      background: linear-gradient(180deg, #123e31, #0f2c24);
+    }
+    aside h1 { margin: 0 0 6px; font-size: 19px; line-height: 1.35; }
+    aside .version { color: #b7d7ca; font-size: 12px; margin-bottom: 20px; }
+    aside nav a {
+      display: block; padding: 7px 9px; border-radius: 7px;
+      color: #dcece5; text-decoration: none; font-size: 13px;
+    }
+    aside nav a:hover { background: rgba(255,255,255,.1); color: white; }
+    aside nav .sub { padding-left: 22px; color: #bcd6cb; }
+    main { width: min(1180px, 100%); padding: 44px 42px 100px; }
+    .hero {
+      padding: 32px; border-radius: 18px; color: white;
+      background: linear-gradient(125deg, #145b46, #1f8064);
+      box-shadow: var(--shadow);
+    }
+    .hero h1 { margin: 0 0 8px; font-size: clamp(27px, 4vw, 43px); line-height: 1.2; }
+    .hero p { margin: 8px 0; color: #e7f7f1; }
+    .badge {
+      display: inline-block; margin: 4px 6px 0 0; padding: 4px 9px;
+      border: 1px solid rgba(255,255,255,.35); border-radius: 999px; font-size: 12px;
+    }
+    section {
+      margin-top: 30px; padding: 28px; border: 1px solid var(--line);
+      border-radius: 15px; background: var(--paper); box-shadow: var(--shadow);
+      scroll-margin-top: 18px;
+    }
+    section h2 { margin: 0 0 18px; padding-bottom: 10px; border-bottom: 2px solid var(--green-2); }
+    h3 { margin-top: 28px; color: #24483c; }
+    h4 { margin: 22px 0 8px; }
+    .lead { color: var(--muted); font-size: 17px; }
+    .flow {
+      display: grid; grid-template-columns: repeat(5, minmax(130px, 1fr));
+      gap: 12px; margin: 22px 0;
+    }
+    .flow .node {
+      position: relative; min-height: 112px; padding: 15px;
+      border: 1px solid #bcd8cd; border-radius: 12px; background: var(--green-2);
+    }
+    .flow .node:not(:last-child)::after {
+      content: "→"; position: absolute; right: -17px; top: 37px;
+      z-index: 2; color: var(--green); font-size: 23px; font-weight: 700;
+    }
+    .flow strong { display: block; color: var(--green); }
+    .flow small { color: var(--muted); }
+    .callout {
+      margin: 16px 0; padding: 14px 16px; border-left: 4px solid var(--blue);
+      border-radius: 8px; background: var(--blue-2);
+    }
+    .callout.warn { border-color: #d08a00; background: var(--amber-2); }
+    .callout.danger { border-color: var(--red); background: var(--red-2); }
+    .callout.ok { border-color: var(--green); background: var(--green-2); }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .card { padding: 16px; border: 1px solid var(--line); border-radius: 11px; background: #fbfcfb; }
+    .card h4 { margin-top: 0; }
+    .table-wrap { overflow-x: auto; margin: 14px 0; }
+    table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+    th, td { padding: 9px 10px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { background: #edf4f1; color: #24483c; }
+    tr:nth-child(even) td { background: #fafcfb; }
+    pre {
+      position: relative; overflow: auto; padding: 18px; border-radius: 10px;
+      color: var(--code-ink); background: var(--code); line-height: 1.5; font-size: 13px;
+      white-space: pre;
+    }
+    .copy {
+      float: right; margin: -2px 0 5px 8px; padding: 5px 9px; border: 0;
+      border-radius: 7px; color: #dff5ea; background: #315447; cursor: pointer;
+    }
+    .copy:hover { background: #487565; }
+    .src {
+      display: inline-block; padding: 1px 6px; border-radius: 5px;
+      color: #335449; background: #edf3f0; font-family: Consolas, monospace; font-size: 12px;
+    }
+    .term { color: var(--green); font-weight: 700; }
+    .status { padding: 2px 7px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .status.yes { color: #145b46; background: var(--green-2); }
+    .status.no { color: var(--red); background: var(--red-2); }
+    .status.wait { color: var(--amber); background: var(--amber-2); }
+    ul.tight li, ol.tight li { margin: 4px 0; }
+    .index-range { white-space: nowrap; font-family: Consolas, monospace; }
+    footer { margin-top: 28px; color: var(--muted); font-size: 12px; text-align: center; }
+    @media (max-width: 980px) {
+      .layout { display: block; }
+      aside { position: relative; height: auto; }
+      aside nav { columns: 2; }
+      main { padding: 24px 16px 70px; }
+      .flow { grid-template-columns: 1fr; }
+      .flow .node:not(:last-child)::after { content: "↓"; right: 50%; top: auto; bottom: -22px; }
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+    @media print {
+      aside { display: none; }
+      .layout { display: block; }
+      main { max-width: none; padding: 0; }
+      section { box-shadow: none; break-inside: avoid; }
+      .copy { display: none; }
+    }
+  </style>
+</head>
+<body>
+<div class="layout">
+  <aside>
+    <h1>청계천로 모델 실험<br>실전 가이드</h1>
+    <div class="version">기준 커밋 066dba7 · 2026-11-18 코드 대조</div>
+    <nav>
+      <a href="#overview">1. 한눈에 보기</a>
+      <a href="#git">2. Git·저장소 구조</a>
+      <a href="#environment">3. 환경 이해</a>
+      <a class="sub" href="#road">도로·차량·교통</a>
+      <a class="sub" href="#step">한 step의 흐름</a>
+      <a class="sub" href="#observation">67칸 관측</a>
+      <a class="sub" href="#action-reward">행동·보상·종료</a>
+      <a class="sub" href="#shield">shield</a>
+      <a href="#run">4. 모델 돌리기</a>
+      <a class="sub" href="#baseline">현재 베이스라인</a>
+      <a href="#control">5. 내가 제어할 것</a>
+      <a href="#results">6. 결과 읽기</a>
+      <a href="#publish">7. 결과 올리기</a>
+      <a href="#rules">8. 하면 안 되는 것</a>
+      <a href="#gaps">9. 미정·코드 차이</a>
+      <a href="#sources">근거 파일</a>
+    </nav>
+  </aside>
+
+  <main>
+    <header class="hero">
+      <h1>같은 환경에서, 한 축만 바꾸고, 같은 방식으로 비교하기</h1>
+      <p>팀원 네 명이 저장소를 처음 열어도 환경 → 학습 → 평가 → 보고서까지 따라갈 수 있도록 코드와 설정을 기준으로 정리한 문서입니다.</p>
+      <span class="badge">기준 커밋 066dba7</span>
+      <span class="badge">청계A01 동행 r0</span>
+      <span class="badge">PPO baseline</span>
+      <span class="badge">관측 67차원</span>
+      <span class="badge">목표: 완주 ≥95% · 개입 ≤16%</span>
+    </header>
+
+    <div class="callout warn">
+      <strong>먼저 알아둘 현재 상태</strong><br>
+      실행 중인 세 베이스라인의 <code>config.json</code>에는 커밋이 <code>066dba7…</code>로 기록됐지만
+      <code>exact_tag=null</code>, <code>target_is_ancestor=false</code>입니다. 즉 <strong>코드 기준점은 잡혔지만
+      공식 <code>env-v2</code> 태그는 아직 확인되지 않은 상태</strong>입니다.
+      근거: <span class="src">models/baseline_ppo/checkpoints/ts0/config.json:2-10</span>
+    </div>
+
+    <section id="overview">
+      <h2>1. 한눈에 보기</h2>
+      <p class="lead"><span class="term">환경</span>은 모두 같게 고정하고, 각 사람은 자기 모델의 한 축만 바꿉니다. 학습 결과와 평가 결과는 서로 다른 브랜치가 소유합니다.</p>
+      <div class="flow" aria-label="전체 실험 흐름">
+        <div class="node"><strong>① 환경</strong><small>도로·교통·관측·행동·보상<br>기준: 066dba7 / 예정 태그 env-v2</small></div>
+        <div class="node"><strong>② 학습</strong><small>학습 시드 0·1·2<br>shield off, 최소 50만 step</small></div>
+        <div class="node"><strong>③ 체크포인트</strong><small>30만 · 50만 · final<br>가중치와 resume 상태 분리</small></div>
+        <div class="node"><strong>④ 평가</strong><small>판 시드 1000~1099<br>deterministic + shield shadow</small></div>
+        <div class="node"><strong>⑤ 보고서</strong><small>CSV·요약·그래프<br>reports 브랜치 → main/docs</small></div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <h4>모델 브랜치가 갖는 것</h4>
+          <p><code>model/{이름}-{모델}</code>에 모델 코드, 설정, 체크포인트, TensorBoard, 학습 CSV와 학습 곡선을 둡니다.</p>
+        </div>
+        <div class="card">
+          <h4>보고서 브랜치가 갖는 것</h4>
+          <p><code>reports/{이름}-{모델}</code>에서 평가 CSV·메타·요약·그래프·보고서만 <code>main/docs/reports/</code>로 보냅니다.</p>
+        </div>
+      </div>
+      <p>팀 원칙과 목표의 근거: <span class="src">experiment_protocol.md:1-6</span>,
+        <span class="src">experiment_protocol.md:125-147</span>,
+        <span class="src">experiment_protocol.md:331-359</span></p>
+    </section>
+
+    <section id="git">
+      <h2>2. Git 구조와 폴더별 역할</h2>
+      <h3>브랜치·태그 구조</h3>
+      <pre><button class="copy">복사</button>main
+├─ (예정) env-v2 태그          공통 환경 + 평가 도구의 고정점
+├─ env/v2-prep                 환경 준비
+├─ tools/eval                  공통 평가 도구 준비
+├─ model/{이름}-{모델}         개인 모델·학습 산출물
+├─ reports/{이름}-{모델}       평가 결과·보고서만 main으로 PR
+└─ env/fix-{내용}              공통 환경 버그 수정 후 새 태그</pre>
+      <p>프로토콜 구조: <span class="src">experiment_protocol.md:174-185</span>. 현재 실행 설정에는 아직 정확한 태그가 기록되지 않았습니다.</p>
+
+      <h3>폴더 지도</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>경로</th><th>역할</th><th>개인 모델에서 수정?</th><th>메모</th></tr></thead>
+          <tbody>
+            <tr><td><code>env/</code></td><td>SUMO 환경, 관측·행동·보상, 도로 생성</td><td><span class="status no">금지</span></td><td>공통 비교 환경. 버그는 <code>env/fix-*</code>에서 팀 합의 후 수정.</td></tr>
+            <tr><td><code>algorithms/</code></td><td>PPO와 학습 알고리즘</td><td><span class="status no">공용 파일 금지</span></td><td>알고리즘 축이면 모델 폴더 안에 복사·별도 구현.</td></tr>
+            <tr><td><code>utils/</code></td><td>네트워크, 버퍼, 평가, 로깅</td><td><span class="status no">공용 파일 금지</span></td><td>모델 전용 네트워크는 모델 폴더에 둠.</td></tr>
+            <tr><td><code>scripts/</code></td><td>공통 평가·수집·검증 도구</td><td><span class="status no">금지</span></td><td><code>evaluate_all.py</code>는 공통 진입점.</td></tr>
+            <tr><td><code>models/{이름}/</code></td><td>개인 학습 스크립트, 설정, 체크포인트, 로그</td><td><span class="status yes">수정 위치</span></td><td>팀원끼리 경로가 겹치지 않게 이름을 고유하게 사용.</td></tr>
+            <tr><td><code>docs/reports/</code></td><td>평가 결과와 최종 보고서</td><td><span class="status yes">결과만</span></td><td>모델 브랜치가 아니라 reports 브랜치에서 커밋.</td></tr>
+            <tr><td><code>results/</code></td><td>기존·로컬 실행 결과</td><td><span class="status wait">새 공식 위치 아님</span></td><td>기본 <code>train.py</code>는 <code>--out-dir</code>이 없으면 여기 사용.</td></tr>
+            <tr><td><code>config/</code></td><td>노선·정류장 정의</td><td><span class="status no">금지</span></td><td><code>lines.yaml</code>에 A01 동행 5개 정류장과 왕복 11개가 있음.</td></tr>
+            <tr><td><code>data/</code></td><td>OSM, 특수구역 CSV, 수집 데이터</td><td><span class="status no">원칙상 금지</span></td><td>데이터·모방학습 축은 출처와 범위를 보고서에 명시.</td></tr>
+            <tr><td><code>tools/</code></td><td>OSM→SUMO 변환, 시나리오 생성, 표시</td><td><span class="status no">금지</span></td><td>도로 생성 파이프라인.</td></tr>
+            <tr><td><code>train.py</code></td><td>공통 PPO 학습 템플릿</td><td><span class="status no">직접 수정 금지</span></td><td>개인 모델 폴더에 복사한 파일에서 실험.</td></tr>
+            <tr><td><code>test.py</code></td><td>체크포인트 GUI/비GUI 재생</td><td><span class="status no">금지</span></td><td>기본 PPO·BC 로더 지원.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>코드 자체도 역할을 명시합니다:
+        <span class="src">train.py:1-12</span>,
+        <span class="src">env/road_builder.py:1-15</span>,
+        <span class="src">utils/networks.py:1-10</span>.</p>
+    </section>
+
+    <section id="environment">
+      <h2>3. 환경 하나가 어떻게 되어 있는가</h2>
+
+      <h3 id="road">도로망·ROii·정류장·교통</h3>
+      <div class="table-wrap">
+        <table>
+          <tbody>
+            <tr><th>도로</th><td>OSM을 SUMO 네트워크로 변환한 청계광장→광장시장 동행 <code>r0</code>, 기준 길이 2,146 m. 보도·횡단보도는 netconvert가 생성합니다. <span class="src">env/road_config.py:290-306</span> <span class="src">env/road_builder.py:58-88</span></td></tr>
+            <tr><th>ROii 셔틀</th><td>길이 4.9 m, 폭 2.095 m, 질량 2,890 kg, 승객 8명, 최고 11.11 m/s(40 km/h), 가속 1.0 m/s², 감속 2.5 m/s². 차체·정원·최고속도는 사실, 가감속과 비상감속 일부는 코드 주석상 가정입니다. <span class="src">env/road_config.py:290-320</span> <span class="src">tools/make_cgc_scenario.py:638-653</span></td></tr>
+            <tr><th>정류장</th><td>현재 학습 노선은 bs_01~bs_05 다섯 곳. 모델이 정류장 차로·구간에서 0.1 m/s 이하로 10초 연속 정지해야 성공합니다. <span class="src">config/lines.yaml:23-43</span> <span class="src">env/sumo_env.py:1512-1637</span></td></tr>
+            <tr><th>일반 차량</th><td>Krauss 35%, IDM 30%, EIDM 20%, ACC 15% 혼합. 청계천 시나리오 생성 코드의 배경차 최대속도는 8.3 m/s이며, 측면 합류 차량·세종대로 60초 주기 합류도 있습니다. <span class="src">tools/make_cgc_scenario.py:630-669</span> <span class="src">tools/make_cgc_scenario.py:702-718</span></td></tr>
+            <tr><th>이륜차·자전거</th><td>본선 오토바이 flow와 동·서행 자전거 20초 주기 flow가 있습니다. <span class="src">tools/make_cgc_scenario.py:670-724</span></td></tr>
+            <tr><th>보행자·승객</th><td>보행자는 기본 시간당 400명, 24개 경로쌍. 승객은 정류장별 평균 100초에 한 명(<code>0.01/s</code>) 도착하고 약 두 정거장 뒤 하차합니다. <span class="src">tools/make_cgc_scenario.py:790-830</span> <span class="src">config/lines.yaml:16-18</span></td></tr>
+            <tr><th>주정차</th><td>차로를 점유하는 다발지점 4곳은 판마다 각각 확률 0.7. 한빛공원은 승용차 1대, 나머지는 이륜차와 화물차 조합입니다. 차로 밖 노상주차는 4구역·32대이며 주행을 막지 않습니다. <span class="src">data/road_data/illegal_parking_hotspots.csv:1-5</span> <span class="src">tools/make_cgc_scenario.py:840-867</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout">
+        <strong>주의:</strong> <code>ROAD["num_lanes"]=2</code>는 대표값입니다. 실제 OSM 경로는 구간별 차로 수가 달라질 수 있으며 관측은 현재 차로 기준 좌2~우2의 존재 여부를 매 step 계산합니다.
+      </div>
+
+      <h3 id="step">한 step에서 일어나는 일</h3>
+      <ol class="tight">
+        <li><strong>관측:</strong> 현재 속도, 주변 차량, 차로 모양, 신호, 회전·화살표, 횡단보도, 보호구역, 정류장, 차선변경 금지구역을 67개 값으로 만듭니다.</li>
+        <li><strong>행동:</strong> 정책이 가감속과 차선 명령을 냅니다. 학습에서는 확률적으로 샘플링하고, 평가는 평균 가감속 + 차선 argmax를 사용합니다.</li>
+        <li><strong>shield 판정:</strong> mode가 <code>shadow/on</code>이면 차량·신호·보행자·옆 차로 위험을 계산합니다. <code>shadow</code>는 기록만 합니다.</li>
+        <li><strong>SUMO 진행:</strong> 속도·차선 명령을 적용하고 <code>simulationStep()</code>으로 0.5초 진행합니다.</li>
+        <li><strong>사건 판정:</strong> 충돌, 도착, 적색 통과, 정류장 성공/놓침, 양보 위반, 잘못된 차로를 판정합니다.</li>
+        <li><strong>보상·종료:</strong> 해당 보상과 감점을 합산하고 종료 또는 시간초과 여부를 반환합니다.</li>
+      </ol>
+      <p>구현 순서 근거: <span class="src">env/sumo_env.py:2122-2172</span>,
+        <span class="src">env/sumo_env.py:2174-2245</span>,
+        <span class="src">env/sumo_env.py:2391-2487</span>.</p>
+
+      <h3 id="observation">관측 67칸: 인덱스·이름·범위</h3>
+      <p><span class="term">관측(observation)</span>은 모델이 한 순간에 받는 숫자 벡터입니다. 전체 범위는 −1~1이며 블록 순서는 코드가 직접 구성합니다.
+        <span class="src">env/sumo_env.py:313-347</span> <span class="src">env/sumo_env.py:1743-1802</span></p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>인덱스</th><th>컬럼 이름</th><th>의미·값 범위</th></tr></thead>
+          <tbody>
+            <tr><td class="index-range">0</td><td><code>obs.speed</code></td><td>내 속도 / 기준속도. 0~1.</td></tr>
+            <tr><td class="index-range">1–20</td><td><code>obs.{L2,L1,C,R1,R2}.{lead_gap,lead_dv,follow_gap,follow_dv}</code></td><td>차로마다 4개. 앞 거리 0~1, 앞 상대속도 −1~1, 뒤 거리는 −1~0, 뒤 상대속도 −1~1. 차량이 없으면 앞 <code>(1,1)</code>, 뒤 <code>(−1,−1)</code>.</td></tr>
+            <tr><td class="index-range">21–25</td><td><code>obs.{차로}.lane_end</code></td><td>−1=차로 없음, 1=시야 안에서 이어짐, 0~1=차로 끝까지 거리/50m.</td></tr>
+            <tr><td class="index-range">26–30</td><td><code>obs.{차로}.density</code></td><td>전방 50m 차량 밀도. 0=비어 있음, 1=가득 참 또는 차로 없음.</td></tr>
+            <tr><td class="index-range">31–36</td><td><code>obs.signal.dist/red/yellow/green/stop/visible</code></td><td>거리/150m + 색 one-hot + 가시 여부. 선두 차량이 아니면 <code>[1,0,0,0,0,0]</code>.</td></tr>
+            <tr><td class="index-range">37–39</td><td><code>obs.turn.left/straight/right</code></td><td>다음 교차로 회전 one-hot.</td></tr>
+            <tr><td class="index-range">40–54</td><td><code>obs.{차로}.arrow_left/straight/right</code></td><td>5개 차로의 노면 진행 방향. 각 값 0/1.</td></tr>
+            <tr><td class="index-range">55–60</td><td><code>obs.crossing{0,1}.dist/ped_gap/ped_toward</code></td><td>다음 횡단보도 두 곳의 거리, 보행자 거리, 접근 여부. 정규화 후 −1~1.</td></tr>
+            <tr><td class="index-range">61–62</td><td><code>obs.school_zone.dist/limit</code></td><td>보호구역까지 거리/100m, 제한속도/기준속도. 구역 안 거리는 0.</td></tr>
+            <tr><td class="index-range">63–65</td><td><code>obs.bus_stop.dist/lane_diff/dwell</code></td><td>정류장 거리/150m, 필요한 차로 이동/2, 정지 진행도/10초.</td></tr>
+            <tr><td class="index-range">66</td><td><code>obs.lc_zone</code></td><td>차선변경 금지 구간이면 1, 아니면 0.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>정확한 이름 생성: <span class="src">env/sumo_env.py:357-391</span>.
+        값 계산: <span class="src">env/sumo_env.py:1161-1309</span>,
+        <span class="src">env/sumo_env.py:1406-1482</span>,
+        <span class="src">env/sumo_env.py:1565-1587</span>.
+        사람이 읽는 컬럼 정의: <span class="src">docs/data_columns.md:24-46</span>.</p>
+
+      <h3 id="action-reward">행동 공간·보상·종료 조건</h3>
+      <div class="grid-2">
+        <div class="card">
+          <h4>행동 2차원</h4>
+          <ul class="tight">
+            <li><code>action[0]</code>: −1 최대감속 ~ +1 최대가속.</li>
+            <li><code>action[1]</code>: −1 오른쪽, 0 유지, +1 왼쪽.</li>
+            <li>기본 정책은 가감속 Normal + 차선 3-way Categorical인 hybrid PPO입니다.</li>
+          </ul>
+          <p><span class="src">env/mdp_config.py:121-169</span> <span class="src">utils/networks.py:171-265</span></p>
+        </div>
+        <div class="card">
+          <h4>즉시 종료</h4>
+          <ul class="tight">
+            <li>충돌: −20</li>
+            <li>적색 위반: −20</li>
+            <li>잘못된 차로 끝에 갇힘: −20</li>
+            <li>도착: +20</li>
+            <li>2400 step 도달: 시간초과 −10</li>
+          </ul>
+          <p><span class="src">train.py:70-117</span> <span class="src">env/sumo_env.py:2230-2245</span></p>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>유효 보상 항목</th><th>가중치</th><th>적용 방식</th></tr></thead>
+          <tbody>
+            <tr><td>속도</td><td>+0.1</td><td>매 step <code>0.1 × 속도/vmax</code></td></tr>
+            <tr><td>진행</td><td>+10</td><td>전체 경로 완주까지 누적 합이 약 +10</td></tr>
+            <tr><td>앞차 6m 미만</td><td>−0.1</td><td>해당 step</td></tr>
+            <tr><td>차선변경 실행</td><td>−0.02</td><td>실행 1회</td></tr>
+            <tr><td>횡단보도 양보 위반</td><td>−20</td><td>종료하지 않고 위반 시 감점</td></tr>
+            <tr><td>회전 과속</td><td>−0.5</td><td>교차로 내부 제한속도 초과 step</td></tr>
+            <tr><td>이유 없는 저속·정지</td><td>−0.05 ~ −0.15</td><td>빈 거리 비례 추가 감점</td></tr>
+            <tr><td>신호 접근 과속</td><td>−0.02/m·s⁻¹</td><td>step당 최대 −0.2</td></tr>
+            <tr><td>보호구역 과속</td><td>−0.25/m·s⁻¹</td><td>허용 오차 0.3m/s, step당 최대 −0.5</td></tr>
+            <tr><td>보호구역 접근 과속</td><td>−0.05/m·s⁻¹</td><td>step당 최대 −0.2</td></tr>
+            <tr><td>정차금지 구역 정지</td><td>−0.1</td><td>0.5m/s 미만인 step</td></tr>
+            <tr><td>정류장 성공 / 놓침</td><td>+5 / −5</td><td>성공·놓침마다</td></tr>
+            <tr><td>차선변경 금지구간 위반</td><td>−1</td><td>실제로 변경한 1회</td></tr>
+            <tr><td>blocked·invalid·shield</td><td>0</td><td>현재 baseline에서는 비활성</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><strong>중요:</strong> 기본값은 <code>env/mdp_config.py</code>에 있지만 실제 baseline은
+        <code>train.py</code>의 <code>REWARD_OVERRIDES</code>가 덮어씁니다.
+        따라서 결과를 해석할 때는 반드시 실행 폴더의 <code>config.json.environment.reward</code>를 봅니다.
+        근거: <span class="src">train.py:63-120</span>,
+        <span class="src">models/baseline_ppo/checkpoints/ts0/config.json:132-173</span>.</p>
+
+      <h3 id="shield">shield: 학습 off, 테스트 shadow</h3>
+      <p><span class="term">shield</span>는 모델의 위험 명령을 안전 규칙이 대신 고치는 장치입니다. 과제 비교에서는 규칙이 운전을 돕지 않도록 <code>shadow</code>로 “개입했을지”만 기록합니다.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>mode</th><th>행동</th><th>사용처</th></tr></thead>
+          <tbody>
+            <tr><td><code>off</code></td><td>위험 판정도 하지 않음</td><td>학습</td></tr>
+            <tr><td><code>shadow</code></td><td>모델 명령은 그대로, 차량·신호·보행자·차선 게이트 활성 여부만 기록</td><td>공식 평가</td></tr>
+            <tr><td><code>on</code></td><td>위험 가감속·차선변경 명령을 실제로 덮어씀</td><td>참고 평가만</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>네 유형은 앞차 정지거리, 적·황색 정지거리, 보행자 필터, 목표 차선 간격입니다.
+        <span class="src">env/mdp_config.py:48-61</span>
+        <span class="src">env/sumo_env.py:241-257</span>
+        <span class="src">env/sumo_env.py:1701-1741</span>
+        <span class="src">env/sumo_env.py:1865-1929</span>
+        <span class="src">env/sumo_env.py:2104-2167</span></p>
+    </section>
+
+    <section id="run">
+      <h2>4. 모델 돌리는 법</h2>
+      <div class="callout danger">
+        아래 명령은 팀원이 나중에 실행할 재현 절차입니다. 이 가이드 작성 중에는 학습·평가·Git 명령을 실행하지 않았습니다.
+        공식 시작은 <code>env-v2</code> 태그 공지 후입니다. 태그 전에는 팀 기준 커밋 <code>066dba7</code>을 임시 기준으로만 사용하세요.
+      </div>
+
+      <h3>환경 설치와 내 브랜치</h3>
+      <pre><button class="copy">복사</button># Windows
+py -3.13 --version
+sumo --version
+py -3.13 -m pip install -r requirements-env-v2.txt
+
+# env-v2 태그가 공개된 뒤
+git fetch origin --tags
+git switch -c model/내이름-모델명 env-v2
+git describe --tags --exact-match</pre>
+      <p>고정 패키지 목록: <span class="src">requirements-env-v2.txt:1-8</span>. 현재 이 파일은 작업 트리에는 있지만 기준 커밋 포함 여부가 확정되지 않았으므로 PR 전 확인이 필요합니다.</p>
+
+      <h3>내 모델 폴더 준비</h3>
+      <pre><button class="copy">복사</button>models/내이름/
+├─ train_ppo.py
+├─ config.yaml
+├─ README.md
+└─ checkpoints/
+   ├─ ts0/
+   ├─ ts1/
+   └─ ts2/</pre>
+      <p>현재 저장소에는 이 구조를 자동 생성하는 명령이 없습니다. 공용 <code>train.py</code>를 모델 폴더에 복사하고 모델 전용 import·경로를 확인하는 작업이 필요합니다. 프로토콜 근거: <span class="src">experiment_protocol.md:220-234</span>.</p>
+
+      <h3>스모크 → 본 학습 → resume</h3>
+      <pre><button class="copy">복사</button># 먼저 2만 step
+py -3.13 models/내이름/train_ppo.py ^
+  --seed 0 --total-steps 20000 ^
+  --save-steps 10000,20000 ^
+  --out-dir models/내이름/checkpoints/smoke
+
+# 본 학습: 시드마다 별도 out-dir
+py -3.13 models/내이름/train_ppo.py ^
+  --seed 0 --total-steps 500000 ^
+  --save-steps 300000,500000 ^
+  --out-dir models/내이름/checkpoints/ts0
+
+# 50만에서 100만으로 이어 학습: 추가량이 아니라 최종 누적 목표
+py -3.13 models/내이름/train_ppo.py ^
+  --seed 0 --resume models/내이름/checkpoints/ts0/final.resume.pt ^
+  --total-steps 1000000 ^
+  --save-steps 1000000 ^
+  --out-dir models/내이름/checkpoints/ts0</pre>
+      <p><code>--resume</code>은 정책·optimizer·누적 step·난수 상태를 복원합니다.
+        <code>--init</code>은 가중치만 읽으므로 공식 이어 학습에 쓰지 않습니다.
+        <span class="src">train.py:323-343</span>
+        <span class="src">train.py:400-418</span>
+        <span class="src">algorithms/ppo.py:460-499</span></p>
+
+      <h3>재생·시뮬레이션 보기</h3>
+      <pre><button class="copy">복사</button># GUI: SUMO 창에서 ▶ 버튼을 눌러 시작
+py -3.13 test.py models/내이름/checkpoints/ts0/final.pt --episodes 3 --shield shadow
+
+# 화면 없이 빠른 확인
+py -3.13 test.py models/내이름/checkpoints/ts0/final.pt --episodes 10 --nogui --shield shadow</pre>
+      <p><span class="src">test.py:73-121</span></p>
+
+      <h3>공통 평가와 병합</h3>
+      <pre><button class="copy">복사</button># 한 조각
+py -3.13 scripts/evaluate_all.py ^
+  --ckpt models/내이름/checkpoints/ts0/step500k.pt ^
+  --model-name 내이름_ppo --train-seed 0 --ckpt-step 500k ^
+  --seeds 1000-1024 --shield shadow ^
+  --out docs/reports/내이름_ppo/
+
+# 학습 시드 0·1·2와 모든 조각이 끝난 뒤
+py -3.13 scripts/evaluate_all.py ^
+  --merge-glob "docs/reports/내이름_ppo/ts*_step500k_shadow_*.csv" ^
+  --expected-seeds 1000-1099 ^
+  --out docs/reports/내이름_ppo/</pre>
+      <p>평가기 CLI와 태그 차단: <span class="src">scripts/common_eval.py:336-440</span>,
+        <span class="src">scripts/common_eval.py:840-906</span>.
+        단, 이 공통 평가 구현은 기준 커밋 066dba7에 포함됐는지 아직 확정되지 않았습니다.</p>
+
+      <h3>Kaggle</h3>
+      <pre><button class="copy">복사</button>git clone &lt;저장소 주소&gt; repo
+cd repo
+git checkout &lt;내 모델 브랜치의 정확한 커밋 해시&gt;
+
+# 팀의 기존 Kaggle SUMO 설치 셀 실행 후
+python models/내이름/train_ppo.py \
+  --seed 0 --total-steps 500000 \
+  --save-steps 300000,500000 \
+  --out-dir models/내이름/checkpoints/ts0</pre>
+      <p>Kaggle 표준 노트북·설치 스크립트는 저장소 코드에서 확인되지 않았습니다. 세션 종료 전에 체크포인트, resume, <code>tb/</code>, CSV, config를 모두 내려받아야 합니다. <span class="src">experiment_protocol.md:260-270</span></p>
+
+      <h3 id="baseline">현재 베이스라인은 실제로 이렇게 실행 중</h3>
+      <p>세 시드는 <strong>서로 다른 worktree</strong>에서 실행되고, 결과만 본 저장소의 공통 <code>models/baseline_ppo/checkpoints/</code>로 저장됩니다. CPU 과다 경쟁을 줄이기 위해 OMP/MKL thread를 각각 2로 제한했습니다.</p>
+      <pre><button class="copy">복사</button># worktree 0: C:\Users\USER\Desktop\cheonggye-wt-ts0
+$env:OMP_NUM_THREADS='2'; $env:MKL_NUM_THREADS='2'
+py -3.13 train.py --seed 0 --total-steps 500000 --save-steps 300000,500000 --replay-prob 0 --out-dir "C:\Users\USER\Desktop\청계로드\models\baseline_ppo\checkpoints\ts0"
+
+# worktree 1: C:\Users\USER\Desktop\cheonggye-wt-ts1
+py -3.13 train.py --seed 1 --total-steps 500000 --save-steps 300000,500000 --replay-prob 0 --out-dir "C:\Users\USER\Desktop\청계로드\models\baseline_ppo\checkpoints\ts1"
+
+# worktree 2: C:\Users\USER\Desktop\cheonggye-wt-ts2
+py -3.13 train.py --seed 2 --total-steps 500000 --save-steps 300000,500000 --replay-prob 0 --out-dir "C:\Users\USER\Desktop\청계로드\models\baseline_ppo\checkpoints\ts2"</pre>
+      <p>세 설정 파일 모두 요청량 500,000, replay 0, 커밋 066dba7을 기록합니다.
+        <span class="src">models/baseline_ppo/checkpoints/ts0/config.json:2-19</span>,
+        <span class="src">models/baseline_ppo/checkpoints/ts0/config.json:61-79</span>.
+        시작 당시 스냅샷은 각 worktree의 <code>env/sumo</code>를 사용합니다:
+        <span class="src">models/baseline_ppo/checkpoints/ts0/train.py:331-335</span>.</p>
+    </section>
+
+    <section id="control">
+      <h2>5. 내가 제어할 수 있는 것</h2>
+      <h3><code>train.py</code> 명령행 옵션 전체</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>옵션</th><th>기본값</th><th>의미</th></tr></thead>
+          <tbody>
+            <tr><td><code>--seed</code></td><td>0</td><td>학습 난수 시드. 공식 비교는 0·1·2.</td></tr>
+            <tr><td><code>--init PATH</code></td><td>없음</td><td>정책 가중치만 초기화. optimizer·step은 새로 시작. <code>--resume</code>과 동시 사용 불가.</td></tr>
+            <tr><td><code>--resume PATH</code></td><td>없음</td><td><code>*.resume.pt</code>에서 정책·optimizer·누적 step·난수 상태 복원.</td></tr>
+            <tr><td><code>--timesteps</code>, <code>--total-steps</code></td><td>1,000,000</td><td>최종 누적 목표 step.</td></tr>
+            <tr><td><code>--run-name</code></td><td>날짜·시각 자동</td><td><code>results/</code> 아래 폴더명. <code>--out-dir</code>이 있으면 무시.</td></tr>
+            <tr><td><code>--out-dir PATH</code></td><td>없음</td><td>산출물을 저장할 정확한 폴더. 병렬 실행마다 달라야 함.</td></tr>
+            <tr><td><code>--lr FLOAT</code></td><td><code>HPARAMS["lr"]</code> = 1e−4</td><td>학습률만 CLI에서 덮어씀.</td></tr>
+            <tr><td><code>--replay-prob FLOAT</code></td><td>0.3</td><td>실패 판을 다시 뽑는 확률. 현재 baseline은 0으로 실행 중.</td></tr>
+            <tr><td><code>--save-steps LIST</code></td><td>300000,500000</td><td>쉼표로 구분한 공식 체크포인트 목표.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><span class="src">train.py:323-354</span></p>
+
+      <h3>무엇을 어디서 바꾸나</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>실험 축</th><th>바꿀 위치</th><th>예시</th><th>건드리지 않을 공용 파일</th></tr></thead>
+          <tbody>
+            <tr><td>하이퍼파라미터</td><td>개인 <code>train_*.py</code>의 <code>HPARAMS</code></td><td>lr 1e−4→5e−5, n_steps 2048→4096</td><td>루트 <code>train.py</code></td></tr>
+            <tr><td>보상</td><td>개인 <code>train_*.py</code>의 <code>REWARD_OVERRIDES</code></td><td>정류장 놓침 −5→−10 하나만 변경</td><td><code>env/mdp_config.py</code></td></tr>
+            <tr><td>네트워크</td><td>개인 스크립트의 <code>hidden_sizes</code>, <code>activation</code>; 큰 변경은 모델 폴더 전용 network 파일</td><td>(256,256)→(256,256,128)</td><td><code>utils/networks.py</code></td></tr>
+            <tr><td>알고리즘</td><td><code>models/{이름}/</code> 안의 전용 algorithm·train·eval adapter</td><td>PPO→SAC, 단 평가용 <code>predict()</code> 제공</td><td><code>algorithms/ppo.py</code></td></tr>
+            <tr><td>관측 블록 on/off</td><td>개인 학습 스크립트가 <code>OBSERVATION</code> 복사본을 만들어 환경에 전달</td><td>density 블록 제거 실험</td><td><code>env/mdp_config.py</code></td></tr>
+            <tr><td>새 관측 의미</td><td>현재 깨끗한 개인 확장 지점 없음</td><td>새 센서 블록은 <code>sumo_env.py</code> 변경이 필요</td><td>팀 합의 없이 구현 금지</td></tr>
+            <tr><td>학습 방식</td><td>개인 train·buffer·algorithm 파일</td><td>curriculum, replay 전략</td><td>공용 train·utils</td></tr>
+            <tr><td>모방학습</td><td>개인 폴더 + <code>train_bc.py</code> 참고</td><td>obs 67개→행동 정답</td><td>3인칭 state를 정책 입력으로 쓰지 않기</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>현재 baseline 하이퍼파라미터는 lr 1e−4, rollout 2048, epoch 10, batch 64, γ 0.99, GAE λ 0.95, clip 0.2, hidden 256×256 ReLU, hybrid입니다.
+        <span class="src">train.py:124-173</span>
+        <span class="src">models/baseline_ppo/checkpoints/ts0/config.json:23-48</span>.</p>
+      <div class="callout warn">
+        <strong>관측 축의 현재 제약:</strong> 프로토콜은 “내 폴더 안 config만 변경”을 요구하지만, 코드에는 모델별 YAML을 자동 로드하는 계층이 없습니다.
+        기존 블록을 끄는 것은 개인 train 스크립트에서 설정 복사본으로 가능하지만, 새 관측 계산을 추가하려면 공용 <code>sumo_env.py</code>가 필요합니다.
+        이 경우 혼자 수정하지 말고 실험 설계를 팀과 먼저 합의해야 합니다.
+      </div>
+    </section>
+
+    <section id="results">
+      <h2>6. 결과 보는 법</h2>
+      <h3>학습 폴더에 생기는 것</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>파일</th><th>뜻</th></tr></thead>
+          <tbody>
+            <tr><td><code>model.pt</code></td><td>주기적으로 덮어쓰는 최신 정책 가중치.</td></tr>
+            <tr><td><code>model.resume.pt</code></td><td>최신 정책 + optimizer + 누적 step + 난수 상태.</td></tr>
+            <tr><td><code>step300k.pt</code>, <code>step500k.pt</code></td><td>같은 학습량끼리 비교하는 고정 시점 가중치.</td></tr>
+            <tr><td><code>*.resume.pt</code></td><td>해당 시점에서 이어 학습할 상태.</td></tr>
+            <tr><td><code>final.pt</code></td><td>정상 종료한 마지막 모델. best가 아님.</td></tr>
+            <tr><td><code>best_model.pt</code></td><td>검증 20판에서 선택된 참고 모델.</td></tr>
+            <tr><td><code>config.json</code></td><td>커밋, 시드, 실제 step, 환경·보상·관측·안전 설정.</td></tr>
+            <tr><td><code>training_log.csv</code></td><td>업데이트별 학습 지표.</td></tr>
+            <tr><td><code>eval_log.csv</code></td><td>학습 중 고정 검증판 평가 지표. 첫 평가 전에는 파일이 없을 수 있음.</td></tr>
+            <tr><td><code>tb/</code></td><td>TensorBoard 이벤트.</td></tr>
+            <tr><td><code>curves/</code></td><td>reward, losses, entropy, outcomes, validation PNG.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><span class="src">train.py:421-499</span> <span class="src">utils/logger.py:10-31</span> <span class="src">utils/logger.py:74-151</span></p>
+
+      <h3><code>training_log.csv</code> 핵심 컬럼</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>컬럼</th><th>읽는 법</th></tr></thead>
+          <tbody>
+            <tr><td><code>steps</code>, <code>update</code></td><td>누적 환경 step과 PPO 업데이트 번호.</td></tr>
+            <tr><td><code>ep_rew_mean</code>, <code>ep_len_mean</code></td><td>최근 최대 100판의 평균 보상·길이. 보상은 절대값보다 추세를 봄.</td></tr>
+            <tr><td><code>completion_rate</code></td><td>학습 중 최근 판의 “도착 + 놓친 정류장 0” 비율.</td></tr>
+            <tr><td><code>collision_rate</code>, <code>red_light_rate</code>, <code>lane_error_rate</code>, <code>timeout_rate</code>, <code>missed_stop_rate</code></td><td>실패 원인을 먼저 분리.</td></tr>
+            <tr><td><code>avg_speed</code>, <code>lane_changes_per_episode</code></td><td>정지 정책이나 차선변경 붕괴 확인.</td></tr>
+            <tr><td><code>policy_loss</code>, <code>value_loss</code></td><td>폭주·불안정 여부. 단독 숫자보다 급격한 변화 확인.</td></tr>
+            <tr><td><code>entropy</code>, <code>std</code>, <code>p_lane_change</code></td><td>탐험이 너무 빨리 사라지는지 확인.</td></tr>
+            <tr><td><code>approx_kl</code>, <code>clip_fraction</code></td><td>업데이트가 과격한지 확인. 코드 주석은 KL이 0.02를 크게 넘으면 학습률 점검을 권고.</td></tr>
+            <tr><td><code>explained_variance</code></td><td>critic이 return 변화를 설명하는 정도. 낮거나 음수면 가치 추정 불량 신호.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><span class="src">algorithms/ppo.py:270-355</span> <span class="src">algorithms/ppo.py:390-427</span></p>
+
+      <h3>공통 평가 CSV</h3>
+      <p>한 행은 판 시드 하나입니다. 컬럼 정의는 코드의 <code>EPISODE_COLUMNS</code>가 최종 근거입니다.
+        <span class="src">scripts/common_eval.py:33-45</span></p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>컬럼군</th><th>의미</th></tr></thead>
+          <tbody>
+            <tr><td><code>seed, steps, distance_km, avg_speed_kmh</code></td><td>판 식별과 주행량.</td></tr>
+            <tr><td><code>end_reason</code></td><td><code>completed, missed_stop, collision, red_light, lane_error, timeout, vanished</code>.</td></tr>
+            <tr><td><code>missed_stops, stop_count</code></td><td>놓침 수와 성공 정류장 수.</td></tr>
+            <tr><td><code>shield_step_ratio</code></td><td>그 판의 개입 필요 step / 전체 step.</td></tr>
+            <tr><td><code>events_*</code></td><td>연속 개입 구간 수. 2 step 연속 비활성 후 재개입해야 새 이벤트.</td></tr>
+            <tr><td><code>collision_with</code></td><td>vehicle / pedestrian / none.</td></tr>
+            <tr><td><code>invalid_lc, lane_changes</code></td><td>불가능한 차선 명령과 실제 변경 횟수.</td></tr>
+            <tr><td><code>ped_yield_violations, school_zone_speeding_ratio</code></td><td>보행자·보호구역 위반.</td></tr>
+            <tr><td><code>max_decel, mean_abs_jerk</code></td><td>급감속과 승차감 보조 지표.</td></tr>
+            <tr><td><code>pass_A ... pass_I</code></td><td>청계광장부터 광장시장까지 지점별 통과 여부. <span class="src">scripts/checkpoints.py:1-23</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>완주율·수동개입률</h3>
+      <ul class="tight">
+        <li><strong>완주율</strong> = <code>end_reason == completed</code>인 판 / 전체 판. 도착했어도 정류장을 놓치면 완주가 아닙니다.</li>
+        <li><strong>학습 시드별 수동개입률</strong> = 모든 판의 개입 step 합 / 모든 판의 전체 step 합. 판별 비율의 단순 평균이 아니라 step 가중 평균입니다.</li>
+        <li><strong>최종 판정</strong> = 학습 시드 0·1·2 수동개입률의 평균 ≤16%, 완주율 평균 ≥95%. 표준편차도 함께 봅니다.</li>
+      </ul>
+      <p><span class="src">scripts/common_eval.py:448-477</span> <span class="src">scripts/common_eval.py:793-808</span></p>
+
+      <h3>결과가 나쁠 때 보는 순서</h3>
+      <ol class="tight">
+        <li><code>config.json</code>: 커밋, dirty, 실제 step, shield, replay, 시드가 맞는지.</li>
+        <li><code>end_reason</code>: 충돌·적색·정류장·시간초과 중 무엇이 지배적인지.</li>
+        <li><code>pass_A~I</code>와 event 위치 그래프: 어디까지 갔는지.</li>
+        <li><code>completion_rate</code>와 <code>missed_stop_rate</code>: 도착만 하고 정류장을 놓치는지.</li>
+        <li><code>p_lane_change</code>와 실제 차선변경: 0으로 붕괴했는지, 반대로 지그재그인지.</li>
+        <li><code>entropy/std/KL/clip_fraction/value_loss</code>: 탐험 소실 또는 업데이트 폭주인지.</li>
+        <li>시드 0·1·2를 비교: 한 시드만 좋은 결과를 일반화하지 않기.</li>
+        <li>보상 관점에서 현재 이상행동이 실제로 더 유리한지 계산하기.</li>
+      </ol>
+    </section>
+
+    <section id="publish">
+      <h2>7. 결과 올리는 법</h2>
+      <h3>1) 모델 브랜치</h3>
+      <pre><button class="copy">복사</button>git add models/내이름/
+git status
+git commit -m "ppo: 시드 0/1/2 50만 step 학습"
+git push -u origin model/내이름-ppo</pre>
+      <p>모델 코드, 체크포인트, resume, TensorBoard, 학습 CSV·곡선만 올립니다.</p>
+
+      <h3>2) 결과 보고서 브랜치</h3>
+      <pre><button class="copy">복사</button># 모델 변경을 먼저 모델 브랜치에 commit/push한 뒤
+git fetch origin
+git switch -c reports/내이름-ppo origin/main
+
+git add docs/reports/내이름_ppo.md docs/reports/내이름_ppo/
+git status
+git commit -m "results: 내이름 ppo 50만/최종 평가"
+git push -u origin reports/내이름-ppo</pre>
+      <p>그다음 <code>reports/내이름-ppo → main</code> PR을 만들고 팀원 한 명 이상이 확인합니다.
+        환경·공통 평가 도구는 완료 즉시 검토 후 main, 모델 코드는 평가와 반칙 체크 후 main입니다.
+        <span class="src">experiment_protocol.md:319-369</span></p>
+    </section>
+
+    <section id="rules">
+      <h2>8. 하면 안 되는 것 — 반칙 체크리스트</h2>
+      <ul class="tight">
+        <li>☐ 테스트 1000~1099 또는 최종 2000~2999로 학습·튜닝·best 선택을 하지 않았다.</li>
+        <li>☐ 공통 환경·평가 파일이 기준 env-v2와 다르지 않다.</li>
+        <li>☐ 결과가 좋은 학습 시드만 골라 보고하지 않았다.</li>
+        <li>☐ if문 감속, 차로 강제, 규칙 기반 시나리오 선택으로 모델을 돕지 않았다.</li>
+        <li>☐ 상위 정책도 규칙 정답 지도학습이 아니라 보상으로 학습한 RL이다.</li>
+        <li>☐ 신호는 선두 차량일 때만 관측한다.</li>
+        <li>☐ 관측 범위 밖 정보, 신호 미래 잔여시간, 다른 차·보행자의 미래 경로를 쓰지 않는다.</li>
+        <li>☐ 계속 멈추기·일찍 종료하기 같은 reward hacking이 없다.</li>
+        <li>☐ <code>config.json</code>에 speedMode, laneChangeMode, teleport, collision 설정이 있다.</li>
+        <li>☐ 병합 CSV의 요구 판 시드에 누락·중복이 없다.</li>
+        <li>☐ 세 학습 시드 모두 30만·50만·final, TensorBoard, 곡선을 남겼다.</li>
+        <li>☐ 모델 브랜치에 공용 <code>env/</code>, 루트 <code>train.py</code>, 공통 평가기 변경을 섞지 않았다.</li>
+      </ul>
+      <p>원문: <span class="src">experiment_protocol.md:382-394</span>.</p>
+    </section>
+
+    <section id="gaps">
+      <h2>9. 아직 정해지지 않았거나 코드·프로토콜이 다른 것</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>항목</th><th>확인 결과</th><th>팀이 해야 할 일</th></tr></thead>
+          <tbody>
+            <tr><td><code>env-v2</code> 태그</td><td><span class="status no">미확인</span> 실행 config는 <code>exact_tag=null</code>, <code>target_is_ancestor=false</code>.</td><td>환경·평가 도구를 main에 합친 뒤 태그 생성·공지.</td></tr>
+            <tr><td>기준 커밋과 현재 작업 트리</td><td>베이스라인은 066dba7 스냅샷으로 실행 중. 현재 루트 <code>train.py</code>와 공통 평가기는 그 이후 작업 트리 변경을 포함합니다.</td><td>학습 종료 후 변경을 검토·커밋하고 새 기준점을 확정.</td></tr>
+            <tr><td>공통 평가기</td><td><span class="status wait">작업 트리에 구현</span> 1판 평가·병합 스모크는 프로토콜상 통과. 그러나 기준 커밋 포함과 공식 태그는 미확정.</td><td>4프로세스 동시 조각, 100판 시간 실측, PR 검토.</td></tr>
+            <tr><td><code>docs/env_v2.md</code></td><td>마지막 줄은 “공통 평가 스크립트는 이후 구현”이라고 써서 현재 작업 트리와 불일치합니다. <span class="src">docs/env_v2.md:50-60</span></td><td>평가기 PR이 확정된 뒤 갱신.</td></tr>
+            <tr><td>프로토콜의 모델 폴더</td><td><code>models/{이름}/train_모델.py + config.yaml</code> 구조를 요구하지만 자동 scaffold·YAML 로더는 코드에 없습니다.</td><td>팀 공통 템플릿 또는 생성 스크립트 결정.</td></tr>
+            <tr><td>체크포인트 <code>meta.json</code></td><td>프로토콜 예시에는 meta.json이 있지만 현재 학습 코드는 실행 폴더 공통 <code>config.json</code>만 씁니다.</td><td>config.json을 공식 메타로 인정할지, 체크포인트별 meta를 추가할지 결정.</td></tr>
+            <tr><td>관측 실험의 격리</td><td>새 관측 계산은 공용 <code>sumo_env.py</code> 변경 없이는 어렵습니다.</td><td>모델별 observation adapter 설계 또는 관측 축 담당자의 공용 변경 절차 합의.</td></tr>
+            <tr><td>100판 소요시간</td><td>프로토콜의 약 2.4시간은 <strong>추정</strong>이며 실측 전입니다.</td><td>확정 환경에서 한 번 측정해 기록.</td></tr>
+            <tr><td>실제 셔틀 16%</td><td>시간 비율·운행당·km당 중 단위가 확인되지 않았습니다.</td><td>원 자료 단위를 확인한 뒤 비교 문구 확정.</td></tr>
+            <tr><td>Kaggle 표준 환경</td><td>문서는 “기존 노트북 설치 셀”을 가리키지만 저장소 내 표준 노트북 경로는 확인되지 않았습니다.</td><td>노트북 이름·커밋·SUMO 설치 셀을 팀 문서에 고정.</td></tr>
+            <tr><td>그래프 설명</td><td>프로토콜은 속도 그래프에 보호구역·주정차 음영을 말하지만 현재 코드는 보호구역(1333~1610m)만 음영 처리합니다. <span class="src">scripts/common_eval.py:589-593</span></td><td>주정차 위치 음영을 넣을지 문구를 줄일지 결정.</td></tr>
+            <tr><td>평가 CSV 선택 컬럼</td><td>프로토콜의 <code>collision_edge/pos</code>, <code>avg_nearby_vehicles</code>, <code>teleports</code>는 현재 <code>EPISODE_COLUMNS</code>에 없습니다.</td><td>필요하면 공통 평가 PR에서 추가.</td></tr>
+            <tr><td>학습 중 “환경 개입률” 표시</td><td><code>training_log.csv</code>에는 개입률이 없고, 고정 검증이 실행된 <code>eval_log.csv</code>에만 intervention_rate가 생깁니다.</td><td>문서 표현을 “검증 로그”로 통일.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="sources">
+      <h2>근거 파일 빠른 찾기</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>질문</th><th>가장 먼저 볼 파일</th></tr></thead>
+          <tbody>
+            <tr><td>팀 규칙·브랜치·평가 시드</td><td><code>experiment_protocol.md</code></td></tr>
+            <tr><td>시뮬레이션·관측·행동 기본값</td><td><code>env/mdp_config.py</code></td></tr>
+            <tr><td>ROii·교통 설정</td><td><code>env/road_config.py</code>, <code>tools/make_cgc_scenario.py</code></td></tr>
+            <tr><td>관측 계산·step·보상·종료·shield</td><td><code>env/sumo_env.py</code></td></tr>
+            <tr><td>실제 baseline 보상·하이퍼파라미터</td><td><code>train.py</code>, 실행 폴더의 <code>config.json</code></td></tr>
+            <tr><td>PPO 업데이트·체크포인트</td><td><code>algorithms/ppo.py</code></td></tr>
+            <tr><td>네트워크</td><td><code>utils/networks.py</code></td></tr>
+            <tr><td>학습 로그·곡선</td><td><code>utils/logger.py</code></td></tr>
+            <tr><td>평가 지표</td><td><code>utils/evaluator.py</code>, <code>scripts/common_eval.py</code></td></tr>
+            <tr><td>정류장</td><td><code>config/lines.yaml</code></td></tr>
+            <tr><td>수집 컬럼</td><td><code>docs/data_columns.md</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="lead">원칙: 프로토콜과 코드가 다르면 실행 폴더의 <code>config.json</code>과 실제 코드가 우선입니다. 단, 공용 환경 변경은 코드가 가능하더라도 팀 합의 없이 하면 안 됩니다.</p>
+    </section>
+
+    <footer>청계천로 자율주행 버스 팀 가이드 · 외부 CDN/라이브러리 없는 단일 HTML</footer>
+  </main>
+</div>
+<script>
+  document.querySelectorAll(".copy").forEach(function (button) {
+    button.addEventListener("click", function () {
+      var pre = button.parentElement;
+      var text = pre.innerText.replace(/^복사\s*/, "");
+      navigator.clipboard.writeText(text).then(function () {
+        var before = button.textContent;
+        button.textContent = "복사됨";
+        setTimeout(function () { button.textContent = before; }, 1200);
+      });
+    });
+  });
+</script>
+</body>
+</html>

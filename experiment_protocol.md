@@ -75,7 +75,7 @@ git describe --tags --exact-match    # 브랜치를 만든 직후 env-v2가 나�
 
 **③ 학습 전·평가 전·push 전에 같은 환경인지 확인**
 ```bash
-git diff --stat env-v2 -- env/ scripts/evaluate_all.py train.py algorithms/
+git diff --stat env-v2 -- env/ scripts/evaluate_all.py scripts/common_eval.py train.py algorithms/ requirements-env-v2.txt
 ```
 아무것도 안 나오면 같은 환경이다. 뭔가 나오면 공용 파일을 고친 것이니 되돌린다.
 
@@ -93,6 +93,8 @@ git diff --stat env-v2 -- env/ scripts/evaluate_all.py train.py algorithms/
 | B4 | **시드별 CSV·3시드 요약 저장** | 판별 CSV와 학습 시드 3개의 평균 ± 표준편차를 남긴다 |
 | B5 | **평가 그래프 3개 자동 저장** | 거리별 평균 속도, 지점별 통과율, 충돌·개입 위치 (3-9) |
 | — | 끝나면 100판 평가를 한 번 실측해서 걸린 시간을 2-6에 적는다 | |
+
+**구현 상태 (2026-11-18)**: B1~B5와 병렬 실행용 프로세스별 SUMO 폴더, 조각 원자적 저장, 누락·중복 검사, 학습 시드 0·1·2 요약, 다른 알고리즘용 policy factory를 구현했다. 문법·CLI·집계 헬퍼 검사와 실제 체크포인트 1판 평가 → 압축 trace → 병합 → 요약 JSON/MD → 한글 그래프 3개 스모크를 통과했다. `env-v2` 태그를 붙이기 전 4프로세스 동시 조각 실행과 100판 시간 실측을 마쳐야 한다.
 
 ### C. 베이스라인 (담당: ___)
 - `env-v2` 태그를 붙인 뒤 기본 설정 PPO를 학습 시드 0·1·2로 학습하고 공통 스크립트로 평가한다. 각자 모델이 이보다 나아졌는지 판단하는 기준이 된다.
@@ -185,16 +187,28 @@ main ─── env-v2 태그 (확정 환경 + 공통 평가 스크립트 + docs)
 
 ## 2-3. 환경 가져오기 (모두 같은 환경을 쓰는 방법)
 
+**① 실행 프로그램 설치·버전 확인 (Windows 기준)**
+```bash
+py -3.13 --version
+sumo --version
+py -3.13 -m pip install -r requirements-env-v2.txt
+py -3.13 -c "import gymnasium, torch, traci, matplotlib, tensorboard, numpy; print(gymnasium.__version__, torch.__version__, matplotlib.__version__, tensorboard.__version__, numpy.__version__)"
+```
+- `env-v2` 검증 환경은 Python **3.13.15**, SUMO **1.27.1**이다.
+- Python 패키지는 `requirements-env-v2.txt`에 고정한다. 위 마지막 명령은 차례대로 `1.4.0 / 2.15.0+cpu(또는 2.15.0) / 3.11.2 / 2.21.0 / 2.5.4`가 나와야 한다. `traci` 패키지 버전은 `py -3.13 -m pip show traci`에서 **1.28.0**인지 확인한다.
+- 이 프로젝트에서는 `python` 명령이 구형 Python 3.8을 가리킬 수 있으므로 Windows에서는 학습·평가도 `py -3.13`으로 실행한다.
+
+**② 확정 코드 가져오기**
 ```bash
 git fetch origin --tags                       # 최신 브랜치와 태그 받기
 git switch -c model/huiyoung-ppo env-v2       # env-v2 태그에서 내 브랜치 만들기
 git describe --tags --exact-match             # 브랜치를 만든 직후 "env-v2"가 나오면 정상
 ```
 
-**같은 환경인지 확인하는 방법** (학습 전, 평가 전, push 전에 한 번씩)
+**③ 같은 코드 환경인지 확인** (학습 전, 평가 전, push 전에 한 번씩)
 
 ```bash
-git diff --stat env-v2 -- env/ scripts/evaluate_all.py train.py algorithms/
+git diff --stat env-v2 -- env/ scripts/evaluate_all.py scripts/common_eval.py train.py algorithms/ requirements-env-v2.txt
 ```
 
 - **아무것도 안 나와야 정상**이다. 뭔가 나오면 공용 파일을 고친 것이니 되돌린다.
@@ -225,16 +239,19 @@ models/{이름}/
 
 **① 스모크 테스트 (먼저, 약 2만 step)**
 ```bash
-python models/huiyoung/train_ppo.py --seed 0 --total-steps 20000 \
+py -3.13 models/huiyoung/train_ppo.py --seed 0 --total-steps 20000 \
     --save-steps 10000,20000 --out-dir models/huiyoung/checkpoints/smoke
 ```
 확인할 것: 에러가 없는지, 체크포인트가 저장되는지, 차선변경 횟수가 0이 아닌지, 측면 충돌이 너무 많지 않은지, 텐서보드 기록이 생기는지
 
 **② 본 학습 (학습 시드 0, 1, 2 각각)**
 ```bash
-python models/huiyoung/train_ppo.py --seed 0 --total-steps 1000000 \
+py -3.13 models/huiyoung/train_ppo.py --seed 0 --total-steps 1000000 \
     --save-steps 300000,500000 --out-dir models/huiyoung/checkpoints/ts0
 ```
+- 시드 0·1·2를 동시에 돌릴 때는 터미널을 3개 열어 `--seed`와 `--out-dir`을 각각 `0/ts0`, `1/ts1`, `2/ts2`로 다르게 준다.
+- 학습과 공통 평가는 프로세스마다 별도 임시 SUMO 작업 폴더를 자동 생성하므로 같은 clone에서도 동시에 실행할 수 있다. 단, **같은 `--out-dir`을 두 프로세스가 공유하면 안 된다.**
+- 여러 팀원이 같은 PC에서 서로 다른 브랜치를 동시에 수정·커밋하려면 각자 clone 또는 `git worktree`를 쓴다. 한 작업 폴더에서 브랜치를 계속 바꾸면 실행 중인 모델의 코드와 커밋 대상이 섞인다.
 - 학습 종료 시 마지막 step 모델을 반드시 `final.pt`로 저장한다. 총 학습량이 50만이면 `step500k.pt`와 `final.pt`가 같은 모델임을 메타 파일에 기록한다.
 - shield는 `env-v2` 기본값이 "학습 중 끔"이라 따로 지정하지 않는다.
 - 최소 50만 step까지는 학습한다. 100만은 선택이다.
@@ -254,14 +271,38 @@ python models/huiyoung/train_ppo.py --seed 0 --total-steps 1000000 \
 
 ## 2-6. 평가 실행
 
+**한 조각 평가** — 체크포인트 하나 = 학습 시드 하나 × step 하나
 ```bash
-# 체크포인트 하나 = 학습 시드 하나 × step 하나
-python scripts/evaluate_all.py \
-    --ckpt models/huiyoung/checkpoints/ts0_step500k.pt \
+py -3.13 scripts/evaluate_all.py \
+    --ckpt models/huiyoung/checkpoints/ts0/step500k.pt \
     --model-name huiyoung_ppo --train-seed 0 --ckpt-step 500k \
-    --seeds 1000-1099 --shield shadow \
+    --seeds 1000-1024 --shield shadow \
     --out docs/reports/huiyoung_ppo/
 ```
+
+공식 실행에서는 현재 커밋에 `env-v2` 태그가 포함됐는지 자동 검사한다. 태그 전 개발 스모크에만 `--allow-unverified-env`를 붙인다. 공식 결과에 이 옵션을 쓰면 안 된다.
+
+**100판 병렬 평가**
+- 터미널 4개에서 위 명령의 `--seeds`만 `1000-1024`, `1025-1049`, `1050-1074`, `1075-1099`로 나눠 실행한다.
+- 학습 시드 0·1·2, 50만·final에도 같은 방식으로 반복한다. 각 프로세스가 별도 임시 SUMO 폴더를 사용하므로 같은 clone에서 동시에 실행해도 된다.
+- 같은 조각을 두 번 실행하면 기존 파일 보호를 위해 실패한다. 정말 다시 만들 때만 `--overwrite`를 붙인다.
+- 기본 PPO/BC가 아닌 SAC·HRL 등은 모델 브랜치에 아래 인터페이스의 로더를 만들고 `--policy-factory models.huiyoung.eval_adapter:make_policy --model-config ...`를 추가한다.
+  ```python
+  def make_policy(checkpoint_path, env, config_path=None):
+      # predict(obs, deterministic=True)를 가진 객체를 반환
+      ...
+  ```
+
+**조각 병합·3시드 요약·그래프 생성**
+```bash
+py -3.13 scripts/evaluate_all.py \
+    --merge-glob "docs/reports/huiyoung_ppo/ts*_step500k_shadow_*.csv" \
+    --expected-seeds 1000-1099 \
+    --out docs/reports/huiyoung_ppo/
+```
+- 학습 시드 0·1·2가 모두 있어야 공식 병합된다. 개발 중 일부만 확인할 때만 `--allow-partial-train-seeds`를 쓴다.
+- 각 학습 시드 안에서 판 시드가 정확히 한 번씩 있는지 검사한다. 누락·중복·범위 밖 시드 또는 환경 태그 미검증 조각이 하나라도 있으면 요약과 그래프를 만들지 않고 실패한다.
+- 출력은 판별 CSV, 메타 JSON, 그래프용 압축 trace CSV(`.trace.csv.gz`), 학습 시드별 병합 CSV, 3시드 `summary_*.json/.md`, 그래프 PNG 3개다. 모든 모델이 같은 이름·컬럼·요약 형식을 쓴다.
 
 **필수 평가**
 
@@ -272,7 +313,7 @@ python scripts/evaluate_all.py \
 
 - 50만이 final이면 중복 평가하지 않고 보고서에 **“50만 = final”**이라고 적는다.
 - 선택: 30만 step, final 체크포인트의 개입 모드(`--shield on`, 참고용)
-- 100판은 약 2.4시간이 걸린다(추정). 시드 구간을 나눠(예: `--seeds 1000-1024`, `1025-1049` …) 병렬 실행할 수 있다. 조각 CSV 파일명에는 판 시드 범위를 반드시 붙인다(예: `ts0_step500k_shadow_1000-1024.csv`). 병합할 때 100개 시드가 정확히 한 번씩 있는지 검사해 빠진 시드나 중복 시드가 있으면 실패 처리한다. 같은 폴더에서 동시에 돌릴 때 `env/sumo/` 파일 충돌이 나면 `git worktree`로 폴더를 나눈다 (3-10).
+- 100판은 약 2.4시간이 걸린다(추정). 위처럼 4조각을 병렬 실행하면 벽시계 시간이 줄어든다. CPU·메모리가 부족하면 조각 수를 줄인다.
 - **튜닝하면서 중간 확인할 때는 `--seeds 900100-900129`를 쓴다.** 테스트 판(1000~)으로 튜닝하면 반칙이다.
 
 ## 2-7. 브랜치에 push하기
@@ -290,24 +331,31 @@ git push -u origin model/huiyoung-ppo          # 처음 한 번은 -u, 이후엔
 
 ## 2-8. 평가 결과와 보고서 만들기
 
-- 판별 CSV, 학습 시드 3개 평균 ± 표준편차 요약, 평가 그래프 3개는 **`docs/reports/{이름}_{모델}/`**에 저장한다.
+- 판별 CSV·메타 JSON·압축 trace CSV, 학습 시드 3개 평균 ± 표준편차 요약, 평가 그래프 3개는 **`docs/reports/{이름}_{모델}/`**에 저장한다.
 - 보고서는 에이전트가 3-6절 양식에 맞춰 **`docs/reports/{이름}_{모델}.md`**로 작성한다. 숫자는 병합 완료된 CSV와 요약 파일에서 읽고 임의로 옮겨 적지 않는다.
 - 실패한 실험도 쓴다. "이건 안 됐다"도 최종 보고서에 쓸 결과다.
 
 ## 2-9. 결과를 main에 올리기 (결과 보고서는 항상 main의 docs)
 
-모델 파일·텐서보드·학습 곡선은 모델 브랜치에 두고, 평가 결과와 보고서만 main 기준 보고서 브랜치에 올린다. 모델 브랜치에 `docs/reports/`를 커밋하지 않는다.
+**소유권을 섞지 않는다.**
+- `model/{이름}-{모델}`: 모델 코드, config, 30만·50만·final 체크포인트, 재개 파일, TensorBoard, 학습 CSV, 학습 곡선
+- `reports/{이름}-{모델}` → `main`: 판별·trace CSV, 평가 메타, 병합 CSV, 요약 JSON/MD, 평가 그래프 3개, 최종 보고서
+
+평가는 모델 브랜치에서 실행해 `docs/reports/{이름}_{모델}/`를 만들되 **그 브랜치에서는 결과를 add/commit하지 않는다.** 평가·병합이 끝난 뒤 아래처럼 새 보고서 브랜치로 전환하면 아직 커밋하지 않은 결과 파일은 작업 폴더에 그대로 남는다. 그다음 결과만 커밋한다.
 
 ```bash
 git fetch origin
+git status                                      # 모델 브랜치의 코드·모델 변경은 먼저 commit/push
 git switch -c reports/huiyoung-ppo origin/main
-# 공통 평가 스크립트의 --out으로 docs/reports/huiyoung_ppo/를 생성하고,
-# 에이전트가 docs/reports/huiyoung_ppo.md를 작성한 뒤 아래 파일만 확인한다.
+# 에이전트가 docs/reports/huiyoung_ppo.md를 작성한 뒤 결과만 확인한다.
 git add docs/reports/huiyoung_ppo.md docs/reports/huiyoung_ppo/
+git status                                      # models/, train.py, env/가 staged되면 안 됨
 git commit -m "results: huiyoung ppo 50만/최종 평가"
 git push -u origin reports/huiyoung-ppo
 ```
 → GitHub에서 `reports/huiyoung-ppo` → `main` PR을 만들고, 팀원 1명이 확인하면 머지한다.
+
+`git switch` 전에 모델 변경이 남아 있으면 먼저 모델 브랜치에 커밋·push한다. 다른 팀원의 기존 보고서 경로와 겹치지 않도록 `{이름}_{모델}` 폴더 이름을 고유하게 쓴다.
 
 ## 2-10. 머지 규칙
 
@@ -334,7 +382,7 @@ git merge env-v3                 # 예: 새 환경 반영
 ## 2-12. 반칙 체크리스트 (결과 올리기 전 각자, 머지 전 다른 팀원이 확인)
 
 - [ ] 팀 비교·최종 평가 판(1000~1099, 2000~2999)으로 학습, 튜닝, best 선택을 하지 않았다 (튜닝은 900100~에서만)
-- [ ] `git diff --stat env-v2 -- env/ scripts/evaluate_all.py train.py algorithms/` 결과가 비어 있다
+- [ ] `git diff --stat env-v2 -- env/ scripts/evaluate_all.py scripts/common_eval.py train.py algorithms/ requirements-env-v2.txt` 결과가 비어 있다
 - [ ] 결과가 좋은 학습 시드만 골라서 보고하지 않았다 (CSV 전체 제출)
 - [ ] 규칙(if문으로 감속, 차로 지정 등)으로 운전을 돕지 않았다. 판단 모듈을 쓴다면 보상으로 학습한 RL(PPO 등)이고, 규칙을 정답으로 지도학습한 분류기(MLP 등)가 아니다
 - [ ] 신호 정보는 선두 차량만 받는다
@@ -423,11 +471,13 @@ git merge env-v3                 # 예: 새 환경 반영
 
 **병렬 조각 병합 규칙**: 파일명에 판 시드 범위를 넣는다. 병합 시 기대 범위의 모든 시드가 정확히 한 번씩 있는지 검사하고, 누락·중복·범위 밖 시드가 하나라도 있으면 요약과 그래프를 만들지 않고 실패한다. 병합된 CSV에도 실제 포함 시드의 최솟값·최댓값을 파일명에 남긴다.
 
-**출력 2: 메타 파일** (`.json`): 체크포인트 경로, 실제 step, 모델 이름, 학습 시드, 커밋 해시, 환경 태그와 일치 여부, 판 시드 범위, shield 방식, 날짜, 병합한 조각 파일 목록, 누락·중복 검사 결과
+**출력 2: 압축 trace CSV** (`.trace.csv.gz`): 그래프 병합용 판 시드, r0 거리, 속도, shield 유형별 활성 여부, 충돌 여부. 판별 CSV와 같은 stem을 쓰며 저장소 용량을 줄이기 위해 gzip으로 압축한다.
 
-**출력 3: 요약**: 같은 체크포인트의 학습 시드 0·1·2 결과를 모아 완주율·수동개입률 등 각 지표의 평균 ± 표준편차를 저장한다. 16% 통과 여부는 세 수동개입률의 평균으로 판정한다.
+**출력 3: 메타 파일** (`.json`): 체크포인트 경로와 step 표기, 모델 이름, 학습 시드, 커밋 해시, 환경 태그와 일치 여부, Python·SUMO·주요 패키지 버전, 판 시드 범위, shield 방식, 날짜, 누락·중복 검사 결과. 병합 요약 메타에는 사용한 조각 파일 목록도 기록한다.
 
-**출력 4: 그래프 3개**: ① 거리별 평균 속도(보호구역·주정차 지점 음영) ② 지점별 통과율 막대 ③ 충돌·개입 위치(r0 거리 축)
+**출력 4: 요약**: 같은 체크포인트의 학습 시드 0·1·2 결과를 모아 완주율·수동개입률 등 각 지표의 평균 ± 표준편차를 JSON과 Markdown으로 저장한다. 16% 통과 여부는 세 수동개입률의 평균으로 판정한다.
+
+**출력 5: 그래프 3개**: ① 거리별 평균 속도(보호구역 음영) ② 지점별 통과율 막대 ③ 충돌·개입 위치(r0 거리 축)
 
 ## 3-5. 데이터 컬럼 규칙
 
@@ -557,7 +607,7 @@ tensorboard --logdir models/huiyoung/checkpoints/   # 브라우저에서 http://
 - 지점별 통과율 막대
 - 충돌·개입 위치 (r0 거리 축)
 
-**config 기록** (`{out-dir}/config.json`): 학습 시드, 총 step, 보상 가중치, 꺼진 규칙 목록, ego speedMode·laneChangeMode, teleport·collision 옵션, 커밋 해시, 환경 태그, 검증에 쓴 판 시드
+**config 기록** (`{out-dir}/config.json`): 학습 시드, 총 step, 보상 가중치, 꺼진 규칙 목록, ego speedMode·laneChangeMode, teleport·collision 옵션, 커밋 해시, 환경 태그, Python·SUMO·주요 패키지 버전, 검증에 쓴 판 시드
 
 ## 3-10. 프로젝트 유의사항 (지금까지 실제로 겪은 것)
 
@@ -565,7 +615,7 @@ tensorboard --logdir models/huiyoung/checkpoints/   # 브라우저에서 http://
 - **로드뷰 사실과 추정을 구분해서 기록한다.** 사진을 해석해 붙인 위치(Claude 추정 포함)가 확인 없이 데이터가 된 사례가 있었다: 정차금지지대 3곳(실제로는 청계5가 1곳만 있음), 배오개 보호구역(실제 없음), 승용차 주정차 30 m 간격(근거 없음). CSV 사유 열에 "로드뷰 YYYY.MM 직접 확인 / 추정"을 적는다.
 - **환경이 쉬우면 수치가 부푼다.** 기존 3차 모델 92%는 주정차가 버스를 거의 막지 않던 환경의 결과였다 (4-5). 새 기능은 keep-lane에 강제 조작을 넣어 "실제로 작동하는지" 먼저 확인한다 (예: 주정차가 끝까지 차로를 막는지, 구역 안에서 과속하면 감점되는지).
 - **그림만 있고 기능이 없는 경우를 조심한다.** GUI에 보이는 것과 관측·보상에 반영되는 것은 별개다. 보호구역이 그려져 있지 않아 관측에도 안 잡히던 사례가 있었다.
-- **같은 폴더에서 여러 실행을 동시에 돌리지 않는다.** `env/sumo/` 파일을 동시에 쓰고 읽다 충돌한다. 병렬 실행은 `git worktree`로 폴더를 나눈다.
+- **학습·평가 실행은 프로세스별 임시 SUMO 폴더를 자동 사용한다.** 같은 clone에서 병렬 실행할 수 있지만, 학습 `--out-dir`과 평가 시드 조각은 프로세스마다 겹치지 않게 준다. 서로 다른 브랜치를 동시에 수정·커밋할 때는 clone 또는 `git worktree`를 나눈다.
 
 **정보와 규칙**
 - **행동을 대신 정하거나 고치면 규칙이다** (shield, 보행자 필터, 정류장 규칙, 차로 강제, 차선변경 게이트, ego의 SUMO 안전모드). **감점·보상·관측·도로 환경은 규칙이 아니다.**
