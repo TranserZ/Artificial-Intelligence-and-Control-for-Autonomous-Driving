@@ -204,19 +204,30 @@ class PPO:
             state: 직전 rollout이 끝난 시점의 관측 (에피소드를 이어서 수집)
             ep_stats: [ep_return, ep_length] 리스트 (호출 간 누적 유지)
         Returns:
-            (last_obs, last_value, finished_returns)
+            (last_obs, last_value, finished_episodes)
         """
         obs = state
-        finished_returns = []
+        finished_episodes = []
         self.buffer.clear()
 
         for _ in range(self.n_steps):
             action, log_prob, value = self.act(obs)
-            next_obs, reward, terminated, truncated, _ = env.step(action)
+            next_obs, reward, terminated, truncated, info = env.step(action)
 
             self.num_timesteps += 1
-            ep_stats[0] += reward
-            ep_stats[1] += 1
+            ep_stats["return"] += reward
+            ep_stats["length"] += 1
+            ep_stats["collided"] |= bool(info.get("collided"))
+            ep_stats["red_light"] |= bool(info.get("red_violation"))
+            ep_stats["lane_error"] |= bool(info.get("wrong_lane"))
+            ep_stats["arrived"] |= bool(info.get("arrived"))
+            ep_stats["missed_stops"] = int(info.get("missed_stops", 0) or 0)
+            ep_stats["lane_changes"] += int(
+                info.get("lane_change", 0) != 0
+                and bool(info.get("lane_change_applied")))
+            if info.get("speed") is not None:
+                ep_stats["speed_sum"] += float(info["speed"])
+                ep_stats["speed_count"] += 1
 
             # ★ truncation(시간 초과) 보정:
             #   MDP가 끝난 게 아니라 시간 제한으로 잘린 것이므로,
@@ -230,17 +241,30 @@ class PPO:
                             terminated)
 
             if terminated or truncated:
-                finished_returns.append(ep_stats[0])
+                finished_episodes.append({
+                    **ep_stats,
+                    "completed": bool(ep_stats["arrived"]
+                                      and ep_stats["missed_stops"] == 0),
+                    "missed_stop": bool(ep_stats["missed_stops"] > 0),
+                    "timeout": bool(truncated and not terminated),
+                    "avg_speed": (ep_stats["speed_sum"] / ep_stats["speed_count"]
+                                  if ep_stats["speed_count"] else 0.0),
+                })
                 if logger is not None:
-                    logger.log_episode(self.num_timesteps, ep_stats[0],
-                                       int(ep_stats[1]))
-                ep_stats[0], ep_stats[1] = 0.0, 0
+                    logger.log_episode(self.num_timesteps, ep_stats["return"],
+                                       int(ep_stats["length"]))
+                ep_stats.update({
+                    "return": 0.0, "length": 0, "collided": False,
+                    "red_light": False, "lane_error": False,
+                    "arrived": False, "missed_stops": 0,
+                    "lane_changes": 0, "speed_sum": 0.0, "speed_count": 0,
+                })
                 obs, _ = env.reset()
             else:
                 obs = next_obs
 
         # rollout이 에피소드 중간에 끊겼다면 이후 가치를 부트스트랩
-        return obs, self.get_value(obs), finished_returns
+        return obs, self.get_value(obs), finished_episodes
 
     # ==================================================================
     # 3단계) 정책 업데이트 (clipped surrogate)
@@ -257,7 +281,7 @@ class PPO:
         T = len(self.buffer)
         indices = np.arange(T)
         stats = {"policy_loss": 0.0, "value_loss": 0.0,
-                 "entropy": 0.0, "approx_kl": 0.0, "clip_frac": 0.0}
+                 "entropy": 0.0, "approx_kl": 0.0, "clip_fraction": 0.0}
         n_batches = 0
 
         for _ in range(self.n_epochs):
@@ -311,10 +335,17 @@ class PPO:
                 stats["value_loss"] += value_loss.item()
                 stats["entropy"] += entropy.mean().item()
                 stats["approx_kl"] += approx_kl.item()
-                stats["clip_frac"] += clip_frac.item()
+                stats["clip_fraction"] += clip_frac.item()
                 n_batches += 1
 
         out = {k: v / max(n_batches, 1) for k, v in stats.items()}
+        with torch.no_grad():
+            _, _, value_after = self.policy.evaluate_actions(obs_t, act_t)
+            target_var = torch.var(ret_t)
+            out["explained_variance"] = (
+                float(1.0 - torch.var(ret_t - value_after) / target_var)
+                if target_var > 1e-12 else float("nan"))
+        out["learning_rate"] = float(self.optimizer.param_groups[0]["lr"])
         # hybrid 진단: 업데이트 "후" 정책의 평균 차선변경(좌+우) 확률.
         #   0으로 붕괴 → 차선유지 지역최적 경고 / 적당히 유지되며
         #   eval의 차선변경 횟수가 오르면 제대로 배우는 중.
@@ -345,17 +376,23 @@ class PPO:
             save_steps: 이 스텝 수들을 처음 넘는 업데이트 직후 save_fn(스텝)을 부른다
                 (예: 30만/50만/100만 step 체크포인트를 그 시점 모델 그대로 저장).
         """
-        pending_saves = sorted(int(s) for s in save_steps)
+        pending_saves = sorted(
+            int(s) for s in save_steps if int(s) > self.num_timesteps)
         obs, _ = env.reset()
-        ep_stats = [0.0, 0]                    # [현재 에피소드 보상, 길이]
-        recent_returns = deque(maxlen=20)
+        ep_stats = {
+            "return": 0.0, "length": 0, "collided": False,
+            "red_light": False, "lane_error": False, "arrived": False,
+            "missed_stops": 0, "lane_changes": 0,
+            "speed_sum": 0.0, "speed_count": 0,
+        }
+        recent_episodes = deque(maxlen=100)
         n_updates = 0
 
         while self.num_timesteps < total_timesteps:
             # 1) rollout
             obs, last_value, finished = self.collect_rollout(
                 env, obs, logger=logger, ep_stats=ep_stats)
-            recent_returns.extend(finished)
+            recent_episodes.extend(finished)
 
             # 2) advantage
             advantages, returns = self.buffer.compute_gae(
@@ -366,10 +403,22 @@ class PPO:
             n_updates += 1
 
             # 로깅
+            def recent_mean(key):
+                return (float(np.mean([ep[key] for ep in recent_episodes]))
+                        if recent_episodes else float("nan"))
+
             metrics = {
                 "update": n_updates,
-                "ep_rew_mean": float(np.mean(recent_returns))
-                               if recent_returns else float("nan"),
+                "ep_rew_mean": recent_mean("return"),
+                "ep_len_mean": recent_mean("length"),
+                "completion_rate": recent_mean("completed"),
+                "collision_rate": recent_mean("collided"),
+                "red_light_rate": recent_mean("red_light"),
+                "lane_error_rate": recent_mean("lane_error"),
+                "timeout_rate": recent_mean("timeout"),
+                "missed_stop_rate": recent_mean("missed_stop"),
+                "avg_speed": recent_mean("avg_speed"),
+                "lane_changes_per_episode": recent_mean("lane_changes"),
                 "std": self.policy.current_std,
                 **stats,
             }
@@ -396,7 +445,12 @@ class PPO:
                 # 평가가 학습 중이던 에피소드를 끊었으므로 리셋.
                 # (끊긴 경험은 이미 버퍼에 반영됐고 GAE가 부트스트랩하므로 무해)
                 obs, _ = env.reset()
-                ep_stats[0], ep_stats[1] = 0.0, 0
+                ep_stats.update({
+                    "return": 0.0, "length": 0, "collided": False,
+                    "red_light": False, "lane_error": False,
+                    "arrived": False, "missed_stops": 0,
+                    "lane_changes": 0, "speed_sum": 0.0, "speed_count": 0,
+                })
 
             # 5) 주기적 체크포인트
             if (checkpoint_fn is not None and checkpoint_interval > 0
@@ -410,3 +464,34 @@ class PPO:
     def load(self, path: str):
         self.policy.load_state_dict(
             torch.load(path, map_location=self.device))
+
+    def save_training_state(self, path: str):
+        """이어 학습용 상태. 배포·평가용 .pt와 분리해 호환성을 유지한다."""
+        state = {
+            "format": "ppo_training_state_v1",
+            "policy": self.policy.state_dict(),
+            "optimizer": self.optimizer.state_dict(),
+            "num_timesteps": self.num_timesteps,
+            "numpy_rng_state": np.random.get_state(),
+            "torch_rng_state": torch.get_rng_state(),
+        }
+        if torch.cuda.is_available():
+            state["cuda_rng_state_all"] = torch.cuda.get_rng_state_all()
+        torch.save(state, path)
+
+    def load_training_state(self, path: str):
+        """정책·optimizer·누적 step·난수 상태를 복원한다."""
+        try:
+            state = torch.load(path, map_location=self.device,
+                               weights_only=False)
+        except TypeError:  # PyTorch 2.5 이전
+            state = torch.load(path, map_location=self.device)
+        if state.get("format") != "ppo_training_state_v1":
+            raise ValueError(f"지원하지 않는 이어 학습 파일: {path}")
+        self.policy.load_state_dict(state["policy"])
+        self.optimizer.load_state_dict(state["optimizer"])
+        self.num_timesteps = int(state["num_timesteps"])
+        np.random.set_state(state["numpy_rng_state"])
+        torch.set_rng_state(state["torch_rng_state"].cpu())
+        if torch.cuda.is_available() and "cuda_rng_state_all" in state:
+            torch.cuda.set_rng_state_all(state["cuda_rng_state_all"])

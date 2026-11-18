@@ -4,6 +4,7 @@
 않도록 분리했다. 알고리즘은 `logger.log_train(...)` 처럼 부르기만 하면 된다.
 """
 import csv
+import math
 import os
 
 
@@ -83,7 +84,73 @@ class RunLogger:
                 writer.writeheader()
                 writer.writerows(rows)
 
+    @staticmethod
+    def _numeric_series(rows, key):
+        points = []
+        for row in rows:
+            try:
+                x, y = float(row["steps"]), float(row[key])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if math.isfinite(x) and math.isfinite(y):
+                points.append((x, y))
+        return points
+
+    def save_curves(self):
+        """CSV와 같은 값으로 학습 곡선 PNG를 자동 생성한다."""
+        try:
+            import matplotlib
+            matplotlib.use("Agg")
+            import matplotlib.pyplot as plt
+        except Exception as e:
+            print(f"[안내] 학습 곡선 PNG 저장 실패 ({type(e).__name__}: {e})")
+            return []
+
+        curves_dir = os.path.join(self.run_dir, "curves")
+        os.makedirs(curves_dir, exist_ok=True)
+        saved = []
+
+        def plot(name, title, rows, keys):
+            series = [(label, self._numeric_series(rows, key))
+                      for key, label in keys]
+            series = [(label, pts) for label, pts in series if pts]
+            if not series:
+                return
+            fig, ax = plt.subplots(figsize=(9, 5))
+            for label, pts in series:
+                ax.plot([p[0] for p in pts], [p[1] for p in pts],
+                        label=label, linewidth=1.8)
+            ax.set_title(title)
+            ax.set_xlabel("training steps")
+            ax.grid(True, alpha=0.3)
+            if len(series) > 1:
+                ax.legend()
+            fig.tight_layout()
+            path = os.path.join(curves_dir, name)
+            fig.savefig(path, dpi=150)
+            plt.close(fig)
+            saved.append(path)
+
+        plot("reward.png", "Training reward", self.train_rows,
+             [("ep_rew_mean", "episode reward mean")])
+        plot("losses.png", "PPO losses", self.train_rows,
+             [("policy_loss", "policy loss"), ("value_loss", "value loss")])
+        plot("entropy.png", "Policy exploration", self.train_rows,
+             [("entropy", "entropy"), ("p_lane_change", "lane-change probability")])
+        plot("training_outcomes.png", "Recent training outcomes", self.train_rows,
+             [("completion_rate", "completion"),
+              ("collision_rate", "collision"),
+              ("red_light_rate", "red light"),
+              ("timeout_rate", "timeout"),
+              ("missed_stop_rate", "missed stop")])
+        plot("validation.png", "Validation metrics", self.eval_rows,
+             [("completion_rate", "completion rate"),
+              ("intervention_rate", "intervention rate"),
+              ("collision_rate", "collision rate")])
+        return saved
+
     def close(self):
         self.save_csv()
+        self.save_curves()
         if self.writer is not None:
             self.writer.close()

@@ -14,8 +14,10 @@
 실행:  python train.py
 """
 import argparse
+import json
 import os
 import shutil
+import subprocess
 import torch
 from datetime import datetime
 
@@ -23,7 +25,7 @@ from env.road_config import ROAD, EGO, TRAFFIC
 from env.mdp_config import SIMULATION, OBSERVATION, ACTION
 from env.mdp_config import REWARD as REWARD_DEFAULTS
 from env import road_builder
-from env.sumo_env import SumoHighwayEnv
+from env.sumo_env import HELD_OUT_SEEDS, SumoHighwayEnv
 
 from algorithms.ppo import PPO
 from utils.buffer import RolloutBuffer
@@ -39,7 +41,7 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 #  (무엇을 왜 바꿨는지 + 이전 결과의 어떤 문제를 고치려는지를 쉬운 말로)
 # ══════════════════════════════════════════════════════════════════
 TRAIN_PURPOSE = """
-env-v1 기본 설정 (experiment_protocol.md). 규칙·SUMO 안전모드를 모두 빼고 모델 혼자 운전한다.
+env-v2 기본 설정 (experiment_protocol.md). 규칙·SUMO 안전모드를 모두 빼고 모델 혼자 운전한다.
 shield(차량·신호·보행자 필터·차선변경 게이트)는 학습 내내 끄고, 평가는 감시 모드로 수동개입률을 잰다.
 정류장은 모델이 직접 선다 (정차 성공 +5, 놓침 -5). 차선변경 금지 구간은 막지 않고 -1.
 best 모델 = 검증 판(900000~)에서 완주율 95% 이상 중 수동개입률이 가장 낮은 것.
@@ -51,9 +53,8 @@ best 모델 = 검증 판(900000~)에서 완주율 95% 이상 중 수동개입률
 TOTAL_TIMESTEPS = 1_000_000  # 총 학습 스텝 수 (신호등 200k → 500k, 보행자·우회전 추가로 1M,
                              #   1.5M은 1M보다 신호위반이 늘어 다시 1M. 어린이 보호구역 1.5M run도
                              #   1M 시점 모델이 이미 같은 수준이라 효과 없음 → 1M)
-MIDPOINT_TIMESTEPS = 700_000  # 이 시점의 모델을 model_mid.pt로 따로 저장 (학습 길이 효과 비교용)
 # 이 스텝 수를 처음 넘을 때 그 시점 모델을 step{N}.pt로 저장 (best가 아님 — 같은 step끼리 모델 비교용)
-SAVE_STEPS = (300_000, 500_000, 1_000_000)
+SAVE_STEPS = (300_000, 500_000)
 
 # ══════════════════════════════════════════════════════════════════
 #  보상 튜닝 — env/mdp_config.py 의 기본값을 여기서 덮어쓴다.
@@ -104,14 +105,14 @@ REWARD_OVERRIDES = dict(
     zone_approach_penalty=0.05,    # 보호구역 입구에서 30 km/h가 되도록 감속 곡선 초과 1 m/s당 감점
     no_stop_zone_penalty=0.1,         # 정차금지지대에서 서 있으면 스텝당 감점
     school_zone_speeding_penalty=0.1, # 어린이보호구역 초과 1 m/s당 감점 (상한 0.5)
-    shield_penalty=0.0,               # shield 개입 감점 — env-v1은 학습 중 shield off라 쓰지 않음
+    shield_penalty=0.0,               # shield 개입 감점 — env-v2는 학습 중 shield off라 쓰지 않음
     shield_penalty_scale=0.0,
     stop_success_bonus=5.0,           # 정류장 정차 성공 (정류장 구간에서 10초 정지) +
     missed_stop_penalty=5.0,          # 정류장 놓침 −
     lc_forbidden_penalty=1.0,         # 차선변경 금지 구간(정지선 앞 30 m·교차로 직후 20 m·지그재그)에서 변경 −
 )
 REWARD = {**REWARD_DEFAULTS, **REWARD_OVERRIDES}
-# 학습 중 shield는 끈다 (env-v1: 규칙 없이 모델 혼자). 평가 때만 evaluator가 감시 모드로 바꾼다.
+# 학습 중 shield는 끈다 (env-v2: 규칙 없이 모델 혼자). 평가 때만 evaluator가 감시 모드로 바꾼다.
 SIMULATION["shield"] = {**SIMULATION["shield"], "mode": "off"}
 # 학습 중에만: 완주 못 한 판을 30% 확률로 다시 연다 (env/sumo_env.py _update_replay)
 SIMULATION["replay"] = {"prob": 0.3, "size": 200}
@@ -180,10 +181,13 @@ RUN_NAME = None         # None이면 run_날짜_시각 자동 생성.
 # ══════════════════════════════════════════════════════════════════
 
 
-def make_run_dir() -> str:
+def make_run_dir(out_dir=None) -> str:
     """results/<run이름>/ 폴더를 만들고 경로를 반환."""
-    name = RUN_NAME or datetime.now().strftime("run_%Y%m%d_%H%M%S")
-    run_dir = os.path.join(BASE, RESULTS_DIR, name)
+    if out_dir:
+        run_dir = os.path.abspath(out_dir)
+    else:
+        name = RUN_NAME or datetime.now().strftime("run_%Y%m%d_%H%M%S")
+        run_dir = os.path.join(BASE, RESULTS_DIR, name)
     os.makedirs(run_dir, exist_ok=True)
     if not os.path.isdir(run_dir):
         raise NotADirectoryError(
@@ -205,6 +209,88 @@ def snapshot_configs(run_dir: str):
         shutil.copy(src, run_dir)
 
 
+def _git(*args):
+    try:
+        return subprocess.check_output(
+            ["git", *args], cwd=BASE, text=True,
+            stderr=subprocess.DEVNULL).strip()
+    except (OSError, subprocess.CalledProcessError):
+        return None
+
+
+def _git_ok(*args):
+    try:
+        subprocess.check_call(
+            ["git", *args], cwd=BASE, stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL)
+        return True
+    except (OSError, subprocess.CalledProcessError):
+        return False
+
+
+def write_run_config(run_dir, *, seed, requested_steps, actual_steps,
+                     status, tensorboard_enabled, resume_source=None):
+    """재현에 필요한 환경·학습 설정을 config.json 하나에 기록한다."""
+    exact_tag = _git("describe", "--tags", "--exact-match")
+    config = {
+        "schema_version": 2,
+        "updated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "status": status,
+        "git": {
+            "commit": _git("rev-parse", "HEAD"),
+            "exact_tag": exact_tag,
+            "target_environment": "env-v2",
+            "target_is_ancestor": _git_ok(
+                "merge-base", "--is-ancestor", "env-v2", "HEAD"),
+            "dirty": bool(_git(
+                "status", "--porcelain", "--untracked-files=no")),
+        },
+        "training": {
+            "seed": seed,
+            "requested_steps": requested_steps,
+            "actual_steps": actual_steps,
+            "resume_source": resume_source,
+            "save_steps": list(SAVE_STEPS),
+            "validation_seeds": [EVAL_SEED_BASE,
+                                 EVAL_SEED_BASE + EVAL_EPISODES - 1],
+            "hparams": HPARAMS,
+        },
+        "environment": {
+            "held_out_seed_ranges": [list(r) for r in HELD_OUT_SEEDS],
+            "simulation": SIMULATION,
+            "observation": OBSERVATION,
+            "action": ACTION,
+            "reward": REWARD,
+            "disabled_driving_rules": [
+                "SUMO stop delegation",
+                "300 m bus-stop speed/lane rule",
+                "forced route/bus-stop/school-zone lane changes",
+                "route-lane action mask",
+                "always-on pedestrian filter",
+                "always-on lane-change safety gate",
+            ],
+            "ego_sumo": {
+                "speed_mode": 0,
+                "lane_change_mode": 0,
+                "time_to_teleport": -1,
+                "collision_action": "remove",
+                "collision_check_junctions": True,
+            },
+        },
+        "artifacts": {
+            "tensorboard_enabled": tensorboard_enabled,
+            "tensorboard_dir": "tb",
+            "curves_dir": "curves",
+            "final_checkpoint": "final.pt",
+            "final_resume_state": "final.resume.pt",
+        },
+    }
+    path = os.path.join(run_dir, "config.json")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(config, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+
+
 BACKUP_DIR = os.path.join(BASE, "train_file_backup")
 
 
@@ -215,14 +301,22 @@ if __name__ == "__main__":
     parser.add_argument("--init", default=None,
                         help="이 모델 가중치에서 이어서 학습 (예: 천호사거리 모델 → 청계천로). "
                              "관측 차원이 늘었으면 새 입력 가중치는 0으로 채워 기존 행동을 유지한다")
-    parser.add_argument("--timesteps", type=int, default=None, help="TOTAL_TIMESTEPS 덮어쓰기")
+    parser.add_argument("--resume", default=None,
+                        help="optimizer·누적 step까지 복원하는 *.resume.pt. "
+                             "--total-steps는 추가량이 아니라 최종 누적 목표")
+    parser.add_argument("--timesteps", "--total-steps", dest="timesteps",
+                        type=int, default=None, help="TOTAL_TIMESTEPS 덮어쓰기")
     parser.add_argument("--run-name", default=None, help="results/ 아래 폴더 이름")
+    parser.add_argument("--out-dir", default=None,
+                        help="결과를 저장할 정확한 폴더 (--run-name보다 우선)")
     parser.add_argument("--lr", type=float, default=None, help="학습률 덮어쓰기 (이어 학습 시 낮춰서)")
     parser.add_argument("--replay-prob", type=float, default=None,
                         help="실패한 판 다시 열 확률 (기본 0.3, 0이면 끔)")
     parser.add_argument("--save-steps", default=None,
-                        help="그 시점 모델을 따로 저장할 스텝 (쉼표, 기본 300000,500000,1000000)")
+                        help="그 시점 모델을 따로 저장할 스텝 (쉼표, 기본 300000,500000)")
     args = parser.parse_args()
+    if args.init and args.resume:
+        parser.error("--init과 --resume은 동시에 쓸 수 없습니다")
     if args.save_steps:
         SAVE_STEPS = tuple(int(s) for s in args.save_steps.split(",") if s.strip())
     if args.replay_prob is not None:
@@ -232,7 +326,6 @@ if __name__ == "__main__":
         HPARAMS["lr"] = args.lr
     if args.timesteps:
         TOTAL_TIMESTEPS = args.timesteps
-        MIDPOINT_TIMESTEPS = int(TOTAL_TIMESTEPS * 0.7)
     if args.run_name:
         RUN_NAME = args.run_name
 
@@ -244,7 +337,7 @@ if __name__ == "__main__":
           f"교통량 {TRAFFIC['vehs_per_hour']}대/시간")
 
     # 2) 결과 폴더 + 로거
-    run_dir = make_run_dir()
+    run_dir = make_run_dir(args.out_dir)
     logger = RunLogger(run_dir)
     print(f"결과 폴더: {run_dir}")
 
@@ -286,6 +379,14 @@ if __name__ == "__main__":
                              "env-v1 이전 모델은 이어 학습할 수 없습니다 (관측 구성이 바뀜).")
         agent.policy.load_state_dict(sd)
         print(f"초기 가중치: {args.init} (입력 {w.shape[1]} → {own.shape[1]})")
+    elif args.resume:
+        agent.load_training_state(args.resume)
+        if agent.num_timesteps >= TOTAL_TIMESTEPS:
+            raise SystemExit(
+                f"이어 학습 상태가 이미 {agent.num_timesteps} step입니다. "
+                f"--total-steps는 이보다 큰 최종 누적 목표여야 합니다.")
+        print(f"이어 학습: {args.resume} "
+              f"({agent.num_timesteps} → 목표 {TOTAL_TIMESTEPS} step)")
     print(f"obs_dim={env.observation_space.shape[0]}, "
           f"act_dim={env.action_space.shape[0]}, device={agent.device}")
 
@@ -294,17 +395,26 @@ if __name__ == "__main__":
     #    checkpoint: 프로세스가 강제 종료(kill)되면 finally도 실행되지 않으므로
     #    CHECKPOINT_INTERVAL마다 모델/CSV/설정을 미리 저장해둔다.
     model_path = os.path.join(run_dir, "model.pt")
+    final_path = os.path.join(run_dir, "final.pt")
     best_path = os.path.join(run_dir, "best_model.pt")
     best = {"score": None}
-    midpoint_saved = {"done": False}
+    completed = False
+    write_run_config(
+        run_dir, seed=args.seed, requested_steps=TOTAL_TIMESTEPS,
+        actual_steps=agent.num_timesteps, status="running",
+        tensorboard_enabled=logger.writer is not None,
+        resume_source=args.resume)
 
     def checkpoint():
         agent.save(model_path)
-        if not midpoint_saved["done"] and agent.num_timesteps >= MIDPOINT_TIMESTEPS:
-            agent.save(os.path.join(run_dir, "model_mid.pt"))
-            midpoint_saved["done"] = True
+        agent.save_training_state(os.path.join(run_dir, "model.resume.pt"))
         logger.save_csv()
         snapshot_configs(run_dir)
+        write_run_config(
+            run_dir, seed=args.seed, requested_steps=TOTAL_TIMESTEPS,
+            actual_steps=agent.num_timesteps, status="running",
+            tensorboard_enabled=logger.writer is not None,
+            resume_source=args.resume)
         print(f"    [checkpoint @{agent.num_timesteps}] {model_path}", flush=True)
 
     def on_eval(m):
@@ -325,6 +435,7 @@ if __name__ == "__main__":
                 else f"step{step // 1000}k.pt")
         path = os.path.join(run_dir, name)
         agent.save(path)
+        agent.save_training_state(path.replace(".pt", ".resume.pt"))
         print(f"    [step {step} 체크포인트 @{agent.num_timesteps}] {path}", flush=True)
 
     try:
@@ -340,12 +451,26 @@ if __name__ == "__main__":
                     eval_seed_base=EVAL_SEED_BASE,
                     save_steps=SAVE_STEPS,
                     save_fn=save_step)
+        completed = True
     finally:
         env.close()
         logger.close()
         agent.save(model_path)
+        agent.save_training_state(os.path.join(run_dir, "model.resume.pt"))
+        if completed:
+            agent.save(final_path)
+            agent.save_training_state(
+                os.path.join(run_dir, "final.resume.pt"))
         snapshot_configs(run_dir)
+        write_run_config(
+            run_dir, seed=args.seed, requested_steps=TOTAL_TIMESTEPS,
+            actual_steps=agent.num_timesteps,
+            status="completed" if completed else "interrupted_or_failed",
+            tensorboard_enabled=logger.writer is not None,
+            resume_source=args.resume)
         print(f"\n저장 완료: {model_path}")
+        if completed:
+            print(f"최종 모델:      {final_path}")
         print(f"재생 방법:      python test.py "
               f"{os.path.relpath(model_path, BASE)}")
         print(f"학습 곡선 보기: tensorboard --logdir {RESULTS_DIR}"
