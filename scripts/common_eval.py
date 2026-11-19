@@ -33,7 +33,8 @@ from checkpoints import ALL_CODES, NAMES, CheckpointTracker  # noqa: E402
 
 EPISODE_COLUMNS = [
     "seed", "steps", "distance_km", "avg_speed_kmh", "end_reason",
-    "missed_stops", "stop_count", "shield_step_ratio", "events_total",
+    "missed_stops", "stop_count", "stops_total", "shield_step_ratio",
+    "events_total",
     "events_vehicle", "events_signal", "events_ped_filter", "events_lc_gate",
     "collision_with", "invalid_lc", "ped_yield_violations",
     "school_zone_speeding_ratio", "lane_changes", "max_decel", "mean_abs_jerk",
@@ -293,6 +294,7 @@ def run_episode(policy, env, seed):
         "end_reason": get_end_reason(info, terminated, truncated),
         "missed_stops": int(info.get("missed_stops", 0) or 0),
         "stop_count": int(info.get("stops_done", 0) or 0),
+        "stops_total": int(info.get("stops_total", 0) or 0),
         "shield_step_ratio": round(
             shield_steps / max(steps, 1), 8),
         "events_total": counters["total"].count,
@@ -445,6 +447,17 @@ def numeric(row, key):
     return float(value) if value not in ("", None) else 0.0
 
 
+def scheduled_stops(row):
+    """정류장 성공률의 분모. 새 CSV는 배정된 정류장 수를 쓰고,
+    그 칸이 없는 기존 CSV는 성공 + 놓침으로 계산한다."""
+    raw = row.get("stops_total", "")
+    if raw not in ("", None):
+        return int(numeric(row, "stops_total"))
+    return (
+        int(numeric(row, "stop_count"))
+        + int(numeric(row, "missed_stops")))
+
+
 def summarize_rows(rows):
     count = len(rows)
     total_steps = sum(
@@ -454,10 +467,22 @@ def summarize_rows(rows):
     reasons = defaultdict(int)
     for row in rows:
         reasons[row["end_reason"]] += 1
+    collisions = reasons.get("collision", 0)
+    official = (
+        reasons.get("completed", 0)
+        + reasons.get("missed_stop", 0))
+    perfect = reasons.get("completed", 0)
+    stop_success = sum(
+        int(numeric(row, "stop_count")) for row in rows)
+    stop_total = sum(scheduled_stops(row) for row in rows)
     return {
         "episodes": count,
-        "completion_rate": (
-            reasons["completed"] / max(count, 1)),
+        "collision_rate": collisions / max(count, 1),
+        "official_completion_rate": official / max(count, 1),
+        "completion_rate": official / max(count, 1),
+        "perfect_completion_rate": perfect / max(count, 1),
+        "stop_success_rate": (
+            stop_success / max(stop_total, 1)),
         "shield_step_ratio": (
             sum(
                 numeric(row, "shield_step_ratio")
@@ -544,6 +569,36 @@ def validate_group(pieces, expected):
         key=lambda row: (
             int(row["seed"]), float(row["distance_m"])))
     return rows, traces, source_files, result
+
+
+def aggregate_seeds(per_seed):
+    """학습 시드별 요약으로 3시드 평균과 자동 판정을 만든다."""
+    train_seeds = sorted(map(int, per_seed))
+
+    def rates(key):
+        return [
+            per_seed[str(seed)][key]
+            for seed in train_seeds
+        ]
+
+    collision = rates("collision_rate")
+    official = rates("official_completion_rate")
+    perfect = rates("perfect_completion_rate")
+    stops = rates("stop_success_rate")
+    intervention = rates("shield_step_ratio")
+    return train_seeds, {
+        "collision_rate": mean_sd(collision),
+        "official_completion_rate": mean_sd(official),
+        "completion_rate": mean_sd(official),
+        "perfect_completion_rate": mean_sd(perfect),
+        "stop_success_rate": mean_sd(stops),
+        "shield_step_ratio": mean_sd(intervention),
+        "target_passed": (
+            statistics.fmean(collision) < 0.05
+            and statistics.fmean(official) >= 0.95 - 1e-12),
+        "team_goal_intervention_met": (
+            statistics.fmean(intervention) <= 0.16 + 1e-12),
+    }
 
 
 def mean_sd(values):
@@ -682,16 +737,20 @@ def summary_markdown(summary):
             + ", ".join(map(str, summary["train_seeds"]))),
         "",
         (
-            "| 학습 시드 | 완주율 | 수동개입률 | "
-            "km당 개입 | 평균 속도(km/h) |"),
-        "|---|---:|---:|---:|---:|",
+            "| 학습 시드 | 충돌률 | 완주율(공식) | 완벽 완주율 | "
+            "정류장 성공률 | 수동개입률 | km당 개입 | "
+            "평균 속도(km/h) |"),
+        "|---|---:|---:|---:|---:|---:|---:|---:|",
     ]
     items = sorted(
         summary["per_train_seed"].items(),
         key=lambda pair: int(pair[0]))
     for seed, item in items:
         lines.append(
-            f"| {seed} | {item['completion_rate']:.2%} | "
+            f"| {seed} | {item['collision_rate']:.2%} | "
+            f"{item['official_completion_rate']:.2%} | "
+            f"{item['perfect_completion_rate']:.2%} | "
+            f"{item['stop_success_rate']:.2%} | "
             f"{item['shield_step_ratio']:.2%} | "
             f"{item['interventions_per_km']:.3f} | "
             f"{item['avg_speed_kmh']:.2f} |")
@@ -699,19 +758,37 @@ def summary_markdown(summary):
     lines += [
         "",
         (
-            "- 완주율 평균 ± 표준편차: "
-            f"{aggregate['completion_rate']['mean']:.2%} ± "
-            f"{aggregate['completion_rate']['sd']:.2%}"),
+            "- 충돌률 평균 ± 표준편차: "
+            f"{aggregate['collision_rate']['mean']:.2%} ± "
+            f"{aggregate['collision_rate']['sd']:.2%}"),
+        (
+            "- 완주율(공식) 평균 ± 표준편차: "
+            f"{aggregate['official_completion_rate']['mean']:.2%} ± "
+            f"{aggregate['official_completion_rate']['sd']:.2%}"),
+        (
+            "- 완벽 완주율 평균 ± 표준편차: "
+            f"{aggregate['perfect_completion_rate']['mean']:.2%} ± "
+            f"{aggregate['perfect_completion_rate']['sd']:.2%}"),
+        (
+            "- 정류장 성공률 평균 ± 표준편차: "
+            f"{aggregate['stop_success_rate']['mean']:.2%} ± "
+            f"{aggregate['stop_success_rate']['sd']:.2%}"),
         (
             "- 수동개입률 평균 ± 표준편차: "
             f"{aggregate['shield_step_ratio']['mean']:.2%} ± "
             f"{aggregate['shield_step_ratio']['sd']:.2%}"),
         (
-            "- 목표 판정: "
+            "- 자동 판정: "
             + (
                 "통과" if aggregate["target_passed"]
                 else "미통과")
-            + " (완주율 평균 ≥95%, 수동개입률 평균 ≤16%)"),
+            + " (충돌률 평균 <5%, 완주율(공식) 평균 ≥95%)"),
+        (
+            "- 팀 목표 수동개입률 ≤16%: "
+            + (
+                "충족" if aggregate["team_goal_intervention_met"]
+                else "미충족")
+            + " (자동 판정에는 포함하지 않음)"),
         "",
     ]
     return "\n".join(lines)
@@ -790,23 +867,7 @@ def merge_results(args):
         all_rows.extend(rows)
         all_traces.extend(traces)
 
-    train_seeds = sorted(map(int, per_seed))
-    completion = [
-        per_seed[str(seed)]["completion_rate"]
-        for seed in train_seeds
-    ]
-    intervention = [
-        per_seed[str(seed)]["shield_step_ratio"]
-        for seed in train_seeds
-    ]
-    aggregate = {
-        "completion_rate": mean_sd(completion),
-        "shield_step_ratio": mean_sd(intervention),
-        "target_passed": (
-            statistics.fmean(completion) >= 0.95 - 1e-12
-            and statistics.fmean(intervention)
-            <= 0.16 + 1e-12),
-    }
+    train_seeds, aggregate = aggregate_seeds(per_seed)
     label = (
         f"step{safe_name(checkpoint_step)}_{shield}_"
         f"{expected_start}-{expected_end}")
