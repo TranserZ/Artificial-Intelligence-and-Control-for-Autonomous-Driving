@@ -1,0 +1,17 @@
+{
+  "name": "exp-ppo-reward",
+  "gamma": 0.99,
+  "reward": {
+    "speed_weight": 0.0,
+    "close_gap_penalty": 0.0,
+    "lane_change_penalty": 0.0,
+    "turn_overspeed_penalty": 0.0,
+    "green_stop_penalty": 0.0,
+    "green_stop_extra": 0.0,
+    "approach_overspeed_penalty": 0.0,
+    "zone_overspeed_penalty": 0.0,
+    "zone_approach_penalty": 0.0,
+    "no_stop_zone_penalty": 0.0,
+    "school_zone_speeding_penalty": 0.0
+  }
+}
