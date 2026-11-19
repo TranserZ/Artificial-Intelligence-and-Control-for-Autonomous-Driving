@@ -116,6 +116,19 @@ REWARD_OVERRIDES = dict(
     lc_forbidden_penalty=1.0,         # 차선변경 금지 구간(정지선 앞 30 m·교차로 직후 20 m·지그재그)에서 변경 −
 )
 REWARD = {**REWARD_DEFAULTS, **REWARD_OVERRIDES}
+# 실험 파일에서 덮어쓸 수 있는 키. 종료 조건(red_light_terminate)과
+# 거리·시간 문턱은 여기 없다.
+REWARD_WEIGHT_KEYS = frozenset({
+    "speed_weight", "close_gap_penalty", "collision_penalty", "arrival_bonus",
+    "progress_weight", "blocked_penalty", "lane_change_penalty",
+    "invalid_action_penalty", "red_light_penalty", "yield_violation_penalty",
+    "timeout_penalty", "wrong_lane_penalty", "turn_overspeed_penalty",
+    "green_stop_penalty", "green_stop_extra", "approach_overspeed_penalty",
+    "zone_overspeed_penalty", "zone_approach_penalty", "no_stop_zone_penalty",
+    "school_zone_speeding_penalty", "shield_penalty", "shield_penalty_scale",
+    "stop_success_bonus", "missed_stop_penalty", "lc_forbidden_penalty",
+})
+EXPERIMENT_PATH = None
 # 학습 중 shield는 끈다 (env-v2: 규칙 없이 모델 혼자). 평가 때만 evaluator가 감시 모드로 바꾼다.
 SIMULATION["shield"] = {**SIMULATION["shield"], "mode": "off"}
 # 학습 중에만: 완주 못 한 판을 30% 확률로 다시 연다 (env/sumo_env.py _update_replay)
@@ -211,6 +224,8 @@ def snapshot_configs(run_dir: str):
                 os.path.join(BASE, "env", "mdp_config.py"),
                 os.path.join(BASE, "train.py")]:
         shutil.copy(src, run_dir)
+    if EXPERIMENT_PATH:
+        shutil.copy(EXPERIMENT_PATH, run_dir)
 
 
 def _git(*args):
@@ -251,6 +266,33 @@ def runtime_versions():
         "sumo": sumo,
         "packages": packages,
     }
+
+
+def apply_experiment(path):
+    """실험 JSON의 gamma·보상 가중치만 반영한다. 기본 파일은 그대로 둔다."""
+    with open(path, encoding="utf-8") as f:
+        spec = json.load(f)
+    if not isinstance(spec, dict):
+        raise SystemExit(f"실험 파일은 객체여야 합니다: {path}")
+    unknown = sorted(set(spec) - {"name", "gamma", "reward"})
+    if unknown:
+        raise SystemExit(f"실험 파일에 쓸 수 없는 키가 있습니다: {unknown}")
+    if "gamma" in spec:
+        gamma = float(spec["gamma"])
+        if not 0.0 < gamma < 1.0:
+            raise SystemExit(f"gamma는 0과 1 사이여야 합니다: {gamma}")
+        HPARAMS["gamma"] = gamma
+    reward = spec.get("reward") or {}
+    if not isinstance(reward, dict):
+        raise SystemExit("reward는 가중치 객체여야 합니다")
+    bad = sorted(set(reward) - REWARD_WEIGHT_KEYS)
+    if bad:
+        raise SystemExit(
+            "보상 가중치가 아닌 값은 실험 파일로 바꿀 수 없습니다: "
+            + ", ".join(bad))
+    for key, value in reward.items():
+        REWARD[key] = float(value)
+    return spec
 
 
 def write_run_config(run_dir, *, seed, requested_steps, actual_steps,
@@ -340,7 +382,16 @@ if __name__ == "__main__":
                         help="실패한 판 다시 열 확률 (기본 0.3, 0이면 끔)")
     parser.add_argument("--save-steps", default=None,
                         help="그 시점 모델을 따로 저장할 스텝 (쉼표, 기본 300000,500000)")
+    parser.add_argument("--experiment", default=None,
+                        help="gamma와 보상 가중치만 담은 JSON. 없으면 위 기본값")
+    parser.add_argument("--eval-interval", type=int, default=None,
+                        help="학습 중 검증 주기. 0이면 검증 판(900000~)을 쓰지 않음")
     args = parser.parse_args()
+    if args.experiment:
+        EXPERIMENT_PATH = os.path.abspath(args.experiment)
+        apply_experiment(EXPERIMENT_PATH)
+    if args.eval_interval is not None:
+        EVAL_INTERVAL = args.eval_interval
     if args.init and args.resume:
         parser.error("--init과 --resume은 동시에 쓸 수 없습니다")
     if args.save_steps:
