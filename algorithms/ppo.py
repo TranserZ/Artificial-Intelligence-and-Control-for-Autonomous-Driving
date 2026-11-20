@@ -237,8 +237,12 @@ class PPO:
             if truncated and not terminated:
                 stored_reward += self.gamma * self.get_value(next_obs)
 
+            # done은 "판이 끝났다"(충돌·도착·시간 초과 모두)를 뜻한다. GAE가 이 스텝에서
+            #   다음 판으로 넘어가지 않게 끊는다. 시간 초과의 이후 가치는 위에서 보상에
+            #   γV(s')로 이미 더했다. (예전엔 terminated만 넣어서, 시간 초과 스텝에
+            #   γV(s') + γV(다음 판 첫 상태)가 이중으로 더해지고 GAE가 다음 판으로 샜다.)
             self.buffer.add(obs, action, log_prob, stored_reward, value,
-                            terminated)
+                            terminated or truncated)
 
             if terminated or truncated:
                 finished_episodes.append({
