@@ -55,7 +55,8 @@ def is_cheonggyecheon(road: dict) -> bool:
     return road.get("layout", "straight") == "cheonggyecheon"
 
 
-def _build_cheonggyecheon(ego: dict, out_dir: str, demo_ego: bool = False) -> str:
+def _build_cheonggyecheon(ego: dict, out_dir: str, demo_ego: bool = False,
+                          road: dict = None) -> str:
     """청계천로(OSM 실제 도로) 시나리오를 out_dir에 만들고 sumocfg 경로를 반환한다.
 
     1) data/osm/cheonggyecheon.osm → cgc.nod/edg.xml (tools/osm_to_sumo.py, PROJ 불필요)
@@ -72,7 +73,13 @@ def _build_cheonggyecheon(ego: dict, out_dir: str, demo_ego: bool = False) -> st
     import osm_to_sumo
     import make_cgc_scenario
 
-    osm_to_sumo.convert(os.path.join(root, "data", "osm", "cheonggyecheon.osm"), out_dir)
+    # 단계별 맵 (env/curriculum.py): ROAD["elements"]에 없는 요소는 만들지 않는다
+    from env.curriculum import has
+    road = road or {}
+    signals_on, school_on = has(road, "signal"), has(road, "school_zone")
+    print(f"[단계별 맵] {road.get('stage', '-')}단계: {', '.join(road.get('elements') or ['전체'])}")
+    osm_to_sumo.convert(os.path.join(root, "data", "osm", "cheonggyecheon.osm"), out_dir,
+                        signals_on=signals_on, school_on=school_on)
     netconvert_cmd = (
         [checkBinary("netconvert"),
          "--node-files", os.path.join(out_dir, "cgc.nod.xml"),
@@ -94,6 +101,14 @@ def _build_cheonggyecheon(ego: dict, out_dir: str, demo_ego: bool = False) -> st
                                            os.path.join(out_dir, "cgc.nod.xml")):
             break
         subprocess.run(netconvert_cmd, check=True, capture_output=True)
+    # 신호 없는 횡단보도는 모두 없앤다 (보행자·승객 경로를 만들기 전에 해야 경로가 안 끊긴다)
+    net_path = os.path.join(out_dir, "cgc.net.xml")
+    xcon = os.path.join(out_dir, "cgc.crossings.con.xml")
+    if osm_to_sumo.unsignalized_crossing_discards(net_path, xcon):
+        subprocess.run([checkBinary("netconvert"), "--sumo-net-file", net_path,
+                        "--connection-files", xcon, "-o", net_path,
+                        "--offset.disable-normalization", "true"],
+                       check=True, capture_output=True)
     args = make_cgc_scenario.parse_args(
         ["--net", os.path.join(out_dir, "cgc.net.xml"), "--out", out_dir]
         # 데모 셔틀: 학습·평가는 ego를 TraCI로 직접 투입하므로 끈다.
@@ -103,7 +118,11 @@ def _build_cheonggyecheon(ego: dict, out_dir: str, demo_ego: bool = False) -> st
         + ["--pax-route-ids", ",".join(ego.get("routes") or {"r0": 1.0}),
            "--ego-accel", str(ego["accel"]), "--ego-decel", str(ego["decel"]),
            "--ego-max-speed", str(ego["max_speed"])]
-        + (["--roii"] if ego.get("roii") else []))  # ROii 제원 (road_config의 "roii")
+        + (["--roii"] if ego.get("roii") else [])  # ROii 제원 (road_config의 "roii")
+        + ["--elements", ",".join(road.get("elements") or ())]
+        + (["--through-vph", str(road["through_vph"])] if road.get("through_vph") else [])
+        + (["--vehicle-max-speed", str(road["vehicle_max_speed"])]
+           if road.get("vehicle_max_speed") else []))
     make_cgc_scenario.build(args.net, out_dir, args)
     # 버스 경로 위 오른쪽 차로가 직진으로 안 이어지는 교차로 보정 (도로망만 다시 쓰고, 경로는 그대로)
     # 왕복 노선의 청계5가·청계광장 좌회전은 오른쪽 승용차 차로(lane 1)에 따로 붙인다.
@@ -128,6 +147,11 @@ def _build_cheonggyecheon(ego: dict, out_dir: str, demo_ego: bool = False) -> st
                         "--offset.disable-normalization", "true",
                         "--tls.rebuild", "true"],
                        check=True, capture_output=True)
+    # 신호 단계부터: 버스 경로 위 신호 시간을 실측값으로 (data/road_data/signal_timing.csv).
+    # tls.rebuild가 신호를 다시 만들므로 마지막 netconvert 뒤에 한다.
+    if signals_on:
+        import signal_plans
+        signal_plans.apply(net_path, rou_path, "r0")
     return os.path.join(out_dir, "cgc.sumocfg")
 
 
@@ -214,7 +238,7 @@ def build(road: dict, ego: dict, traffic: dict, out_dir: str,
     """
     os.makedirs(out_dir, exist_ok=True)
     if is_cheonggyecheon(road):
-        return _build_cheonggyecheon(ego, out_dir, demo_ego=demo_ego)
+        return _build_cheonggyecheon(ego, out_dir, demo_ego=demo_ego, road=road)
     use_tl = tl_enabled()
     cross = is_intersection(road)
     if cross:

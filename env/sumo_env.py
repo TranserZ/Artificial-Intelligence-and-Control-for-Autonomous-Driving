@@ -150,6 +150,11 @@ class SumoHighwayEnv(gym.Env):
 
         # ----- 도로/차량 설정에서 필요한 값들 -----
         self.vmax = float(road["speed_limit"])   # 속도 정규화 기준
+        # 단계별 맵 (env/curriculum.py): 이번 맵에서 켜진 요소. 없으면(예전 설정) 전부 켜짐
+        from env.curriculum import has as _has
+        self.stage = road.get("stage")
+        self.has_parking = _has(road, "illegal_parking")
+        self.has_school = _has(road, "school_zone")
         self.num_lanes = int(road["num_lanes"])
         # 시작 차선: "center"면 중앙 차선(차선수//2)으로 자동 결정.
         #   3차선 → 1번(가운데), 5차선 → 2번. 차선 수를 바꿔도 항상 가운데라
@@ -281,14 +286,15 @@ class SumoHighwayEnv(gym.Env):
         # 불법주정차 다발지점 (차로 점유). reset마다 지점별 prob 확률로 0초부터 정차 상태로 세운다.
         self._hotspots = _load_zone_rows(
             "illegal_parking_hotspots.csv",
-            ("hotspot_id", "edge_id", "start_pos", "end_pos", "vehicles", "prob"))
+            ("hotspot_id", "edge_id", "start_pos", "end_pos", "vehicles", "prob")
+        ) if self.has_parking else []
         self._hotspot_taken = {}   # (엣지, 차선 번호) → 다발지점 차량 위치 (프리필이 피함)
         self._hotspot_placed = []  # 이번 판에 생성된 다발지점 (id, 엣지, 차량 수)
         # 어린이보호구역 edge → 제한속도 m/s
         self._school_limits = {
             edge: speed for edge, speed in _load_zone_rows(
                 "school_zones.csv", ("edge_id", "speed_limit_ms"))
-        }
+        } if self.has_school else {}
 
         # GUI는 ego를 따라가며 가까이 보이도록 기본값을 둔다.
         self.gui_zoom = float(mdp_sim.get("gui_zoom", 1200.0))

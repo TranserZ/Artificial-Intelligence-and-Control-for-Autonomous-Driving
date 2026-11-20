@@ -1,0 +1,307 @@
+{
+  "name": "광교",
+  "samples": 150,
+  "movements": [
+    {
+      "key": "et_Pd",
+      "label": "동 보행"
+    },
+    {
+      "key": "et_St",
+      "label": "동 직진"
+    },
+    {
+      "key": "nt_Pd",
+      "label": "북 보행"
+    },
+    {
+      "key": "nt_St",
+      "label": "북 직진"
+    },
+    {
+      "key": "st_Pd",
+      "label": "남 보행"
+    },
+    {
+      "key": "st_St",
+      "label": "남 직진"
+    }
+  ],
+  "state_legend": {
+    "G": "녹색",
+    "g": "비보호녹색",
+    "y": "황색/점멸",
+    "r": "적색",
+    "s": "적색후진행",
+    "u": "적황",
+    "o": "황색점멸",
+    "O": "소등",
+    "?": "미확인"
+  },
+  "cycle_s": 140.0,
+  "cycles_observed": 1,
+  "cycle_list_s": [
+    140.0
+  ],
+  "phase_sum_s": 139.6,
+  "phases": [
+    {
+      "index": 0,
+      "duration_s": 37.3,
+      "duration_min_max_s": [
+        37.3,
+        37.3
+      ],
+      "observed": 2,
+      "state": "rrgGgG",
+      "signals": {
+        "적색": [
+          "동 보행",
+          "동 직진"
+        ],
+        "비보호녹색": [
+          "북 보행",
+          "남 보행"
+        ],
+        "녹색": [
+          "북 직진",
+          "남 직진"
+        ]
+      }
+    },
+    {
+      "index": 1,
+      "duration_s": 2.5,
+      "duration_min_max_s": [
+        2.0,
+        3.0
+      ],
+      "observed": 2,
+      "state": "rrryrG",
+      "signals": {
+        "적색": [
+          "동 보행",
+          "동 직진",
+          "북 보행",
+          "남 보행"
+        ],
+        "황색/점멸": [
+          "북 직진"
+        ],
+        "녹색": [
+          "남 직진"
+        ]
+      }
+    },
+    {
+      "index": 2,
+      "duration_s": 4.3,
+      "duration_min_max_s": [
+        3.7,
+        5.0
+      ],
+      "observed": 2,
+      "state": "rrrrrG",
+      "signals": {
+        "적색": [
+          "동 보행",
+          "동 직진",
+          "북 보행",
+          "북 직진",
+          "남 보행"
+        ],
+        "녹색": [
+          "남 직진"
+        ]
+      }
+    },
+    {
+      "index": 3,
+      "duration_s": 3.5,
+      "duration_min_max_s": [
+        3.0,
+        4.0
+      ],
+      "observed": 2,
+      "state": "rrrrry",
+      "signals": {
+        "적색": [
+          "동 보행",
+          "동 직진",
+          "북 보행",
+          "북 직진",
+          "남 보행"
+        ],
+        "황색/점멸": [
+          "남 직진"
+        ]
+      }
+    },
+    {
+      "index": 4,
+      "duration_s": 5.2,
+      "duration_min_max_s": [
+        2.0,
+        9.0
+      ],
+      "observed": 4,
+      "state": "rGrrrr",
+      "signals": {
+        "적색": [
+          "동 보행",
+          "북 보행",
+          "북 직진",
+          "남 보행",
+          "남 직진"
+        ],
+        "녹색": [
+          "동 직진"
+        ]
+      }
+    },
+    {
+      "index": 5,
+      "duration_s": 20.3,
+      "duration_min_max_s": [
+        20.0,
+        20.7
+      ],
+      "observed": 2,
+      "state": "GGrrrr",
+      "signals": {
+        "녹색": [
+          "동 보행",
+          "동 직진"
+        ],
+        "적색": [
+          "북 보행",
+          "북 직진",
+          "남 보행",
+          "남 직진"
+        ]
+      }
+    },
+    {
+      "index": 6,
+      "duration_s": 24.1,
+      "duration_min_max_s": [
+        24.0,
+        24.3
+      ],
+      "observed": 2,
+      "state": "gGrrrr",
+      "signals": {
+        "비보호녹색": [
+          "동 보행"
+        ],
+        "녹색": [
+          "동 직진"
+        ],
+        "적색": [
+          "북 보행",
+          "북 직진",
+          "남 보행",
+          "남 직진"
+        ]
+      }
+    },
+    {
+      "index": 7,
+      "duration_s": 5.2,
+      "duration_min_max_s": [
+        2.0,
+        9.0
+      ],
+      "observed": 4,
+      "state": "rGrrrr",
+      "signals": {
+        "적색": [
+          "동 보행",
+          "북 보행",
+          "북 직진",
+          "남 보행",
+          "남 직진"
+        ],
+        "녹색": [
+          "동 직진"
+        ]
+      }
+    },
+    {
+      "index": 8,
+      "duration_s": 5.3,
+      "duration_min_max_s": [
+        5.0,
+        5.7
+      ],
+      "observed": 2,
+      "state": "ryrrrr",
+      "signals": {
+        "적색": [
+          "동 보행",
+          "북 보행",
+          "북 직진",
+          "남 보행",
+          "남 직진"
+        ],
+        "황색/점멸": [
+          "동 직진"
+        ]
+      }
+    },
+    {
+      "index": 9,
+      "duration_s": 2.0,
+      "duration_min_max_s": [
+        2.0,
+        2.0
+      ],
+      "observed": 2,
+      "state": "rrrGrG",
+      "signals": {
+        "적색": [
+          "동 보행",
+          "동 직진",
+          "북 보행",
+          "남 보행"
+        ],
+        "녹색": [
+          "북 직진",
+          "남 직진"
+        ]
+      }
+    },
+    {
+      "index": 10,
+      "duration_s": 29.9,
+      "duration_min_max_s": [
+        29.7,
+        30.0
+      ],
+      "observed": 2,
+      "state": "rrGGGG",
+      "signals": {
+        "적색": [
+          "동 보행",
+          "동 직진"
+        ],
+        "녹색": [
+          "북 보행",
+          "북 직진",
+          "남 보행",
+          "남 직진"
+        ]
+      }
+    }
+  ],
+  "green_time_per_movement_s": {
+    "동 보행": 44.4,
+    "동 직진": 54.8,
+    "북 보행": 67.2,
+    "북 직진": 69.2,
+    "남 보행": 67.2,
+    "남 직진": 76.0
+  },
+  "other_states_seen": [],
+  "segments_total": 24
+}
