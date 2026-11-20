@@ -1,0 +1,217 @@
+{
+  "schema_version": 2,
+  "model": {
+    "name": "dongyeon_gru_ppo",
+    "axis": "알고리즘/네트워크 (MLP → GRU 기억)",
+    "class": "models.dongyeon.gru_ppo.GRUPPO",
+    "arch": {
+      "obs_dim": 67,
+      "hidden": 256,
+      "gru_hidden": 256,
+      "init_log_std": -0.5,
+      "lane_keep_bias": 0.5,
+      "prev_action": true
+    },
+    "hparams": {
+      "lr": 0.0001,
+      "n_steps": 2048,
+      "n_epochs": 10,
+      "gamma": 0.99,
+      "gae_lambda": 0.95,
+      "clip_eps": 0.2,
+      "value_coef": 0.5,
+      "entropy_coef": 0.0,
+      "lane_entropy_coef": 0.01,
+      "max_grad_norm": 0.5,
+      "normalize_advantage": true,
+      "init_log_std": -0.5,
+      "lane_keep_bias": 0.5,
+      "hidden": 256,
+      "gru_hidden": 256,
+      "seq_len": 64,
+      "seqs_per_batch": 2,
+      "prev_action": true,
+      "seed": 2,
+      "device": "auto"
+    },
+    "eval_interval_updates": 50,
+    "best_rule": "자동 판정 통과 중 개입률 최저, 없으면 공식 완주율→충돌률→주행거리",
+    "policy_factory": "models.dongyeon.eval_adapter:make_policy"
+  },
+  "updated_at": "2026-11-20T19:46:23+00:00",
+  "status": "completed",
+  "wall_hours": 5.649,
+  "runtime": {
+    "python": "3.13.18",
+    "python_executable": "/usr/bin/python3",
+    "sumo": "Eclipse SUMO sumo 1.27.1",
+    "packages": {
+      "gymnasium": "1.4.0",
+      "matplotlib": "3.10.0",
+      "numpy": "2.1.3",
+      "tensorboard": "2.21.0",
+      "torch": "2.11.0+cpu",
+      "traci": "1.28.0"
+    }
+  },
+  "git": {
+    "commit": "77e987a4fdb1131a51882a485be8579bcd9c607c",
+    "exact_tag": null,
+    "target_environment": "env-v2",
+    "target_is_ancestor": false,
+    "dirty": false
+  },
+  "training": {
+    "seed": 2,
+    "requested_steps": 500000,
+    "actual_steps": 501760,
+    "resume_source": null,
+    "save_steps": [
+      300000,
+      500000
+    ],
+    "validation_seeds": [
+      900000,
+      900019
+    ]
+  },
+  "environment": {
+    "held_out_seed_ranges": [
+      [
+        1000,
+        2999
+      ],
+      [
+        900000,
+        999999
+      ]
+    ],
+    "simulation": {
+      "step_length": 0.5,
+      "max_steps": 2400,
+      "warmup_steps": 4,
+      "gui_zoom": 4000.0,
+      "gui_delay": 100.0,
+      "gui_view_width": 200.0,
+      "gui_track_ego": true,
+      "shield": {
+        "mode": "off",
+        "decel": 3.0,
+        "margin": 2.5,
+        "signal_margin": 1.0,
+        "signal_max_decel": 3.0
+      },
+      "replay": {
+        "prob": 0.3,
+        "size": 200
+      }
+    },
+    "observation": {
+      "visibility": 50.0,
+      "density_veh_length": 7.5,
+      "signal": {
+        "enabled": true,
+        "visibility": 150.0
+      },
+      "route_dir": {
+        "enabled": true
+      },
+      "lc_zone": {
+        "enabled": true
+      },
+      "pedestrian": {
+        "enabled": true,
+        "visibility": 50.0,
+        "num_crossings": 2
+      },
+      "school_zone": {
+        "enabled": true,
+        "visibility": 100.0
+      },
+      "bus_stop": {
+        "enabled": true,
+        "visibility": 150.0,
+        "dwell_time": 10.0,
+        "stop_speed": 0.1,
+        "overshoot": 1.0
+      }
+    },
+    "action": {
+      "lane_change_safety": {
+        "min_front_gap": 3.0,
+        "min_rear_gap": 3.0,
+        "front_tau": 0.15,
+        "rear_tau": 0.3,
+        "approach_horizon": 0.6,
+        "spawn_protect": 20.0,
+        "signal_no_change_zone": 30.0
+      },
+      "dim": 2,
+      "accel_index": 0,
+      "lane_change_index": 1,
+      "lane_change_values": [
+        -1,
+        0,
+        1
+      ],
+      "lane_change_threshold": 0.5,
+      "lane_change_duration": 1.0
+    },
+    "reward": {
+      "speed_weight": 0.1,
+      "close_gap_threshold": 6.0,
+      "close_gap_penalty": 0.1,
+      "collision_penalty": 20.0,
+      "arrival_bonus": 20.0,
+      "progress_weight": 10.0,
+      "blocked_penalty": 0.0,
+      "blocked_gap": null,
+      "blocked_speed_frac": 0.85,
+      "lane_change_penalty": 0.02,
+      "invalid_action_penalty": 0.0,
+      "red_light_penalty": 20.0,
+      "red_light_terminate": true,
+      "yield_violation_penalty": 20.0,
+      "yield_margin": 3.0,
+      "ped_wait_zone": 15.0,
+      "timeout_penalty": 10.0,
+      "wrong_lane_penalty": 20.0,
+      "turn_overspeed_penalty": 0.5,
+      "green_stop_penalty": 0.05,
+      "green_stop_gap": 15.0,
+      "green_stop_speed": 1.5,
+      "green_stop_extra": 0.1,
+      "green_stop_ramp": 30.0,
+      "approach_overspeed_penalty": 0.02,
+      "approach_decel": 2.0,
+      "approach_penalty_cap": 0.2,
+      "zone_overspeed_penalty": 0.25,
+      "zone_overspeed_tol": 0.3,
+      "zone_overspeed_cap": 0.5,
+      "zone_approach_penalty": 0.05,
+      "zone_approach_decel": 2.0,
+      "zone_approach_cap": 0.2,
+      "no_stop_zone_penalty": 0.1,
+      "school_zone_speeding_penalty": 0.1,
+      "shield_penalty": 0.0,
+      "shield_penalty_scale": 0.0,
+      "stop_success_bonus": 5.0,
+      "missed_stop_penalty": 5.0,
+      "lc_forbidden_penalty": 1.0
+    },
+    "ego_sumo": {
+      "speed_mode": 0,
+      "lane_change_mode": 0,
+      "time_to_teleport": -1,
+      "collision_action": "remove",
+      "collision_check_junctions": true
+    }
+  },
+  "artifacts": {
+    "tensorboard_enabled": true,
+    "tensorboard_dir": "tb",
+    "curves_dir": "curves",
+    "final_checkpoint": "final.pt",
+    "final_resume_state": "final.resume.pt"
+  }
+}
