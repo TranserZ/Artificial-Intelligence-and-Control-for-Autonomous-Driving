@@ -290,7 +290,12 @@ def convert(osm_path, out_dir, signals_on=True, school_on=True):
     with open(os.path.join(out_dir, "cgc.edg.xml"), "w", encoding="utf-8", newline="\n") as f:
         f.write("<edges>\n")
         for eid, a, b, n_lane, speed, pts, tags in edges:
-            shape = " ".join(f"{x:.2f},{y:.2f}" for x, y in pts[1:-1])
+            # 모양은 양 끝(노드 위치)까지 넣는다. 중간 점만 주면 netconvert가 그 점들만 도로로 써서
+            # 엣지가 마지막 중간 점에서 끝나고 노드까지 남은 거리가 전부 교차로 내부가 된다
+            # (2026-11-21 발견: 경로 2.1 km 중 761 m가 교차로 내부, 보호구역 70 m → 250 m).
+            # OSM_SHAPE_ENDS=0이면 예전 방식(중간 점만).
+            sp = pts if os.environ.get("OSM_SHAPE_ENDS", "1") != "0" else pts[1:-1]
+            shape = " ".join(f"{x:.2f},{y:.2f}" for x, y in sp)
             attr = f' shape="{shape}"' if shape else ""
             name = (tags.get("name") or "").replace('"', "").replace("&", "")
             name_attr = f' name="{name}"' if name else ""

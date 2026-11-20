@@ -702,8 +702,11 @@ def build(net_path, out_dir, args):
     L.append('    <vType id="cutin_car" accel="2.6" decel="4.5" tau="1.0" minGap="1.5" '
              f'maxSpeed="{vms or 9.7}" speedDev="0.15" lcAssertive="3" lcImpatience="1" lcSpeedGain="3" lcStrategic="1" '
              'jmIgnoreFoeProb="0.35" jmTimegapMinor="0.3" jmIgnoreFoeSpeed="3" color="0.9,0.9,0.9" vClass="taxi" guiShape="passenger/sedan"/>')
+    # 차선변경 빈도를 일반 차량(car_*)의 약 1.5배로: lcSpeedGain=8 (2026-11-21 실측, 6단계·본선
+    # 400대/시간·1시간×시드 3개: 일반차 주행 km당 1.40회, 오토바이 2.11회 → 1.50배. 기본값(1)은 1.00배)
     L.append('    <vType id="motorcycle" vClass="motorcycle" guiShape="motorcycle" length="2.2" width="0.8" '
              f'accel="3.5" decel="5.0" maxSpeed="{vms or 11}" minGap="1.0" lcAssertive="2" lcImpatience="0.5" lcCooperative="0.5" '
+             'lcSpeedGain="8" '
              'jmIgnoreFoeProb="0.2" color="0.2,0.2,0.2"/>')
     # 자전거는 단계별 맵에서 삭제했다 (2026-11-21). 실제 청계천 자전거도로는 천 쪽에 분리돼 있어
     # 본선 차로에 자전거를 섞을 근거도 약했다.

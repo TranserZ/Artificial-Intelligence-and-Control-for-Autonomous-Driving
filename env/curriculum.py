@@ -8,8 +8,8 @@
     2 signal           신호등 (실측 주기) + 신호 횡단보도 + 횡단 보행자
     3 cutin            끼어들기 (측면 도로 합류 cutin_car)
     4 school_zone      어린이보호구역 (제한속도 20 km/h)
-    5 illegal_parking  불법주정차 (차로를 막는 다발지점)
-    6 motorcycle       오토바이
+    5 motorcycle       오토바이 (차선변경이 일반 차량의 약 1.5배)
+    6 illegal_parking  불법주정차 (차로를 막는 다발지점, 확정 X)
 
 일반 차량(본선·반대 방향·프리필)은 1단계부터 항상 있다.
 신호 없는 횡단보도와 자전거는 모든 단계에서 없다.
@@ -19,7 +19,7 @@
 """
 import os
 
-STAGE_ORDER = ("bus_stop", "signal", "cutin", "school_zone", "illegal_parking", "motorcycle")
+STAGE_ORDER = ("bus_stop", "signal", "cutin", "school_zone", "motorcycle", "illegal_parking")
 MAX_STAGE = len(STAGE_ORDER)
 
 
