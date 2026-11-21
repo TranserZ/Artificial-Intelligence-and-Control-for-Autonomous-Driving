@@ -8,6 +8,7 @@ road_builder.py가 SUMO 도로 파일(.net.xml 등)을 자동으로 다시 만�
     - 거리: m (미터)
     - 속도: m/s  (참고: 33.33 m/s ≈ 120 km/h,  27 m/s ≈ 97 km/h)
 """
+import os
 
 # ──────────────────────────────────────────────────────────────
 # 1) 도로 형상
@@ -296,12 +297,31 @@ CHEONGGYECHEON = {
     # ⚠ True/False 전환 시 차체·물리가 달라져 학습 환경이 바뀐다.
     #   관측 정규화(vmax=도로 제한속도 13.89)는 그대로라 이어 학습은 가능.
     "roii": True,
+    # 단계별 맵 (env/curriculum.py): 1 정류장 → 2 신호·횡단보도 → 3 끼어들기 →
+    # 4 어린이보호구역 → 5 오토바이 → 6 불법주정차. 뒤 단계는 앞 단계를 모두 포함.
+    # 환경변수 CGC_STAGE가 있으면 그 값을 쓴다 (예: CGC_STAGE=1 python train.py ...).
+    "stage": 6,
+    # 청계천 모든 차량(일반차·끼어드는 차·오토바이·버스)의 최고속도 (m/s).
+    # 도로 제한속도도 30 km/h (서울시 안전속도 5030, 청계천로 전 구간 30 km/h).
+    "vehicle_max_speed": 8.33,      # 30 km/h
+    # 본선 일반 차량 투입량 (대/시간, 방향별). 실측 자료가 없는 가정값.
+    # 실측 신호(청계3가 녹색 38 s/140 s 등)에서 500대/시간이면 대기 줄이 끝없이 늘어나(과포화) 줄였다.
+    # 판 시작 프리필 간격도 이 값으로 계산한다 (TRAFFIC["vehs_per_hour"]를 덮어씀).
+    # 환경변수 CGC_THROUGH_VPH가 있으면 그 값을 쓴다 (교통량 실험용).
+    "through_vph": 400,
 }
 
 if CHEONGGYECHEON["enabled"]:
+    from env.curriculum import elements as _stage_elements, resolve_stage as _resolve_stage
+    CHEONGGYECHEON["stage"] = _resolve_stage(CHEONGGYECHEON["stage"])
     ROAD = {**ROAD, "layout": "cheonggyecheon",
             "length": CHEONGGYECHEON["route_length"],
-            "num_lanes": 2}                 # 청계천 양쪽 일방통행, 각 편도 2차로
+            "num_lanes": 2,                 # 청계천 양쪽 일방통행, 각 편도 2차로
+            "stage": CHEONGGYECHEON["stage"],
+            "vehicle_max_speed": CHEONGGYECHEON["vehicle_max_speed"],
+            "through_vph": int(os.environ.get("CGC_THROUGH_VPH") or CHEONGGYECHEON["through_vph"]),
+            "elements": _stage_elements(CHEONGGYECHEON["stage"])}
+    TRAFFIC = {**TRAFFIC, "vehs_per_hour": ROAD["through_vph"]}
     EGO = {**EGO,
            # 편도(동행) 노선만 학습/평가. 노선·정류장 정의는 config/lines.yaml
            # (A01_east → r0, A01_loop → r0_loop). 왕복을 학습하려면 {"r0_loop": 1.0}.
@@ -319,3 +339,5 @@ if CHEONGGYECHEON["enabled"]:
         # ROii 실측·가정 제원 (cheonggye_A01 명세 §1): 가속·감속은 [가정],
         # 최고속도 40 km/h는 [사실]. 차체·정원은 make_cgc_scenario --roii가 적용.
         EGO = {**EGO, "roii": True, "accel": 1.0, "decel": 2.5, "max_speed": 11.11}
+    # 모든 차량 최고속도 통일 (ROii 차 성능은 40 km/h지만 청계천 운행은 30 km/h로 묶는다)
+    EGO = {**EGO, "max_speed": CHEONGGYECHEON["vehicle_max_speed"]}

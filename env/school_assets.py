@@ -113,8 +113,14 @@ def _sign(font_path, size_m, lines, bg, fg, border, slash=False, limit_kmh=None)
     return img
 
 
-def make_assets(name="정평초등학교", limit_kmh=30, line_color="255,200,0", force=True) -> bool:
-    """PNG를 env/assets/에 만든다. Pillow·한글 폰트가 없으면 False (기존 파일 사용)."""
+def make_assets(name="정평초등학교", limit_kmh=30, line_color="255,200,0", force=True,
+                only=None, files=None) -> bool:
+    """PNG를 env/assets/에 만든다. Pillow·한글 폰트가 없으면 False (기존 파일 사용).
+
+    only: 만들 그림 키 목록 (None이면 전부). files: 키 → 파일 이름 바꾸기 (None이면 FILES).
+    예) 청계천 20 km/h 보호구역: only=("speed", "sign_start"),
+        files={"speed": "school_speed20.png", "sign_start": "school_sign_start20.png"}
+    """
     try:
         import PIL  # noqa: F401
     except ImportError:
@@ -145,8 +151,11 @@ def make_assets(name="정평초등학교", limit_kmh=30, line_color="255,200,0",
         bg = Image.new("RGBA", images[key].size, rgb + (255,))
         bg.alpha_composite(images[key])
         images[key] = bg
+    names = {**FILES, **(files or {})}
     for key, img in images.items():
-        path = os.path.join(ASSET_DIR, FILES[key])
+        if only is not None and key not in only:
+            continue
+        path = os.path.join(ASSET_DIR, names[key])
         if force or not os.path.exists(path):
             img.save(path, optimize=True)
     return True

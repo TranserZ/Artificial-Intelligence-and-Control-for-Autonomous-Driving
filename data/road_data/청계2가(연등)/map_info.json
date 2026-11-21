@@ -1,0 +1,17 @@
+{
+  "name": "청계2가(연등)",
+  "itst_id": "21850",
+  "fetched_at": "2026-11-21T00:48:49",
+  "record": {
+    "itstId": "21850",
+    "itstNm": "청계2가(연등)",
+    "mapCtptIntLat": 37.5679802,
+    "mapCtptIntLot": 126.9876671,
+    "laneWidth": 297.0,
+    "limitSpedTypeNm": "vehicleMaxSpeed, vehicleMaxSpeed",
+    "limitSped": "416, 833",
+    "itstEngNm": null,
+    "rgtrId": "V2X",
+    "regDt": "2026-07-09T16:31:14.000+00:00"
+  }
+}

@@ -547,6 +547,33 @@ def ped_pairs(net, east, west, rng, n):
     return pairs
 
 
+def walkable_pairs(net_path, pairs):
+    """SUMO 자체 보행 경로 계산(duarouter)으로 실제로 걸어갈 수 있는 (출발, 도착) 쌍만 남긴다.
+
+    sumolib의 최단경로는 보행자가 횡단보도 없이 차도를 건너는 연결도 길로 본다. 신호 없는
+    횡단보도를 지운 도로망(단계별 맵)에서는 그런 쌍이 SUMO 실행 중 "No connection found"
+    오류로 시뮬레이션을 멈춘다. duarouter --ignore-errors로 경로가 나오는 쌍만 쓴다.
+    """
+    import subprocess
+    import tempfile
+    import xml.etree.ElementTree as ET
+    if not pairs:
+        return []
+    with tempfile.TemporaryDirectory() as tmp:
+        src, dst = os.path.join(tmp, "walk.rou.xml"), os.path.join(tmp, "walk.out.xml")
+        with open(src, "w", encoding="utf-8") as f:
+            f.write("<routes>\n")
+            for i, (a, b) in enumerate(pairs):
+                f.write(f'    <person id="w{i}" depart="0"><walk from="{a}" to="{b}"/></person>\n')
+            f.write("</routes>\n")
+        subprocess.run([sumolib.checkBinary("duarouter"), "-n", net_path, "--route-files", src,
+                        "-o", dst, "--ignore-errors", "true", "--no-warnings", "true",
+                        "--no-step-log", "true"], check=True, capture_output=True)
+        ok = {p.get("id") for p in ET.parse(dst).getroot().iter("person")
+              if any(w.get("edges") for w in p.iter("walk"))}
+    return [pr for i, pr in enumerate(pairs) if f"w{i}" in ok]
+
+
 _DEMAND_TAGS = ("<flow ", "<personFlow ", "<vehicle ", "<trip ", "<person ")
 
 
@@ -576,6 +603,14 @@ def sort_demand_by_begin(lines):
 
 def build(net_path, out_dir, args):
     net = sumolib.net.readNet(net_path)
+    # 단계별 맵 (env/curriculum.py): --elements에 없는 요소는 만들지 않는다. 비어 있으면 전부.
+    els = [e for e in (getattr(args, "elements", "") or "").split(",") if e]
+
+    def on(name):
+        return not els or name in els
+
+    vms = getattr(args, "vehicle_max_speed", None)   # 모든 차량 최고속도 (m/s). None이면 차종별 기본값
+    print(f"단계 요소: {els or '전부'} / 차량 최고속도: {vms or '차종별 기본값'} m/s")
     # 보도 차로가 있으면 차량 차로는 1번부터 (netconvert --sidewalks.guess)
     # 최단경로는 600m 지점에서 본선 대신 짧은 연결로로 빠지므로 OSM way 순서대로 잇는다
     # (출발 구간이 신호교차로에 합쳐져 사라질 수 있어 START_EDGE 대신 경로 첫 엣지를 쓴다)
@@ -659,24 +694,22 @@ def build(net_path, out_dir, args):
     for cid, model, p, acc, dec, tau, gap, vmax, sigma, color in ctrl:
         sg = f' sigma="{sigma}"' if sigma is not None else ""
         L.append(f'        <vType id="car_{cid}" probability="{p}" carFollowModel="{model}" accel="{acc}" '
-                 f'decel="{dec}" tau="{tau}" minGap="{gap}" maxSpeed="{vmax}" speedDev="0.1" '
+                 f'decel="{dec}" tau="{tau}" minGap="{gap}" maxSpeed="{vms or vmax}" speedDev="0.1" '
                  f'color="{color}" vClass="passenger" guiShape="passenger/sedan"{sg} '
                  f'lcStrategic="1" lcCooperative="0.5" lcAssertive="1.2" lcImpatience="0.2"/>')
     L.append("    </vTypeDistribution>")
     # 끼어드는 차: 차선변경에 적극적이고 간격이 좁은 차량 (택시·배달차 가정)
-    L.append('    <vType id="cutin_car" accel="2.6" decel="4.5" tau="1.0" minGap="1.5" maxSpeed="9.7" '
-             'speedDev="0.15" lcAssertive="3" lcImpatience="1" lcSpeedGain="3" lcStrategic="1" '
+    L.append('    <vType id="cutin_car" accel="2.6" decel="4.5" tau="1.0" minGap="1.5" '
+             f'maxSpeed="{vms or 9.7}" speedDev="0.15" lcAssertive="3" lcImpatience="1" lcSpeedGain="3" lcStrategic="1" '
              'jmIgnoreFoeProb="0.35" jmTimegapMinor="0.3" jmIgnoreFoeSpeed="3" color="0.9,0.9,0.9" vClass="taxi" guiShape="passenger/sedan"/>')
+    # 차선변경 빈도를 일반 차량(car_*)의 약 1.5배로: lcSpeedGain=8 (2026-11-21 실측, 6단계·본선
+    # 400대/시간·1시간×시드 3개: 일반차 주행 km당 1.40회, 오토바이 2.11회 → 1.50배. 기본값(1)은 1.00배)
     L.append('    <vType id="motorcycle" vClass="motorcycle" guiShape="motorcycle" length="2.2" width="0.8" '
-             'accel="3.5" decel="5.0" maxSpeed="11" minGap="1.0" lcAssertive="2" lcImpatience="0.5" lcCooperative="0.5" '
+             f'accel="3.5" decel="5.0" maxSpeed="{vms or 11}" minGap="1.0" lcAssertive="2" lcImpatience="0.5" lcCooperative="0.5" '
+             'lcSpeedGain="8" '
              'jmIgnoreFoeProb="0.2" color="0.2,0.2,0.2"/>')
-    # OSM 조사: highway=cycleway 13개는 자동차 도로가 아니라 변환에서 빠진다.
-    # 청계천로 자동차 way 14개에는 cycleway:left=track(천 쪽 분리 자전거도로)이 있으나
-    # 그 태그는 전용 차로로 만들지 않는다. 대신 본선에 저속 자전거 흐름을 둔다.
-    # maxSpeed 5 m/s, speedFactor 0.8 → 대략 3–5 m/s.
-    L.append('    <vType id="bicycle" vClass="bicycle" guiShape="bicycle" length="1.8" width="0.65" '
-             'accel="1.2" decel="3.0" maxSpeed="5.0" speedFactor="0.8" speedDev="0.15" minGap="0.5" '
-             'color="0,0.55,0.25"/>')
+    # 자전거는 단계별 맵에서 삭제했다 (2026-11-21). 실제 청계천 자전거도로는 천 쪽에 분리돼 있어
+    # 본선 차로에 자전거를 섞을 근거도 약했다.
     L.append('    <vType id="parked_car" accel="2.0" decel="4.5" maxSpeed="8.3" color="0.5,0.5,0.5" '
              'vClass="passenger" guiShape="passenger/van"/>')
     # 광장시장에 세워 둔 오토바이. 차로를 막지 않는 정식 주차(parking=true).
@@ -705,23 +738,18 @@ def build(net_path, out_dir, args):
         L.append(f'    <flow id="through_w" type="carDist" route="main_west" begin="0" end="100000" '
                  f'vehsPerHour="{args.through_vph}" departLane="best" departSpeed="max"/>')
     # 측면 도로 합류(끼어들기 원인 ①). 목적지는 본선 끝 엣지.
-    for e in srcs:
+    for e in (srcs if on("cutin") else []):
         L.append(f'    <flow id="side_{e.getID()}" type="cutin_car" from="{e.getID()}" to="{END_EDGE}" '
                  f'begin="0" end="100000" vehsPerHour="{args.side_vph}" departLane="best" '
                  f'departSpeed="max"/>')
     # 세종대로 합류 (발표 ①: 접촉사고 원인 재현용). 가볍게 60초에 1대.
-    for i, e in enumerate(sejong_srcs):
+    for i, e in enumerate(sejong_srcs if on("cutin") else []):
         L.append(f'    <flow id="through_merge_{i}" type="cutin_car" from="{e.getID()}" to="{END_EDGE}" '
                  f'begin="0" end="100000" period="60" departLane="best" departSpeed="max"/>')
     # 오토바이: 본선 전체를 달리며 차선 사이를 파고든다
-    L.append(f'    <flow id="moto" type="motorcycle" route="main_east" begin="0" end="100000" '
-             f'vehsPerHour="{args.moto_vph}" departLane="best" departSpeed="max"/>')
-    # 동행·서행 전 구간. 20초에 한 대면 4 m/s 기준으로 약 80 m 간격.
-    L.append(f'    <flow id="bike_e" type="bicycle" route="main_east" begin="0" end="100000" '
-             f'period="20" departLane="best" departSpeed="max"/>')
-    if west:
-        L.append('    <flow id="bike_w" type="bicycle" route="main_west" begin="0" end="100000" '
-                 'period="20" departLane="best" departSpeed="max"/>')
+    if on("motorcycle"):
+        L.append(f'    <flow id="moto" type="motorcycle" route="main_east" begin="0" end="100000" '
+                 f'vehsPerHour="{args.moto_vph}" departLane="best" departSpeed="max"/>')
     # 광장시장 구간: 15 m 간격으로 오토바이를 세워 둔다. 정차금지지대 위치는 뺀다.
     no_stop = load_no_stop_zones()
     # 노상주차 줄이 있는 엣지(배오개다리~청계5가): 주차는 연석 쪽 parkingArea가 맡는다.
@@ -786,8 +814,9 @@ def build(net_path, out_dir, args):
                      if args.pax_route_ids else [rid])
     pax_lines = [(ln, lr) for ln, lr in line_routes.items() if lr[0] in pax_route_ids]
     # 보행 경로(횡단보도·보행구역)를 따라가려면 internal/pedestrian 연결을 함께 읽어야 한다
+    ped_pph = args.ped_pph if on("signal") else 0   # 1단계: 횡단보도를 건너는 보행자 없음
     pnet = east_main = west_main = None
-    if args.ped_pph > 0 or (pax_rate > 0 and pax_lines):
+    if ped_pph > 0:
         pnet = sumolib.net.readNet(net_path, withInternal=True, withPedestrianConnections=True)
         main_edges = [e for e in pnet.getEdges() if "청계천로" in (e.getName() or "")]
         def east(e):
@@ -795,40 +824,42 @@ def build(net_path, out_dir, args):
         east_main = [e for e in main_edges if east(e)]
         west_main = [e for e in main_edges if not east(e)]
     # 보행자: 청계천 남·북 보도를 오가며 신호 횡단보도를 건넌다 (팀 천호사거리와 같은 personFlow 방식)
-    if args.ped_pph > 0:
-        pairs = ped_pairs(pnet, east_main, west_main, rng, args.ped_pairs)
+    if ped_pph > 0:
+        # 후보를 넉넉히 뽑아 SUMO로 걸어갈 수 있는 쌍만 남긴다 (신호 없는 횡단보도 삭제 대응)
+        cand = ped_pairs(pnet, east_main, west_main, rng, args.ped_pairs * 3)
+        pairs = walkable_pairs(net_path, cand)[:args.ped_pairs]
+        print(f"보행자 경로 후보 {len(cand)}쌍 중 걸어갈 수 있는 {len(pairs)}쌍 사용")
         L.append('    <vType id="ped" vClass="pedestrian" speed="1.3" color="0,0.4,1"/>')
-        per = args.ped_pph / max(1, len(pairs))
+        per = ped_pph / max(1, len(pairs))
         for i, (a, b) in enumerate(pairs):
             L.append(f'    <personFlow id="ped_{i}" type="ped" begin="0" end="100000" '
                      f'period="{3600.0 / per:.1f}" departPos="random">\n'
                      f'        <walk from="{a}" to="{b}" arrivalPos="random"/>\n    </personFlow>')
-        print(f"보행자 경로 {len(pairs)}쌍, 시간당 {args.ped_pph}명")
-    # 승객 (계획서 §2.3): 정류장 보도에서 걸어와 기다리고, ego 버스를 타고
-    # (lines=노선 이름 — sumo_env가 reset에서 ego에 setLine), 두 정거장 뒤(또는 종점)에서
-    # 내려 걸어간다. 목적지는 가능하면 길 건너편 → 횡단보도 건너는 장면이 생긴다.
-    # 도착은 포아송(period=exp): passenger_rate 0.01 ≈ 100초에 1명씩 정류장에 모인다.
-    if pax_rate > 0 and pax_lines:
+        print(f"보행자 경로 {len(pairs)}쌍, 시간당 {ped_pph}명")
+    # 승객 (단계별 맵, 2026-11-21 단순화): 판 시작 때 정류장마다 정해진 인원(pax_per_stop)이
+    # 정류장에 와서 기다린다 → ego 버스가 정차에 성공하면 탄다 → 두 정거장 뒤에서 내린다. 끝.
+    # (내린 뒤 걸어가지 않는다 — 길을 건너는 승객 없음.) 두 정거장 뒤가 없는 정류장(끝에서 둘째·
+    # 마지막)에서는 타는 승객이 없다. 승객은 관측·보상·정차 판정에 쓰이지 않는다 (화면용).
+    n_pax = int(getattr(args, "pax_per_stop", 2) or 0)
+    if n_pax > 0 and pax_lines:
         L.append('    <vType id="pax" vClass="pedestrian" speed="1.3" color="1,0.55,0"/>')
-        n_pax_flows = 0
+        n_people = 0
         for lname, (route_id2, edges2, sids2) in pax_lines:
-            edge_dir = {e.getID() for e in east_main}
-            for i, sid in enumerate(sids2[:-1]):
-                dest_sid = sids2[min(i + 2, len(sids2) - 1)]
-                src_eid = placed[sid][0]
-                dest_eid = placed[dest_sid][0]
-                # 하차 정류장이 동행이면 길 건너 목적지는 서행 보도에서 찾는다 (반대도 같음)
-                opposite = west_main if dest_eid in edge_dir else east_main
-                walk_to = across_dest(pnet, dest_eid, opposite, rng) or dest_eid
-                L.append(
-                    f'    <personFlow id="pax_{lname}_{sid}" type="pax" begin="0" end="100000" '
-                    f'period="exp({pax_rate})" departPos="random">\n'
-                    f'        <walk from="{src_eid}" busStop="{sid}"/>\n'
-                    f'        <ride busStop="{dest_sid}" lines="{lname}"/>\n'
-                    f'        <walk to="{walk_to}" arrivalPos="random"/>\n    </personFlow>')
-                n_pax_flows += 1
-        print(f"승객 흐름 {n_pax_flows}개 (노선 {[ln for ln, _ in pax_lines]}, "
-              f"도착률 {pax_rate}/s/정류장)")
+            for i, sid in enumerate(sids2):
+                if i + 2 >= len(sids2):
+                    break
+                dest_sid = sids2[i + 2]
+                src_eid, s_start, _, _ = placed[sid]
+                for k in range(n_pax):
+                    pos = max(0.5, s_start - 4.0 - 3.0 * k)   # 정류장 바로 뒤 보도에서 걸어온다
+                    L.append(
+                        f'    <person id="pax_{lname}_{sid}_{k}" type="pax" depart="0" '
+                        f'departPos="{pos:.1f}">\n'
+                        f'        <walk from="{src_eid}" busStop="{sid}"/>\n'
+                        f'        <ride busStop="{dest_sid}" lines="{lname}"/>\n    </person>')
+                    n_people += 1
+        print(f"승객 {n_people}명 (노선 {[ln for ln, _ in pax_lines]}, 정류장당 {n_pax}명, "
+              f"탑승 → 2정거장 뒤 하차)")
     # 데모용 ego(셔틀): 학습 환경에서는 sumo_env가 TraCI로 직접 투입하므로 끌 수 있다.
     # line 속성 + 정류장 stop이 있어야 기다리는 승객(lines=노선 이름)을 태운다.
     if args.demo_ego:
@@ -909,7 +940,8 @@ def build(net_path, out_dir, args):
     # sumo_env가 보호구역 적색 포장·노란선을 읽어 관측·감점에 쓴다.
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     import zone_markings  # noqa: E402
-    add += zone_markings.marking_lines(net)
+    add += zone_markings.marking_lines(net, school_on=on("school_zone"),
+                                       parking_on=on("illegal_parking"))
     add.append("</additional>")
     with open(os.path.join(out_dir, "cgc.add.xml"), "w", encoding="utf-8", newline="\n") as f:
         f.write("\n".join(add) + "\n")
@@ -982,9 +1014,15 @@ def parse_args(argv=None):
     ap.add_argument("--ego-decel", type=float, default=None)
     ap.add_argument("--ego-max-speed", type=float, default=None, help="m/s")
     ap.add_argument("--passenger-rate", type=float, default=None,
-                    help="정류장별 승객 도착률 (1/s). 기본: lines.yaml의 passenger_rate. 0이면 없음")
+                    help="(사용 안 함 — 승객은 --pax-per-stop으로 고정. 예전 명령 호환용)")
     ap.add_argument("--pax-route-ids", default=None,
                     help="승객을 만들 노선의 route id들 (쉼표 구분). 기본: --line 노선만")
+    ap.add_argument("--pax-per-stop", type=int, default=2,
+                    help="정류장마다 판 시작부터 기다리는 승객 수 (탑승 → 2정거장 뒤 하차). 0이면 없음")
+    ap.add_argument("--elements", default="",
+                    help="단계별 맵에서 켤 요소 (쉼표 구분, env/curriculum.py). 비우면 전부")
+    ap.add_argument("--vehicle-max-speed", type=float, default=None,
+                    help="모든 차량(일반차·끼어드는 차·오토바이) 최고속도 m/s. 버스는 --ego-max-speed")
     ap.add_argument("--through-vph", type=int, default=500)
     ap.add_argument("--side-vph", type=int, default=40)
     ap.add_argument("--moto-vph", type=int, default=120)

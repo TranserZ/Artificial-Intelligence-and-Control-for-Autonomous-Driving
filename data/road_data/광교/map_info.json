@@ -1,0 +1,17 @@
+{
+  "name": "광교",
+  "itst_id": "1835",
+  "fetched_at": "2026-11-21T00:38:31",
+  "record": {
+    "itstId": "1835",
+    "itstNm": "광교",
+    "mapCtptIntLat": 37.5690373,
+    "mapCtptIntLot": 126.9827797,
+    "laneWidth": 307.0,
+    "limitSpedTypeNm": "vehicleMaxSpeed",
+    "limitSped": "694",
+    "itstEngNm": null,
+    "rgtrId": "V2X",
+    "regDt": "2026-07-09T16:31:14.000+00:00"
+  }
+}

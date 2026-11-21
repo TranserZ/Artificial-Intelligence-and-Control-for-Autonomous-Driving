@@ -115,7 +115,12 @@ def kmh_of(tags):
     return DEFAULT_KMH.get(tags.get("highway"), 30)
 
 
-def convert(osm_path, out_dir):
+def convert(osm_path, out_dir, signals_on=True, school_on=True):
+    """OSM → cgc.nod.xml / cgc.edg.xml.
+
+    signals_on=False: 신호 교차로를 모두 신호 없는 교차로(priority)로 만든다 (단계별 맵 1단계).
+    school_on=False: 어린이보호구역 엣지에 보호구역 제한속도를 넣지 않는다 (보호구역 단계 전).
+    """
     root = ET.parse(osm_path).getroot()
     nodes, node_tags = {}, {}
     for n in root.findall("node"):
@@ -275,17 +280,22 @@ def convert(osm_path, out_dir):
         f.write("<nodes>\n")
         for r in sorted(used_nodes):
             x, y = project(*nodes[r])
-            kind = "traffic_light" if useful_signal(r) else "priority"
+            kind = "traffic_light" if signals_on and useful_signal(r) else "priority"
             f.write(f'    <node id="n{r}" x="{x:.2f}" y="{y:.2f}" type="{kind}"/>\n')
         f.write("</nodes>\n")
-    school_speeds = load_school_speeds()
+    school_speeds = load_school_speeds() if school_on else {}
     lane_overrides = load_lane_overrides()
     n_school = 0
     n_lanes_fixed = 0
     with open(os.path.join(out_dir, "cgc.edg.xml"), "w", encoding="utf-8", newline="\n") as f:
         f.write("<edges>\n")
         for eid, a, b, n_lane, speed, pts, tags in edges:
-            shape = " ".join(f"{x:.2f},{y:.2f}" for x, y in pts[1:-1])
+            # 모양은 양 끝(노드 위치)까지 넣는다. 중간 점만 주면 netconvert가 그 점들만 도로로 써서
+            # 엣지가 마지막 중간 점에서 끝나고 노드까지 남은 거리가 전부 교차로 내부가 된다
+            # (2026-11-21 발견: 경로 2.1 km 중 761 m가 교차로 내부, 보호구역 70 m → 250 m).
+            # OSM_SHAPE_ENDS=0이면 예전 방식(중간 점만).
+            sp = pts if os.environ.get("OSM_SHAPE_ENDS", "1") != "0" else pts[1:-1]
+            shape = " ".join(f"{x:.2f},{y:.2f}" for x, y in sp)
             attr = f' shape="{shape}"' if shape else ""
             name = (tags.get("name") or "").replace('"', "").replace("&", "")
             name_attr = f' name="{name}"' if name else ""
@@ -307,7 +317,7 @@ def convert(osm_path, out_dir):
                     f'{name_attr}{width_attr}{attr}/>\n')
         f.write("</edges>\n")
 
-    n_tl = sum(1 for r in used_nodes if useful_signal(r))
+    n_tl = sum(1 for r in used_nodes if signals_on and useful_signal(r))
     print(f"노드 {len(used_nodes)}개 (신호등 {n_tl}, 추정 신호 {len(inferred)}, 빠른 도로 중간 신호 {n_drop}개 제외), "
           f"엣지 {len(edges)}개, 어린이보호구역 속도 {n_school}개, 차로 수 보정 {n_lanes_fixed}개 → {out_dir}")
     print(f"배경 정리: 끊긴 끝 잇기 {n_snap}곳, 막다른 토막·주차장 통로 {n_pruned}개 엣지 제거, "
@@ -575,6 +585,27 @@ def tiny_edge_joins(net_path, nod_path, min_len=2.0, min_len_main=8.0):
     text = text.replace("</nodes>", body + "</nodes>")
     open(nod_path, "w", encoding="utf-8", newline="\n").write(text)
     return len(merged)
+
+
+def unsignalized_crossing_discards(net_path, con_path):
+    """신호 없는 교차로의 횡단보도를 지우는 연결 파일(con.xml)을 쓴다. 반환: 지울 개수.
+
+    netconvert --crossings.guess는 신호 없는 교차로에도 횡단보도를 만든다. 단계별 맵에서는
+    신호 없는 횡단보도를 모두 없애기로 했다 (보행자는 신호 횡단보도로만 건넌다).
+    netconvert --sumo-net-file net --connection-files con 으로 적용한다.
+    """
+    root = ET.parse(net_path).getroot()
+    jtype = {j.get("id"): j.get("type") for j in root.iter("junction")}
+    lines = []
+    for e in root.iter("edge"):
+        if e.get("function") != "crossing":
+            continue
+        node = e.get("id")[1:].rsplit("_c", 1)[0]
+        if jtype.get(node) != "traffic_light":
+            lines.append(f'    <crossing node="{node}" edges="{e.get("crossingEdges")}" discard="true"/>')
+    with open(con_path, "w", encoding="utf-8", newline="\n") as f:
+        f.write("<connections>\n" + "\n".join(lines) + "\n</connections>\n")
+    return len(lines)
 
 
 def _passenger_lane_indexes(edge_el):

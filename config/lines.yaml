@@ -24,8 +24,9 @@ stops:
   bs_01: {edge: e73541403_2,   start: 22,  end: 37,  name: 청계광장,          name_en: Cheonggye Plaza}
   bs_02: {edge: e73541403_8,   start: 45,  end: 60,  name: 청계1가.광교,      name_en: Gwanggyo}
   bs_03: {edge: e908646367_3,  start: 30,  end: 45,  name: 청계2가.삼일교(동), name_en: Samilgyo (E)}
-  # bs_04: 청계3가 사거리 건너 바로 오른쪽 (보호구역 기점 직후, 로드뷰 2026.09). 엣지가 14.8 m라 정류장 12 m, keep_edge로 다음 엣지로 밀지 않음
-  bs_04: {edge: e218924602_1,  start: 1.5, end: 13.5, keep_edge: true, name: 청계3가.관수교(동), name_en: Gwansugyo (E)}
+  # bs_04: 청계3가 사거리 건너 바로 오른쪽 (보호구역 기점 직후, 로드뷰 2026.09). keep_edge로 다음 엣지로 밀지 않음.
+  #   2026-11-21: 엣지 모양에 양 끝점을 넣으며 엣지가 14.8 → 101 m가 됨 → 실측 좌표(노선 1374 m)에 맞춰 1.5~13.5 → 33~45 m
+  bs_04: {edge: e218924602_1,  start: 33, end: 45, keep_edge: true, name: 청계3가.관수교(동), name_en: Gwansugyo (E)}
   bs_05: {edge: e218924602_6,  start: 68,  end: 83,  name: 청계4가.배오개다리, name_en: Baeogae Bridge}
   bs_06: {edge: e1212424785_1, start: 184, end: 199, name: 청계5가.광장시장,   name_en: Gwangjang Market}
   bs_07: {edge: e732213463_1,  start: 113, end: 128, name: 청계4가.세운교,     name_en: Sewoongyo}
