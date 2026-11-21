@@ -72,6 +72,8 @@ EXPERT_LC_GATE = {"rear_tau": 1.0, "approach_horizon": 2.0}
 # 1단계는 신호가 없어 팀 코드의 "교차로 직후 금지 구간"이 꺼져 있고, 게이트는 교차로 안을 지나는 차를
 # 못 본다. 그래서 선생님 게이트는 엣지 시작·끝 EXPERT_JUNCTION_GAP m 안의 변경을 막는다.
 EXPERT_JUNCTION_GAP = 20.0
+EXPERT_LEAD_DECEL = 4.5     # m/s². 선생님 차량 shield가 가정하는 앞차 급정거 (배경차 최대 감속)
+EXPERT_SHIELD_MARGIN = 3.0  # m. 앞차 뒤에 남길 간격
 # 선생님 학습 초반 탐색: 기본 lane_keep_bias 0.5는 step마다 약 55% 차선변경 시도 → 2.0 (약 14%)
 EXPERT_LANE_KEEP_BIAS = 2.0
 
@@ -91,6 +93,27 @@ class ExpertGateEnv(SumoHighwayEnv):
             return False
         return super()._lane_change_is_safe(direction)
 
+    def _shield_accel(self, accel_raw: float, v: float):
+        """선생님 차량 shield: 앞차가 EXPERT_LEAD_DECEL로 급정거해도 설 수 있는 속도로 제한한다.
+
+        팀 shield는 앞차도 버스와 같은 감속(2.5)으로 선다고 보아, 신호 대기줄에서 앞차가 세게 서면
+        최대 감속을 걸고도 추돌했다 (2단계 선생님 40판 중 2판)."""
+        import traci
+        cmd0, hit0 = super()._shield_accel(accel_raw, v)
+        lead = traci.vehicle.getLeader(self.ego_id, 120.0)
+        if not lead or not lead[0]:
+            return cmd0, hit0
+        gap = max(float(lead[1]) - EXPERT_SHIELD_MARGIN, 0.0)
+        vl = traci.vehicle.getSpeed(lead[0])
+        b, dt = self.shield_decel, self.step_length
+        v_safe = max(np.sqrt(2.0 * b * (gap + vl * vl / (2.0 * EXPERT_LEAD_DECEL))) - b * dt, 0.0)
+        cmd = accel_raw * (self.max_accel if accel_raw >= 0 else self.max_decel)
+        if v + cmd * dt <= v_safe:
+            return cmd0, hit0
+        need = (v_safe - v) / dt
+        new = need / self.max_accel if need >= 0 else need / self.max_decel
+        return float(np.clip(min(new, cmd0), -1.0, 1.0)), True
+
 
 # 선생님 정류장 정차 규칙 (규칙 + PPO = Optimal Bus). shield만 켠 선생님은 5만 step 동안 정차 성공 0회:
 # 정류장 차로·15 m 구간·10초 연속 정지를 탐색으로 우연히 해내기 어렵고, 놓침 −20 × 5 때문에
@@ -101,7 +124,8 @@ STOP_RULE_TARGET = 2.0     # m. 앞범퍼를 정류장 끝보다 이만큼 앞�
 # 선생님 신호 접근 규칙 (2단계~)
 SIGNAL_RULE_DECEL = 1.5         # m/s². 적색 앞 감속 곡선
 SIGNAL_RULE_YELLOW_DECEL = 2.0  # m/s². 황색에서 이 감속으로 설 수 있을 때만 선다
-SIGNAL_RULE_MARGIN = 1.0        # m. 정지선 앞 여유
+SIGNAL_RULE_MARGIN = 2.5        # m. 정지선 앞 여유 (1.0일 때 학생이 1 m 앞에서 0.5 m/s로 밀려 넘어감)
+SIGNAL_RULE_HOLD = 1.0          # m. 목표 지점(정지선 − 여유)에서 이만큼 안이면 최대 감속 유지
 
 
 class TeacherEnv(ExpertGateEnv):
@@ -172,7 +196,9 @@ class TeacherEnv(ExpertGateEnv):
         if state not in ("r", "u", "y", "s"):
             return accel_raw, False
         target_v = float(np.sqrt(2.0 * SIGNAL_RULE_DECEL * d))
-        if target_v < 0.05:
+        if target_v < 0.05 or d <= SIGNAL_RULE_HOLD:
+            # 정지선 앞에서는 확실히 선다. 서 있는 동안 정답이 "조금 가속"과 "최대 감속"으로 섞이면
+            # 학생이 평균(≈0)을 배워 천천히 밀려 나간다 (2단계 적색 위반 3건 중 2건)
             rule_a = -1.0
         else:
             need = (target_v - v) / self.step_length
