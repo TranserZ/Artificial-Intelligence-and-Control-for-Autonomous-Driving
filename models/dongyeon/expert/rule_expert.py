@@ -22,7 +22,7 @@ import traci
 class RuleExpert:
     """predict(obs, deterministic) 인터페이스 (공통 평가 스크립트 policy factory와 같음)."""
 
-    version = "rule_expert_v3"
+    version = "rule_expert_v4"   # v4: 옆길 합류 차 양보, 차선변경 간격 직접 측정, 불법주정차 미리 비키기
 
     def __init__(self, env, stop_lookahead=150.0, lane_gap=8.0, follow_decel=1.2, stop_decel=1.0,
                  signal_decel=1.2, yellow_decel=2.5, overtake_range=30.0):
@@ -34,21 +34,97 @@ class RuleExpert:
         self.signal_decel = signal_decel
         self.yellow_decel = yellow_decel
         self.overtake_range = overtake_range
+        self.side_prefixes = ("side_", "through_merge_")
+        self.parked_lookahead = 80.0
+        self.yield_range, self.yield_lateral, self.yield_gap, self.yield_min_speed = 30.0, 10.0, 6.0, 1.0
         self.last_reason = ""
 
     # 공통 평가 스크립트가 판 시작을 알려 주지 않아도 되도록 상태를 두지 않는다.
     def reset(self):
         self.last_reason = ""
 
-    def _side_clear(self, ego, direction):
-        """direction 쪽 옆 차로가 앞뒤 lane_gap m 안에 비어 있고 SUMO가 차로 변경 가능하다고 하는가."""
-        if not traci.vehicle.couldChangeLane(ego, direction):
+    def _side_clear(self, ego, direction, parked_overtake=False):
+        """direction 쪽 옆 차로로 지금 옮겨도 되는가.
+
+        기본: traci couldChangeLane(SUMO 판단) + 옆 차로 앞뒤 lane_gap m 안에 차 없음.
+        parked_overtake: 서 있는 불법주정차 뒤에서 천천히 추월할 때. couldChangeLane은 ego 차선변경
+          모드(0)·경로 차로 선호 때문에 빈 차로에도 False를 내는 경우가 있어(6단계 주교 앞에서 확인)
+          대신 차로 존재 + 옆 차로 뒤 차가 오는 속도까지 본 더 큰 간격으로 직접 판단한다.
+        """
+        edge = traci.vehicle.getRoadID(ego)
+        if edge.startswith(":"):
             return False
-        # getNeighbors mode: bit0 = 왼쪽(1)/오른쪽(0), bit1 = 앞(1)/뒤(0)
-        side = 1 if direction > 0 else 0
-        nb = (traci.vehicle.getNeighbors(ego, side)              # 그 쪽 뒤
-              + traci.vehicle.getNeighbors(ego, 0b10 | side))    # 그 쪽 앞
-        return all(abs(g) > self.lane_gap for _, g in nb)
+        if not self.env._is_car_lane(edge, traci.vehicle.getLaneIndex(ego) + direction):
+            return False
+        if not parked_overtake and not traci.vehicle.couldChangeLane(ego, direction):
+            return False
+        # 목표 차로의 차들을 직접 읽어 앞뒤 간격을 잰다 (getNeighbors는 겹친 차를 놓치는 경우가 있었다)
+        target_lane = f"{edge}_{traci.vehicle.getLaneIndex(ego) + direction}"
+        v = traci.vehicle.getSpeed(ego)
+        pos = traci.vehicle.getLanePosition(ego)
+        length = traci.vehicle.getLength(ego)
+        for vid in traci.lane.getLastStepVehicleIDs(target_lane):
+            p = traci.vehicle.getLanePosition(vid)
+            if p >= pos:     # 앞 차: 그 차 꽁무니 − 내 앞머리
+                if p - traci.vehicle.getLength(vid) - pos < self.lane_gap:
+                    return False
+            else:            # 뒤 차: 내 꽁무니 − 그 차 앞머리, 다가오는 속도만큼 여유
+                need = self.lane_gap + (3.0 if parked_overtake else 1.5) * max(0.0, traci.vehicle.getSpeed(vid) - v)
+                if (pos - length) - p < need:
+                    return False
+        # 버스 꽁무니가 아직 앞 엣지(교차로)에 걸쳐 있으면 그쪽 뒤 차를 못 보므로 바꾸지 않음
+        if pos - length < 0.0:
+            return False
+        return True
+
+    def _parked_ahead(self, ego):
+        """경로 앞 lookahead m 안에, 버스와 같은 차로 번호(오른쪽부터)로 서 있는 불법주정차가 있는가.
+
+        6단계 주교(e218924602_4, 34 m)는 교차로 바로 뒤 엣지 오른쪽 차로를 막는다. 교차로 안에서는
+        차선을 못 바꾸므로 교차로에 들어가기 전에 미리 비켜야 한다 (선생의 특권 정보: 앞 엣지의 주정차 위치).
+        """
+        route = traci.vehicle.getRoute(ego)
+        idx = traci.vehicle.getRouteIndex(ego)
+        ahead_edges = set(route[idx:])
+        my_lane = self.env._car_lane_index(ego)
+        for vid in traci.vehicle.getIDList():
+            if not vid.startswith("hs_"):
+                continue
+            road = traci.vehicle.getRoadID(vid)
+            if road not in ahead_edges or road.startswith(":"):
+                continue
+            try:
+                d = traci.vehicle.getDrivingDistance(ego, road, traci.vehicle.getLanePosition(vid))
+            except traci.TraCIException:
+                continue
+            if 0.0 < d < self.parked_lookahead and self.env._car_lane_index(vid) == my_lane:
+                return True
+        return False
+
+    def _yield_side(self, ego):
+        """옆길에서 합류 중인 차(경로 밖·교차로 안)가 버스 진행 방향 앞에 있으면 그 앞에 서는 속도."""
+        route = set(traci.vehicle.getRoute(ego))
+        ex, ey = traci.vehicle.getPosition(ego)
+        ang = np.radians(90.0 - traci.vehicle.getAngle(ego))   # SUMO 각도: 북 0°, 시계 방향
+        hx, hy = np.cos(ang), np.sin(ang)
+        best = None
+        for vid in traci.vehicle.getIDList():
+            if not vid.startswith(self.side_prefixes):
+                continue
+            road = traci.vehicle.getRoadID(vid)
+            if road in route:            # 이미 버스 경로에 올라온 차는 앞차 규칙이 맡는다
+                continue
+            # 옆길에서 서서 기다리는 차는 무시: 교차로 안에 들어왔거나 움직이며 다가오는 차만
+            if not road.startswith(":") and traci.vehicle.getSpeed(vid) < self.yield_min_speed:
+                continue
+            x, y = traci.vehicle.getPosition(vid)
+            dx, dy = x - ex, y - ey
+            ahead = dx * hx + dy * hy           # 진행 방향 거리
+            lateral = abs(-dx * hy + dy * hx)   # 옆 거리
+            if 0.0 < ahead < self.yield_range and lateral < self.yield_lateral:
+                v = float(np.sqrt(max(0.0, 2 * self.follow_decel * max(0.0, ahead - self.yield_gap))))
+                best = v if best is None else min(best, v)
+        return best
 
     def act(self):
         env, ego = self.env, self.env.ego_id
@@ -93,6 +169,13 @@ class RuleExpert:
         if env._waiting_for_ped():
             target, reason = 0.0, "pedestrian"
 
+        # 5-0) 앞 엣지 불법주정차를 교차로 전에 미리 비키기 (같은 차로면 옆 차로로)
+        if lane == 0.0 and not edge.startswith(":") and self._parked_ahead(ego):
+            for dr in (1, -1):
+                if self._side_clear(ego, dr, parked_overtake=True):
+                    lane, reason = float(dr), "avoid_parked"
+                    break
+
         # 5) 서 있는 앞차 추월
         lead = traci.vehicle.getLeader(ego, 80.0)
         if (lead is not None and lane == 0.0 and lead[1] < self.overtake_range
@@ -102,9 +185,15 @@ class RuleExpert:
             parked = lead[0].startswith(("hs_", "park", "moto_park", "truck"))
             if parked or not red_ahead:
                 for dr in (1, -1):
-                    if self._side_clear(ego, dr):
+                    if self._side_clear(ego, dr, parked_overtake=parked and v < 3.0):
                         lane, reason = float(dr), "overtake"
                         break
+
+        # 5-1) 옆길 합류 차 양보: 아직 버스 경로에 올라오지 않은(옆길·교차로 안) 끼어드는 차가
+        #      버스 앞쪽 yield_range m 안에 있으면 그 차 앞 yield_gap m에 서도록 감속 (3단계 이상 충돌 원인)
+        yv = self._yield_side(ego)
+        if yv is not None and yv < target:
+            target, reason = yv, "yield_side"
 
         # 6) 앞차 안전거리
         if lead is not None:

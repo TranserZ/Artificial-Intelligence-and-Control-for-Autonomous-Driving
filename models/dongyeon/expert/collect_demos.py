@@ -43,7 +43,7 @@ from env.sumo_env import HELD_OUT_SEEDS, SumoHighwayEnv  # noqa: E402
 from models.dongyeon.expert.rule_expert import RuleExpert  # noqa: E402
 import traci  # noqa: E402
 
-REASONS = ("cruise", "school_zone", "stop_approach", "dwell", "signal", "pedestrian", "overtake", "follow", "no_ego")
+REASONS = ("cruise", "school_zone", "stop_approach", "dwell", "signal", "pedestrian", "overtake", "follow", "no_ego", "yield_side", "avoid_parked")
 
 
 def train_reward():
