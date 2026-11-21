@@ -205,6 +205,9 @@ class SumoHighwayEnv(gym.Env):
         #   a = +1 → +max_accel (풀 액셀),  a = -1 → -max_decel (풀 브레이크)
         self.max_accel = float(ego["accel"])   # m/s^2
         self.max_decel = float(ego["decel"])   # m/s^2 (양수로 저장, 부호는 계산 시)
+        # ego가 낼 수 있는 최고속도 (m/s). speedMode=0이면 SUMO가 vType maxSpeed를 지켜 주지 않으므로
+        # setSpeed 상한을 여기서 건다. 관측 정규화 기준(vmax)과는 별개다.
+        self.ego_vmax = min(self.vmax, float(ego.get("max_speed", self.vmax)))
 
         # ----- MDP 설정 -----
         self.step_length = float(mdp_sim["step_length"])
@@ -2162,7 +2165,7 @@ class SumoHighwayEnv(gym.Env):
                          if accel_raw >= 0.0 else accel_raw * self.max_decel)
             dv = accel_cmd * self.step_length
             traci.vehicle.setSpeed(
-                self.ego_id, float(np.clip(v + dv, 0.0, self.vmax)))
+                self.ego_id, float(np.clip(v + dv, 0.0, self.ego_vmax)))
 
             # 금지 구간은 변경 "명령 시점" 위치로 판정한다
             lc_forbidden = lane_change != 0 and self._lc_forbidden()
