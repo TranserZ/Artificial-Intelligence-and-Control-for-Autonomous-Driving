@@ -483,8 +483,12 @@ class BCPPO(PPO):
     """
 
     def __init__(self, *a, demos=None, demo_returns=None, bc_coef=1.0, warmup_steps=10_000,
-                 decay_steps=150_000, bc_batch=64, target_kl=None, critic_lr=3e-4, **kw):
+                 decay_steps=150_000, bc_batch=64, target_kl=None, critic_lr=3e-4,
+                 lane_bc_coef=None, **kw):
         super().__init__(*a, **kw)
+        # 차선 BC 항 가중치. None이면 가감속과 같이 λ(t)로 줄고, 값을 주면 끝까지 그 값으로 유지한다
+        # (학생이 속도 보상 때문에 왼쪽 차로로 나갔다가 정류장 11 m 앞에서야 돌아와 놓침)
+        self.lane_bc_coef = lane_bc_coef
         from utils.networks import build_mlp, orthogonal_init
         hp = T.HPARAMS
         obs_dim = self.policy.trunk[0].in_features
@@ -574,11 +578,12 @@ class BCPPO(PPO):
                     loss = policy_loss - self.entropy_coef * entropy.mean()
                     if self.lane_entropy_coef > 0:
                         loss = loss - self.lane_entropy_coef * self.policy.lane_entropy(obs_t[mb]).mean()
-                    if lam > 0:
+                    lam_lane = lam if self.lane_bc_coef is None else self.lane_bc_coef
+                    if lam > 0 or lam_lane > 0:
                         j = torch.randint(0, len(self.demo_obs), (self.bc_batch,), device=self.device)
                         nll, ce, *_ = bc_losses(self.policy, self.demo_obs[j], self.demo_act[j])
                         bc_loss = nll + ce
-                        loss = loss + lam * bc_loss
+                        loss = loss + lam * nll + lam_lane * ce
                     self.optimizer.zero_grad()
                     loss.backward()
                     nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
@@ -617,7 +622,8 @@ def cmd_finetune(args):
     env = make_env("off", replay_prob=args.replay_prob)
     agent = make_agent(env, args.seed, cls=BCPPO, demos=(obs, act), demo_returns=ret,
                        bc_coef=args.bc_coef, warmup_steps=args.warmup_steps,
-                       decay_steps=args.decay_steps, target_kl=args.target_kl)
+                       decay_steps=args.decay_steps, target_kl=args.target_kl,
+                       lane_bc_coef=args.lane_bc_coef)
     load_weights(agent, args.init)
     print(f"초기 가중치: {args.init} · BC λ {args.bc_coef} → 0 ({args.warmup_steps} + "
           f"{args.decay_steps} step) · 시범 {len(obs)} step · 가치 신경망 분리")
@@ -672,6 +678,8 @@ def main():
     q.add_argument("--decay-steps", type=int, default=150_000)
     q.add_argument("--all-episodes", action="store_true", help="실패한 판도 흉내 낸다 (스모크용)")
     q.add_argument("--target-kl", type=float, default=0.02, help="KL 조기 종료 기준 (0이면 끔)")
+    q.add_argument("--lane-bc-coef", type=float, default=None,
+                   help="차선 BC 항을 이 가중치로 끝까지 유지 (없으면 가감속과 같이 줄어듦)")
 
     q = sub.add_parser("collect")
     q.add_argument("--ckpt", required=True)
