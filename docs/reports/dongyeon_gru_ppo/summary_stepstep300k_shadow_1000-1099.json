@@ -1,0 +1,176 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-11-21T10:06:02+09:00",
+  "model_name": "dongyeon_gru_ppo",
+  "checkpoint_step": "step300k",
+  "shield": "shadow",
+  "scenario_seed_range": [
+    1000,
+    1099
+  ],
+  "train_seeds": [
+    0,
+    1,
+    2
+  ],
+  "per_train_seed": {
+    "0": {
+      "episodes": 100,
+      "collision_rate": 0.14,
+      "official_completion_rate": 0.6,
+      "completion_rate": 0.6,
+      "perfect_completion_rate": 0.0,
+      "stop_success_rate": 0.206,
+      "shield_step_ratio": 0.007187591932558528,
+      "interventions_per_km": 1.5341049812119814,
+      "avg_speed_kmh": 12.368952,
+      "missed_stops": 307,
+      "collision_vehicle": 12,
+      "collision_pedestrian": 2,
+      "end_reasons": {
+        "collision": 14,
+        "missed_stop": 60,
+        "red_light": 26
+      },
+      "pass_rates": {
+        "A": 1.0,
+        "B": 0.96,
+        "C": 0.93,
+        "D": 0.86,
+        "E": 0.69,
+        "F": 0.66,
+        "G": 0.66,
+        "H": 0.6,
+        "I": 0.0
+      }
+    },
+    "1": {
+      "episodes": 100,
+      "collision_rate": 0.35,
+      "official_completion_rate": 0.0,
+      "completion_rate": 0.0,
+      "perfect_completion_rate": 0.0,
+      "stop_success_rate": 0.068,
+      "shield_step_ratio": 0.0025285856922574327,
+      "interventions_per_km": 2.26057929373127,
+      "avg_speed_kmh": 5.594964999999999,
+      "missed_stops": 136,
+      "collision_vehicle": 34,
+      "collision_pedestrian": 1,
+      "end_reasons": {
+        "collision": 35,
+        "red_light": 5,
+        "timeout": 60
+      },
+      "pass_rates": {
+        "A": 1.0,
+        "B": 0.8,
+        "C": 0.64,
+        "D": 0.13,
+        "E": 0.01,
+        "F": 0.0,
+        "G": 0.0,
+        "H": 0.0,
+        "I": 0.0
+      }
+    },
+    "2": {
+      "episodes": 100,
+      "collision_rate": 0.47,
+      "official_completion_rate": 0.34,
+      "completion_rate": 0.34,
+      "perfect_completion_rate": 0.0,
+      "stop_success_rate": 0.2,
+      "shield_step_ratio": 0.010135934588515232,
+      "interventions_per_km": 1.4241598653825163,
+      "avg_speed_kmh": 11.299809,
+      "missed_stops": 221,
+      "collision_vehicle": 46,
+      "collision_pedestrian": 1,
+      "end_reasons": {
+        "collision": 47,
+        "missed_stop": 34,
+        "red_light": 19
+      },
+      "pass_rates": {
+        "A": 1.0,
+        "B": 0.93,
+        "C": 0.74,
+        "D": 0.73,
+        "E": 0.37,
+        "F": 0.37,
+        "G": 0.37,
+        "H": 0.34,
+        "I": 0.0
+      }
+    }
+  },
+  "three_seed_summary": {
+    "collision_rate": {
+      "mean": 0.32,
+      "sd": 0.16703293088490065
+    },
+    "official_completion_rate": {
+      "mean": 0.3133333333333333,
+      "sd": 0.3008875759039135
+    },
+    "completion_rate": {
+      "mean": 0.3133333333333333,
+      "sd": 0.3008875759039135
+    },
+    "perfect_completion_rate": {
+      "mean": 0.0,
+      "sd": 0.0
+    },
+    "stop_success_rate": {
+      "mean": 0.158,
+      "sd": 0.078
+    },
+    "shield_step_ratio": {
+      "mean": 0.006617370737777063,
+      "sd": 0.00383559688517735
+    },
+    "target_passed": false,
+    "team_goal_intervention_met": true
+  },
+  "seed_validation": {
+    "0": {
+      "expected_count": 100,
+      "actual_count": 100,
+      "missing": [],
+      "duplicates": [],
+      "out_of_range": [],
+      "passed": true
+    },
+    "1": {
+      "expected_count": 100,
+      "actual_count": 100,
+      "missing": [],
+      "duplicates": [],
+      "out_of_range": [],
+      "passed": true
+    },
+    "2": {
+      "expected_count": 100,
+      "actual_count": 100,
+      "missing": [],
+      "duplicates": [],
+      "out_of_range": [],
+      "passed": true
+    }
+  },
+  "source_files": [
+    "ts0_stepstep300k_shadow_1000-1024.csv",
+    "ts0_stepstep300k_shadow_1025-1049.csv",
+    "ts0_stepstep300k_shadow_1050-1074.csv",
+    "ts0_stepstep300k_shadow_1075-1099.csv",
+    "ts1_stepstep300k_shadow_1000-1024.csv",
+    "ts1_stepstep300k_shadow_1025-1049.csv",
+    "ts1_stepstep300k_shadow_1050-1074.csv",
+    "ts1_stepstep300k_shadow_1075-1099.csv",
+    "ts2_stepstep300k_shadow_1000-1024.csv",
+    "ts2_stepstep300k_shadow_1025-1049.csv",
+    "ts2_stepstep300k_shadow_1050-1074.csv",
+    "ts2_stepstep300k_shadow_1075-1099.csv"
+  ]
+}
