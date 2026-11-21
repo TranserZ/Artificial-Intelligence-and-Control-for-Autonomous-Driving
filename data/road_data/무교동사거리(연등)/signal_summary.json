@@ -1,0 +1,87 @@
+{
+  "name": "무교동사거리(연등)",
+  "samples": 107,
+  "movements": [
+    {
+      "key": "et_Pd",
+      "label": "동 보행"
+    },
+    {
+      "key": "st_Pd",
+      "label": "남 보행"
+    }
+  ],
+  "state_legend": {
+    "G": "녹색",
+    "g": "비보호녹색",
+    "y": "황색/점멸",
+    "r": "적색",
+    "s": "적색후진행",
+    "u": "적황",
+    "o": "황색점멸",
+    "O": "소등",
+    "?": "미확인"
+  },
+  "cycle_s": 159.5,
+  "cycles_observed": 1,
+  "cycle_list_s": [
+    159.5
+  ],
+  "phase_sum_s": 159.4,
+  "phases": [
+    {
+      "index": 0,
+      "duration_s": 18.2,
+      "duration_min_max_s": [
+        18.0,
+        18.5
+      ],
+      "observed": 2,
+      "state": "GG",
+      "signals": {
+        "녹색": [
+          "동 보행",
+          "남 보행"
+        ]
+      }
+    },
+    {
+      "index": 1,
+      "duration_s": 32.7,
+      "duration_min_max_s": [
+        32.5,
+        33.0
+      ],
+      "observed": 2,
+      "state": "gg",
+      "signals": {
+        "비보호녹색": [
+          "동 보행",
+          "남 보행"
+        ]
+      }
+    },
+    {
+      "index": 2,
+      "duration_s": 108.5,
+      "duration_min_max_s": [
+        108.5,
+        108.5
+      ],
+      "observed": 1,
+      "state": "rr",
+      "signals": {
+        "적색": [
+          "동 보행",
+          "남 보행"
+        ]
+      }
+    }
+  ],
+  "green_time_per_movement_s": {
+    "동 보행": 50.9,
+    "남 보행": 50.9
+  },
+  "other_states_seen": [],
+  "segments_total": 7
+}

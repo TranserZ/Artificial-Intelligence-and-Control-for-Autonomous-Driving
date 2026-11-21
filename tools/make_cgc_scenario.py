@@ -757,7 +757,9 @@ def build(net_path, out_dir, args):
     roadside = [z for z in load_roadside_parking() if net.hasEdge(z[0])]
     roadside_edges = {z[0] for z in roadside}
     moto_n = 0
-    for eid in MOTO_PARK_EDGES:
+    # 주차 오토바이도 오토바이 단계(5단계)부터. 300초 뒤 차로로 나와 떠나므로 앞 단계에 두면
+    # 오토바이가 없어야 할 맵에 움직이는 오토바이가 생긴다.
+    for eid in (MOTO_PARK_EDGES if on("motorcycle") else ()):
         if eid in roadside_edges:
             continue
         try:
