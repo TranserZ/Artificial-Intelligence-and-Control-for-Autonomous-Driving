@@ -26,6 +26,7 @@ from datetime import datetime
 from importlib.metadata import PackageNotFoundError, version
 
 from env.road_config import ROAD, EGO, TRAFFIC
+from env.curriculum import road_summary
 from env.mdp_config import SIMULATION, OBSERVATION, ACTION
 from env.mdp_config import REWARD as REWARD_DEFAULTS
 from env import road_builder
@@ -254,6 +255,10 @@ def runtime_versions():
     }
 
 
+# 이 학습이 따르는 공통 환경 태그 (rules/team/experiment_protocol.md). config.json에 조상 여부를 남긴다.
+TARGET_ENV = "env-v3"
+
+
 def write_run_config(run_dir, *, seed, requested_steps, actual_steps,
                      status, tensorboard_enabled, resume_source=None):
     """재현에 필요한 환경·학습 설정을 config.json 하나에 기록한다."""
@@ -266,9 +271,9 @@ def write_run_config(run_dir, *, seed, requested_steps, actual_steps,
         "git": {
             "commit": _git("rev-parse", "HEAD"),
             "exact_tag": exact_tag,
-            "target_environment": "env-v2",
+            "target_environment": TARGET_ENV,
             "target_is_ancestor": _git_ok(
-                "merge-base", "--is-ancestor", "env-v2", "HEAD"),
+                "merge-base", "--is-ancestor", TARGET_ENV, "HEAD"),
             "dirty": bool(_git(
                 "status", "--porcelain", "--untracked-files=no")),
         },
@@ -282,6 +287,8 @@ def write_run_config(run_dir, *, seed, requested_steps, actual_steps,
                                  EVAL_SEED_BASE + EVAL_EPISODES - 1],
             "hparams": HPARAMS,
         },
+        # 단계별 도로 (env/curriculum.py): 몇 단계 도로에서 학습했는가 (CGC_STAGE 반영)
+        "road": road_summary(ROAD),
         "environment": {
             "held_out_seed_ranges": [list(r) for r in HELD_OUT_SEEDS],
             "simulation": SIMULATION,
@@ -363,6 +370,8 @@ if __name__ == "__main__":
     sumocfg = road_builder.build(
         ROAD, EGO, TRAFFIC, sumo_workspace.name)
     print(f"도로 생성 완료: {sumocfg}")
+    if ROAD.get("stage"):
+        print(f"  단계 {ROAD['stage']}: {', '.join(ROAD.get('elements') or [])}")
     print(f"  길이 {ROAD['length']}m, {ROAD['num_lanes']}차선, "
           f"교통량 {TRAFFIC['vehs_per_hour']}대/시간")
 

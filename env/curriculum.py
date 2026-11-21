@@ -37,6 +37,20 @@ def elements(stage: int) -> tuple:
     return STAGE_ORDER[:int(stage)]
 
 
+def road_summary(road: dict) -> dict:
+    """결과 파일(config.json, 평가 json)에 남길 도로 단계 정보.
+
+    CGC_STAGE 환경변수로 바꾼 값도 그대로 남는다 (road_config.py 스냅샷에는 기본값만 있음).
+    """
+    return {
+        "layout": road.get("layout"),
+        "stage": road.get("stage"),
+        "elements": list(road.get("elements") or []),
+        "through_vph": road.get("through_vph"),
+        "vehicle_max_speed": road.get("vehicle_max_speed"),
+    }
+
+
 def has(road_or_elements, name: str) -> bool:
     """ROAD 설정(dict, "elements" 키) 또는 요소 목록에 name이 켜져 있는가.
 

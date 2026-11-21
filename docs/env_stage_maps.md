@@ -121,18 +121,53 @@
 | 지형 | 노선 길이 −0.4%, 차로 수 24/24, 노선 지점 7곳 중 5곳 양호 (광교 −28 m, 삼일대로 −22 m). 허용 이유: `docs/reports/2026-11-21_청계천로_지형오차_요약.md` |
 | 속도 | 모든 차량 8.33 m/s(30 km/h) 이하 확인 |
 
-## 6. 실행 방법
+## 6. 실행 방법 — 단계별 학습·평가 순서 (사람·AI 공통)
 
+**준비**: `env-v3` 태그가 들어간 커밋에서 시작한다 (`git merge env-v3`). 패키지는 `rules/setup/requirements-env-v2.txt`.
+
+**단계를 바꾸는 방법은 하나뿐이다: 명령 앞에 `CGC_STAGE=1~6`.** 없으면 6단계. 코드는 고치지 않는다. 도로는 실행할 때마다 그 단계로 새로 만든다.
+
+### 6-1. 학습 (도로 N마다)
 ```bash
-# 3단계 도로로 학습 (도로는 학습 시작 때 자동 생성)
-CGC_STAGE=3 python train.py --run-name stage3
+# 1단계: 처음부터
+CGC_STAGE=1 python train.py --run-name stage1_ts0 --seed 0
 
-# 앞 단계 성공 모델에서 이어 학습
-CGC_STAGE=4 python train.py --init results/stage3/best_model.pt --run-name stage4
-
-# 화면으로 보기 (데모 버스가 스스로 달림)
-CGC_STAGE=6 python view_road.py
+# 2단계 이후: 앞 단계 "성공 모델"에서 이어 학습 (학습률을 낮추면 앞 단계 능력을 덜 잊는다)
+CGC_STAGE=2 python train.py --init results/stage1_ts0/best_model.pt --run-name stage2_ts0 --seed 0 --lr 5e-5
 ```
+- 결과 폴더: `results/<run-name>/` — `best_model.pt`(검증 판 기준 best), `final.pt`(정상 종료한 마지막), `config.json`
+- `config.json`의 `"road"`에 **학습한 단계·켜진 요소가 자동 기록**된다 (`"stage": 2, "elements": [...]`). 그래도 `--run-name`에 단계를 넣어 두면 헷갈리지 않는다
+- 학습 시드는 0·1·2 세 개 (팀 규칙)
+
+### 6-2. 화면으로 보기
+```bash
+CGC_STAGE=2 python test.py results/stage2_ts0/best_model.pt --episodes 3
+CGC_STAGE=6 python view_road.py        # 모델 없이 도로만 (SUMO 데모 버스)
+```
+
+### 6-3. 공식 평가 → 성공 판정
+```bash
+# 조각 평가 (학습 시드마다, 판 1000~1099를 나눠 병렬로 돌려도 된다)
+CGC_STAGE=2 python scripts/evaluate_all.py --ckpt results/stage2_ts0/best_model.pt \
+    --model-name stage2_ppo --train-seed 0 --ckpt-step best \
+    --seeds 1000-1099 --shield shadow --out docs/reports/stage2_ppo/
+
+# 3시드 병합·요약 (완주율·수동개입률이 summary_*.md에 나온다)
+python scripts/evaluate_all.py --merge-glob "docs/reports/stage2_ppo/ts*_stepbest_shadow_*.csv" \
+    --expected-seeds 1000-1099 --out docs/reports/stage2_ppo/
+```
+- **성공 기준**: 3시드 평균 완주율 95% 이상 + 수동개입률 16% 이하 → 이 모델로 다음 단계를 학습한다
+- **평가 도로 단계는 학습 단계와 같아야 한다.** 체크포인트 옆 `config.json`의 단계와 지금 `CGC_STAGE`가 다르면 평가가 멈춘다. 일부러 다른 단계에서 시험할 때만 `--allow-stage-mismatch`
+- 평가 결과 `.json`의 `"road"`에 평가 도로 단계와 학습 단계(`train_stage`)가 남는다
+- 환경 태그 검사 기본값은 `env-v3`. 태그 전 개발용 시험에만 `--allow-unverified-env`
+
+### 6-4. 자주 하는 실수
+| 실수 | 결과 | 막는 방법 |
+|---|---|---|
+| `CGC_STAGE`를 안 붙임 | 6단계 도로로 학습·평가 | 터미널 첫 줄 `[단계별 맵] N단계: ...` 확인 |
+| 2단계 모델을 다른 단계에서 평가 | 다른 시험을 본 셈 | 평가가 자동으로 멈춤 |
+| `--init` 없이 2단계 이상 학습 | 처음부터 다시 배움 | 앞 단계 `best_model.pt`를 `--init`으로 |
+| 학습 판에 평가 판 사용 | 평가 결과를 믿을 수 없음 | 판 1000~2999·900000~는 학습에서 자동 제외 |
 
 ## 7. 확정된 학습 방식 (2026-11-21)
 

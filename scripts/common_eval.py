@@ -354,6 +354,24 @@ def evaluate(args):
             "공식 평가는 확정 태그에서만 실행하세요. 개발 스모크만 "
             "--allow-unverified-env를 사용할 수 있습니다.")
 
+    # 단계별 도로: 학습한 단계와 평가 도로 단계가 같은지 (체크포인트 옆 config.json 기준)
+    from env.curriculum import road_summary
+    road_info = road_summary(ROAD)
+    train_stage = None
+    cfg_json = os.path.join(os.path.dirname(os.path.abspath(args.ckpt)), "config.json")
+    if os.path.isfile(cfg_json):
+        with open(cfg_json, encoding="utf-8") as f:
+            train_stage = (json.load(f).get("road") or {}).get("stage")
+    road_info["train_stage"] = train_stage
+    print(f"[단계] 평가 도로 {road_info['stage']}단계 · 학습 {train_stage or '기록 없음'}단계",
+          flush=True)
+    if (train_stage is not None and road_info["stage"] is not None
+            and int(train_stage) != int(road_info["stage"])
+            and not args.allow_stage_mismatch):
+        raise SystemExit(
+            f"학습 단계({train_stage})와 평가 도로 단계({road_info['stage']})가 다릅니다. "
+            f"CGC_STAGE={train_stage}로 평가하거나, 의도한 것이면 --allow-stage-mismatch를 쓰세요.")
+
     start_seed, end_seed = args.seeds
     model_name = safe_name(args.model_name)
     step_name = safe_name(args.ckpt_step)
@@ -424,6 +442,7 @@ def evaluate(args):
         "model_config": args.model_config,
         "runtime": runtime_versions(),
         "environment": status,
+        "road": road_info,
         "deterministic": True,
         "eval_mode": True,
         "episode_csv": os.path.basename(csv_path),
@@ -930,7 +949,12 @@ def build_parser():
         "--model-config",
         help="policy factory에 넘길 모델 설정 파일")
     parser.add_argument(
-        "--env-tag", default="env-v2")
+        "--env-tag", default="env-v3")
+    parser.add_argument(
+        "--allow-stage-mismatch", action="store_true",
+        help=(
+            "체크포인트 옆 config.json의 학습 단계와 지금 도로 단계(CGC_STAGE)가 "
+            "달라도 평가 (예: 2단계 모델을 3단계 도로에서 시험)"))
     parser.add_argument(
         "--allow-unverified-env", action="store_true",
         help=(
