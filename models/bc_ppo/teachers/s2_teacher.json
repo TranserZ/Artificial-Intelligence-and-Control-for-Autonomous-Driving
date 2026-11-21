@@ -1,0 +1,5 @@
+{"source": "runs/s2_teacher_ts0/best_model.pt @ 51,200 step (학습 시드 0, teachers/s2_teacher_init51k.pt에서 이어 학습, 고친 정차 규칙)",
+ "teacher": "PPO + shield on (선생님 게이트) + 정류장 정차 규칙",
+ "dev_eval": {"seeds": "900100-900129", "shield": "on", "completion": 0.967, "arrival": 0.967, "collision": 0.033,
+              "red": 0.0, "timeout": 0.0, "missed_stop": 0.0, "intervention_rate": 0.486, "mean_speed_ms": 3.79},
+ "note": "충돌 1/30: 앞차가 버스 감속(2.5 m/s²)보다 세게 설 때 차량 shield가 늦음"}
