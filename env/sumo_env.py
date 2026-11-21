@@ -98,6 +98,9 @@ HELD_OUT_SEEDS = ((1000, 1999), (900_000, 999_999))
 SIGNAL_COLORS = ("red", "yellow", "green", "stop")
 _COLOR_OF_STATE = {"r": "red", "u": "red", "y": "yellow",
                    "G": "green", "g": "green", "o": "green", "O": "green", "s": "stop"}
+# 데이터셋 state.sig{k}.* 칸 수 (경로 r0의 신호 정지선 수, 청계2가는 정지선 2개).
+# 신호가 없는 단계(1단계)에서도 칸을 만들고 -1로 채워, 모든 단계의 기록 파일 칸 구성을 같게 한다.
+STATE_SIGNAL_SLOTS = 7
 
 # SUMO 링크 방향 → (좌, 직, 우) 인덱스. 유턴(t)은 좌로 본다
 _DIR_INDEX = {"l": 0, "L": 0, "t": 0, "s": 1, "r": 2, "R": 2}
@@ -2044,8 +2047,9 @@ class SumoHighwayEnv(gym.Env):
 
         도로 상황을 알 수 있을 정도로만 모은다 (모든 차 좌표 같은 재현용 목록은 state 딕셔너리에).
         학습 입력이 아니다 — 학습에는 obs.* 컬럼만 쓴다 (docs/data_columns.md).
-        - 신호등은 경로가 지나는 순서대로 하나당 독립 컬럼: sig{k}.red/yellow/green/stop (0/1),
-          sig{k}.time_to_switch (s), sig{k}.dist (정지선까지 경로상 거리 m, 지났으면 -1)
+        - 신호등은 경로가 지나는 순서대로 정지선 하나당 독립 컬럼: sig{k}.red/yellow/green/stop (0/1),
+          sig{k}.time_to_switch (s), sig{k}.dist (정지선까지 경로상 거리 m, 지났으면 -1).
+          칸은 항상 STATE_SIGNAL_SLOTS개 — 신호가 없는 단계는 모든 값이 -1
         - 정류장은 하나당: stop{k}.status (0 남음 / 1 정차 성공 / -1 놓침), stop{k}.dist (m, 지났으면 -1)
         - 값이 없으면 -1 (예: 앞차 없음)
         ego가 없으면(종료 뒤) 빈 dict.
@@ -2090,6 +2094,10 @@ class SumoHighwayEnv(gym.Env):
                 lo = self._car_lanes(e_in)[0]
                 d = traci.vehicle.getDrivingDistance(e, e_in, traci.lane.getLength(f"{e_in}_{lo}"), lo)
                 col[f"state.sig{k}.dist"] = float(d) if d > -1e5 else -1.0
+            # 신호가 없거나 적은 단계: 남은 칸을 -1(없음)로 채운다
+            for k in range(len(getattr(self, "_route_signals", [])), STATE_SIGNAL_SLOTS):
+                for c in (*SIGNAL_COLORS, "time_to_switch", "dist"):
+                    col[f"state.sig{k}.{c}"] = -1
             for k, st in enumerate(self._stops):
                 col[f"state.stop{k}.status"] = int(self._stop_status[k])
                 d = -1.0
