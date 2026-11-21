@@ -40,6 +40,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical, Normal
 
+# 여러 학습을 동시에 돌리면 PyTorch가 프로세스마다 코어 전부를 쓰려 해서 서로 막힌다
+# (학습 6개 동시 실행 시 부하 47 / 16코어, 2단계 선생님 45분 동안 업데이트 0회). 기본 1 스레드.
+torch.set_num_threads(int(os.environ.get("BCPPO_THREADS", "1")))
+
 import train as T                                # REWARD, HPARAMS (공용 기본값)
 import algorithms.ppo as ppo_module
 from algorithms.ppo import PPO

@@ -1,0 +1,4 @@
+{"source": "runs/s1_teacher_ts1/best_model.pt @ 51,200 step (학습 시드 1)",
+ "teacher": "PPO + shield on (선생님 게이트) + 정류장 정차 규칙",
+ "dev_eval": {"seeds": "900100-900129", "shield": "on", "completion": 1.0, "arrival": 1.0, "collision": 0.0,
+              "red": 0.0, "timeout": 0.0, "intervention_rate": 0.096, "mean_speed_ms": 5.97}}
