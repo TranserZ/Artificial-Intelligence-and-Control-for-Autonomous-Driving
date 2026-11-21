@@ -6,10 +6,10 @@
   ],
   "args": {
     "cmd": "dagger",
-    "ckpt": "models/bc_ppo/runs/s2_bc_dagger1_brake10/bc.pt",
+    "ckpt": "models/bc_ppo/runs/s2_bc1/bc.pt",
     "teacher": "models/bc_ppo/teachers/s2_teacher.pt",
     "episodes": 25,
-    "seed_base": 50025,
+    "seed_base": 220025,
     "data": "models/bc_ppo/data/s2_dagger2_part1.npz",
     "stochastic": false
   },
@@ -79,191 +79,192 @@
     "missed_stop_penalty": 20.0,
     "lc_forbidden_penalty": 1.0
   },
-  "git": "8a9fa16c1052eb1defd4b82fb230fd22fec9360c",
-  "git_dirty": false,
-  "time": "2026-11-21 22:56:48",
-  "student": "models/bc_ppo/runs/s2_bc_dagger1_brake10/bc.pt",
+  "git": "eb1edfdfa5e71128d12028b3babb595872a8df46",
+  "git_dirty": true,
+  "time": "2026-11-22 00:38:55",
+  "student": "models/bc_ppo/runs/s2_bc1/bc.pt",
   "teacher": "models/bc_ppo/teachers/s2_teacher.pt",
-  "transitions": 21153,
+  "transitions": 31853,
   "student_end_reasons": {
-    "completed": 16,
-    "collision": 3,
-    "red_light": 6
+    "collision": 2,
+    "completed": 21,
+    "timeout": 1,
+    "red_light": 1
   },
-  "label_lane_change_ratio": 0.0021273578215855907,
+  "label_lane_change_ratio": 0.0006592785608890842,
   "episodes": [
     {
       "episode": 0,
-      "seed": 50025,
-      "steps": 1235,
-      "end_reason": "completed",
-      "stops_done": 5
+      "seed": 220025,
+      "steps": 257,
+      "end_reason": "collision",
+      "stops_done": 1
     },
     {
       "episode": 1,
-      "seed": 50026,
-      "steps": 1026,
+      "seed": 220026,
+      "steps": 1473,
       "end_reason": "completed",
       "stops_done": 5
     },
     {
       "episode": 2,
-      "seed": 50027,
-      "steps": 1182,
+      "seed": 220027,
+      "steps": 1611,
       "end_reason": "completed",
       "stops_done": 5
     },
     {
       "episode": 3,
-      "seed": 50028,
-      "steps": 328,
-      "end_reason": "collision",
+      "seed": 220028,
+      "steps": 3600,
+      "end_reason": "timeout",
       "stops_done": 1
     },
     {
       "episode": 4,
-      "seed": 50029,
-      "steps": 1200,
+      "seed": 220029,
+      "steps": 1411,
       "end_reason": "completed",
       "stops_done": 5
     },
     {
       "episode": 5,
-      "seed": 50030,
-      "steps": 1081,
+      "seed": 220030,
+      "steps": 1184,
       "end_reason": "completed",
       "stops_done": 5
     },
     {
       "episode": 6,
-      "seed": 50031,
-      "steps": 1017,
-      "end_reason": "completed",
-      "stops_done": 5
+      "seed": 220031,
+      "steps": 937,
+      "end_reason": "red_light",
+      "stops_done": 3
     },
     {
       "episode": 7,
-      "seed": 50032,
-      "steps": 373,
-      "end_reason": "red_light",
-      "stops_done": 3
-    },
-    {
-      "episode": 8,
-      "seed": 50033,
-      "steps": 93,
-      "end_reason": "red_light",
-      "stops_done": 1
-    },
-    {
-      "episode": 9,
-      "seed": 50034,
-      "steps": 1078,
-      "end_reason": "completed",
-      "stops_done": 5
-    },
-    {
-      "episode": 10,
-      "seed": 50035,
-      "steps": 81,
-      "end_reason": "red_light",
-      "stops_done": 1
-    },
-    {
-      "episode": 11,
-      "seed": 50036,
-      "steps": 311,
-      "end_reason": "collision",
-      "stops_done": 1
-    },
-    {
-      "episode": 12,
-      "seed": 50037,
-      "steps": 651,
-      "end_reason": "red_light",
-      "stops_done": 3
-    },
-    {
-      "episode": 13,
-      "seed": 50038,
-      "steps": 1314,
-      "end_reason": "completed",
-      "stops_done": 5
-    },
-    {
-      "episode": 14,
-      "seed": 50039,
-      "steps": 1465,
-      "end_reason": "completed",
-      "stops_done": 5
-    },
-    {
-      "episode": 15,
-      "seed": 50040,
-      "steps": 1515,
-      "end_reason": "completed",
-      "stops_done": 5
-    },
-    {
-      "episode": 16,
-      "seed": 50041,
-      "steps": 273,
-      "end_reason": "collision",
-      "stops_done": 1
-    },
-    {
-      "episode": 17,
-      "seed": 50042,
-      "steps": 1093,
-      "end_reason": "completed",
-      "stops_done": 5
-    },
-    {
-      "episode": 18,
-      "seed": 50043,
-      "steps": 946,
-      "end_reason": "completed",
-      "stops_done": 5
-    },
-    {
-      "episode": 19,
-      "seed": 50044,
-      "steps": 353,
-      "end_reason": "red_light",
-      "stops_done": 2
-    },
-    {
-      "episode": 20,
-      "seed": 50045,
+      "seed": 220032,
       "steps": 1112,
       "end_reason": "completed",
       "stops_done": 5
     },
     {
+      "episode": 8,
+      "seed": 220033,
+      "steps": 1095,
+      "end_reason": "completed",
+      "stops_done": 5
+    },
+    {
+      "episode": 9,
+      "seed": 220034,
+      "steps": 1249,
+      "end_reason": "completed",
+      "stops_done": 5
+    },
+    {
+      "episode": 10,
+      "seed": 220035,
+      "steps": 1023,
+      "end_reason": "completed",
+      "stops_done": 5
+    },
+    {
+      "episode": 11,
+      "seed": 220036,
+      "steps": 1294,
+      "end_reason": "completed",
+      "stops_done": 5
+    },
+    {
+      "episode": 12,
+      "seed": 220037,
+      "steps": 566,
+      "end_reason": "collision",
+      "stops_done": 1
+    },
+    {
+      "episode": 13,
+      "seed": 220038,
+      "steps": 903,
+      "end_reason": "completed",
+      "stops_done": 5
+    },
+    {
+      "episode": 14,
+      "seed": 220039,
+      "steps": 1467,
+      "end_reason": "completed",
+      "stops_done": 5
+    },
+    {
+      "episode": 15,
+      "seed": 220040,
+      "steps": 1188,
+      "end_reason": "completed",
+      "stops_done": 5
+    },
+    {
+      "episode": 16,
+      "seed": 220041,
+      "steps": 1209,
+      "end_reason": "completed",
+      "stops_done": 5
+    },
+    {
+      "episode": 17,
+      "seed": 220042,
+      "steps": 1369,
+      "end_reason": "completed",
+      "stops_done": 5
+    },
+    {
+      "episode": 18,
+      "seed": 220043,
+      "steps": 1595,
+      "end_reason": "completed",
+      "stops_done": 5
+    },
+    {
+      "episode": 19,
+      "seed": 220044,
+      "steps": 1133,
+      "end_reason": "completed",
+      "stops_done": 5
+    },
+    {
+      "episode": 20,
+      "seed": 220045,
+      "steps": 1256,
+      "end_reason": "completed",
+      "stops_done": 5
+    },
+    {
       "episode": 21,
-      "seed": 50046,
-      "steps": 1043,
+      "seed": 220046,
+      "steps": 1361,
       "end_reason": "completed",
       "stops_done": 5
     },
     {
       "episode": 22,
-      "seed": 50047,
-      "steps": 1166,
+      "seed": 220047,
+      "steps": 1237,
       "end_reason": "completed",
       "stops_done": 5
     },
     {
       "episode": 23,
-      "seed": 50048,
-      "steps": 394,
-      "end_reason": "red_light",
-      "stops_done": 2
+      "seed": 220048,
+      "steps": 1131,
+      "end_reason": "completed",
+      "stops_done": 5
     },
     {
       "episode": 24,
-      "seed": 50049,
-      "steps": 823,
+      "seed": 220049,
+      "steps": 1192,
       "end_reason": "completed",
       "stops_done": 5
     }

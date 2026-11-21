@@ -6,10 +6,10 @@
   ],
   "args": {
     "cmd": "dagger",
-    "ckpt": "models/bc_ppo/runs/s2_bc/bc.pt",
+    "ckpt": "models/bc_ppo/runs/s2_bc0/bc.pt",
     "teacher": "models/bc_ppo/teachers/s2_teacher.pt",
     "episodes": 25,
-    "seed_base": 40025,
+    "seed_base": 210025,
     "data": "models/bc_ppo/data/s2_dagger1_part1.npz",
     "stochastic": false
   },
@@ -79,191 +79,191 @@
     "missed_stop_penalty": 20.0,
     "lc_forbidden_penalty": 1.0
   },
-  "git": "b8a3603cb2ab224c66b12b4ce20ebfe373240c49",
-  "git_dirty": false,
-  "time": "2026-11-21 22:26:52",
-  "student": "models/bc_ppo/runs/s2_bc/bc.pt",
+  "git": "eb1edfdfa5e71128d12028b3babb595872a8df46",
+  "git_dirty": true,
+  "time": "2026-11-22 00:11:06",
+  "student": "models/bc_ppo/runs/s2_bc0/bc.pt",
   "teacher": "models/bc_ppo/teachers/s2_teacher.pt",
-  "transitions": 13390,
+  "transitions": 35874,
   "student_end_reasons": {
-    "red_light": 17,
-    "completed": 7,
-    "collision": 1
+    "red_light": 6,
+    "completed": 14,
+    "timeout": 5
   },
-  "label_lane_change_ratio": 0.09671396564600448,
+  "label_lane_change_ratio": 0.16928694876512237,
   "episodes": [
     {
       "episode": 0,
-      "seed": 40025,
-      "steps": 80,
-      "end_reason": "red_light",
-      "stops_done": 1
-    },
-    {
-      "episode": 1,
-      "seed": 40026,
-      "steps": 150,
-      "end_reason": "red_light",
-      "stops_done": 1
-    },
-    {
-      "episode": 2,
-      "seed": 40027,
-      "steps": 149,
-      "end_reason": "red_light",
-      "stops_done": 1
-    },
-    {
-      "episode": 3,
-      "seed": 40028,
-      "steps": 1155,
-      "end_reason": "completed",
-      "stops_done": 5
-    },
-    {
-      "episode": 4,
-      "seed": 40029,
+      "seed": 210025,
       "steps": 81,
       "end_reason": "red_light",
       "stops_done": 1
     },
     {
+      "episode": 1,
+      "seed": 210026,
+      "steps": 147,
+      "end_reason": "red_light",
+      "stops_done": 1
+    },
+    {
+      "episode": 2,
+      "seed": 210027,
+      "steps": 369,
+      "end_reason": "red_light",
+      "stops_done": 3
+    },
+    {
+      "episode": 3,
+      "seed": 210028,
+      "steps": 1158,
+      "end_reason": "completed",
+      "stops_done": 5
+    },
+    {
+      "episode": 4,
+      "seed": 210029,
+      "steps": 1258,
+      "end_reason": "completed",
+      "stops_done": 5
+    },
+    {
       "episode": 5,
-      "seed": 40030,
-      "steps": 2369,
+      "seed": 210030,
+      "steps": 1320,
       "end_reason": "completed",
       "stops_done": 5
     },
     {
       "episode": 6,
-      "seed": 40031,
-      "steps": 927,
+      "seed": 210031,
+      "steps": 854,
       "end_reason": "completed",
       "stops_done": 5
     },
     {
       "episode": 7,
-      "seed": 40032,
-      "steps": 219,
-      "end_reason": "red_light",
-      "stops_done": 1
+      "seed": 210032,
+      "steps": 932,
+      "end_reason": "completed",
+      "stops_done": 5
     },
     {
       "episode": 8,
-      "seed": 40033,
-      "steps": 1323,
+      "seed": 210033,
+      "steps": 1467,
       "end_reason": "completed",
       "stops_done": 5
     },
     {
       "episode": 9,
-      "seed": 40034,
-      "steps": 453,
+      "seed": 210034,
+      "steps": 496,
       "end_reason": "red_light",
       "stops_done": 3
     },
     {
       "episode": 10,
-      "seed": 40035,
-      "steps": 148,
-      "end_reason": "red_light",
-      "stops_done": 1
-    },
-    {
-      "episode": 11,
-      "seed": 40036,
-      "steps": 309,
-      "end_reason": "collision",
-      "stops_done": 1
-    },
-    {
-      "episode": 12,
-      "seed": 40037,
-      "steps": 278,
-      "end_reason": "red_light",
-      "stops_done": 1
-    },
-    {
-      "episode": 13,
-      "seed": 40038,
-      "steps": 150,
-      "end_reason": "red_light",
-      "stops_done": 1
-    },
-    {
-      "episode": 14,
-      "seed": 40039,
-      "steps": 1395,
+      "seed": 210035,
+      "steps": 928,
       "end_reason": "completed",
       "stops_done": 5
     },
     {
+      "episode": 11,
+      "seed": 210036,
+      "steps": 3600,
+      "end_reason": "timeout",
+      "stops_done": 3
+    },
+    {
+      "episode": 12,
+      "seed": 210037,
+      "steps": 1968,
+      "end_reason": "completed",
+      "stops_done": 5
+    },
+    {
+      "episode": 13,
+      "seed": 210038,
+      "steps": 3600,
+      "end_reason": "timeout",
+      "stops_done": 1
+    },
+    {
+      "episode": 14,
+      "seed": 210039,
+      "steps": 3600,
+      "end_reason": "timeout",
+      "stops_done": 1
+    },
+    {
       "episode": 15,
-      "seed": 40040,
-      "steps": 542,
-      "end_reason": "red_light",
-      "stops_done": 2
+      "seed": 210040,
+      "steps": 1252,
+      "end_reason": "completed",
+      "stops_done": 5
     },
     {
       "episode": 16,
-      "seed": 40041,
-      "steps": 150,
+      "seed": 210041,
+      "steps": 82,
       "end_reason": "red_light",
       "stops_done": 1
     },
     {
       "episode": 17,
-      "seed": 40042,
-      "steps": 248,
-      "end_reason": "red_light",
-      "stops_done": 1
+      "seed": 210042,
+      "steps": 1139,
+      "end_reason": "completed",
+      "stops_done": 5
     },
     {
       "episode": 18,
-      "seed": 40043,
-      "steps": 80,
-      "end_reason": "red_light",
+      "seed": 210043,
+      "steps": 3600,
+      "end_reason": "timeout",
       "stops_done": 1
     },
     {
       "episode": 19,
-      "seed": 40044,
-      "steps": 775,
-      "end_reason": "red_light",
-      "stops_done": 3
+      "seed": 210044,
+      "steps": 1143,
+      "end_reason": "completed",
+      "stops_done": 5
     },
     {
       "episode": 20,
-      "seed": 40045,
-      "steps": 1023,
+      "seed": 210045,
+      "steps": 1096,
       "end_reason": "completed",
       "stops_done": 5
     },
     {
       "episode": 21,
-      "seed": 40046,
-      "steps": 79,
-      "end_reason": "red_light",
-      "stops_done": 1
-    },
-    {
-      "episode": 22,
-      "seed": 40047,
-      "steps": 149,
-      "end_reason": "red_light",
-      "stops_done": 1
-    },
-    {
-      "episode": 23,
-      "seed": 40048,
-      "steps": 936,
+      "seed": 210046,
+      "steps": 1056,
       "end_reason": "completed",
       "stops_done": 5
     },
     {
+      "episode": 22,
+      "seed": 210047,
+      "steps": 1047,
+      "end_reason": "completed",
+      "stops_done": 5
+    },
+    {
+      "episode": 23,
+      "seed": 210048,
+      "steps": 3600,
+      "end_reason": "timeout",
+      "stops_done": 1
+    },
+    {
       "episode": 24,
-      "seed": 40049,
-      "steps": 222,
+      "seed": 210049,
+      "steps": 81,
       "end_reason": "red_light",
       "stops_done": 1
     }

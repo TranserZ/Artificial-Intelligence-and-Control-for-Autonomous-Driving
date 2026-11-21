@@ -1,0 +1,240 @@
+[단계별 맵] 2단계: bus_stop, signal
+노드 501개 (신호등 31, 추정 신호 23, 빠른 도로 중간 신호 5개 제외), 엣지 986개, 어린이보호구역 속도 0개, 차로 수 보정 30개 → /tmp/bcppo_33832_c4fx8lf9
+배경 정리: 끊긴 끝 잇기 3곳, 막다른 토막·주차장 통로 107개 엣지 제거, 차로 수 채운 큰 도로 55개 way
+단계 요소: ['bus_stop', 'signal'] / 차량 최고속도: 8.33 m/s
+배달 트럭 주정차 엣지 없음: e218924602_5
+보행자 경로 후보 44쌍 중 걸어갈 수 있는 24쌍 사용
+보행자 경로 24쌍, 시간당 400명
+승객 6명 (노선 ['A01_east'], 정류장당 2명, 탑승 → 2정거장 뒤 하차)
+노상주차 줄 4곳, 주차 차량 32대
+[zone_markings] 정차금지 교차로가 도로망에 없음 (건너뜀): cluster_n5768277866_n871729539_n9040757788
+[zone_markings] 안전지대 e908646367_3 0~10 m (왼쪽, 폭 2.5→0.5 m)
+[zone_markings] 노상주차 칸 e1212424783_1 13~85 m, 10칸
+[zone_markings] 노상주차 칸 e1212424783_2 5~39 m, 4칸
+[zone_markings] 노상주차 칸 e1212424783_3 4~19 m, 2칸
+[zone_markings] 노상주차 칸 e1212424783_4 5~122 m, 16칸
+본선 24개 엣지 / 노선: A01_east (r0: 정류장 5곳, 24엣지), A01_loop (r0_loop: 정류장 11곳, 53엣지)
+측면 합류 7곳(+세종대로 1곳), 오토바이 주차 0대, 트럭 주정차 0대, 정류장 11개
+측면 합류 엣지: ['e183272596_1', 'e506252728_1b', 'e233651317_5a', 'e233651327_1b', 'e1499619439_1', 'e1562199592_1b', 'e233651275_1b']
+세종대로 합류 엣지: ['e378453707_3']
+[신호] 청계광장 동쪽(모전교) (무교로): 주기 139 s, 버스 방향 녹 55.5 / 황 4.3 / 적 79.2 s — 차용: 광교 실측값
+[신호] 광교 (남대문로): 주기 139 s, 버스 방향 녹 55.5 / 황 4.3 / 적 79.2 s — T-DATA API 21835 광교(연등) 2026-11-21 실측
+[신호] 청계2가 (삼일대로): 주기 170 s, 버스 방향 녹 72 / 황 3 / 적 95 s — 교통영향평가 2025-02-14 청계2가사거리
+[신호] 수표교 (수표로): 주기 139 s, 버스 방향 녹 55.5 / 황 4.3 / 적 79.2 s — 차용: 광교 실측값
+[신호] 청계3가 (충무로): 주기 130.6 s, 버스 방향 녹 32.6 / 황 4.4 / 적 93.6 s — T-DATA API 23331 청계3가(연등) 2026-11-21 실측
+[신호] 청계4가 (창경궁로): 주기 140 s, 버스 방향 녹 42 / 황 3 / 적 95 s — 교통영향평가 2022-07-22 청계4가 교차로
+초기 가중치: models/bc_ppo/teachers/s1_teacher.pt
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update    1] steps=   2048  ep_rew_mean=-20.77  ep_len_mean=1040  completion_rate=0  collision_rate=0  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=1  avg_speed=4.114  lane_changes_per_episode=2  std=0.5643  policy_loss=-0.003771  value_loss=3.441  entropy=1.532  approx_kl=0.004183  clip_fraction=0.05552  explained_variance=0.897  learning_rate=0.0001  p_lane_change=0.2341
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update    2] steps=   4096  ep_rew_mean=-3.756  ep_len_mean=1103  completion_rate=0.3333  collision_rate=0  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.6667  avg_speed=3.893  lane_changes_per_episode=9.667  std=0.561  policy_loss=-0.003823  value_loss=4.479  entropy=1.529  approx_kl=0.004888  clip_fraction=0.04536  explained_variance=0.8751  learning_rate=0.0001  p_lane_change=0.2333
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update    3] steps=   6144  ep_rew_mean=-13.61  ep_len_mean=1162  completion_rate=0.2  collision_rate=0  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.8  avg_speed=3.703  lane_changes_per_episode=8.6  std=0.5611  policy_loss=-0.003067  value_loss=4.272  entropy=1.472  approx_kl=0.007673  clip_fraction=0.04121  explained_variance=0.9013  learning_rate=0.0001  p_lane_change=0.2041
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update    4] steps=   8192  ep_rew_mean=7.971  ep_len_mean=1169  completion_rate=0.4286  collision_rate=0  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.5714  avg_speed=3.683  lane_changes_per_episode=10.29  std=0.5589  policy_loss=-0.002985  value_loss=1.675  entropy=1.536  approx_kl=0.006762  clip_fraction=0.0686  explained_variance=0.91  learning_rate=0.0001  p_lane_change=0.2481
+ Retrying in 1 seconds
+[update    5] steps=  10240  ep_rew_mean=4.279  ep_len_mean=1169  completion_rate=0.375  collision_rate=0  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.625  avg_speed=3.68  lane_changes_per_episode=9.125  std=0.5596  policy_loss=-0.002643  value_loss=2.594  entropy=1.489  approx_kl=0.005569  clip_fraction=0.05229  explained_variance=0.8931  learning_rate=0.0001  p_lane_change=0.2101
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update    6] steps=  12288  ep_rew_mean=13.04  ep_len_mean=1131  completion_rate=0.4  collision_rate=0  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.6  avg_speed=3.817  lane_changes_per_episode=9.9  std=0.5608  policy_loss=-0.002215  value_loss=1.731  entropy=1.567  approx_kl=0.004943  clip_fraction=0.08564  explained_variance=0.9113  learning_rate=0.0001  p_lane_change=0.2588
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update    7] steps=  14336  ep_rew_mean=14.33  ep_len_mean=1102  completion_rate=0.4615  collision_rate=0  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.5385  avg_speed=3.921  lane_changes_per_episode=10.77  std=0.5615  policy_loss=-0.00203  value_loss=3.255  entropy=1.499  approx_kl=0.002258  clip_fraction=0.008936  explained_variance=0.9022  learning_rate=0.0001  p_lane_change=0.2179
+ Retrying in 1 seconds
+[update    8] steps=  16384  ep_rew_mean=10.43  ep_len_mean=1110  completion_rate=0.4286  collision_rate=0  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.5714  avg_speed=3.894  lane_changes_per_episode=10.5  std=0.5607  policy_loss=-0.00234  value_loss=3.162  entropy=1.532  approx_kl=-0.0002212  clip_fraction=0.008838  explained_variance=0.8892  learning_rate=0.0001  p_lane_change=0.2379
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update    9] steps=  18432  ep_rew_mean=14.7  ep_len_mean=1102  completion_rate=0.4375  collision_rate=0  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.5625  avg_speed=3.92  lane_changes_per_episode=10.25  std=0.5588  policy_loss=-0.002161  value_loss=3.736  entropy=1.596  approx_kl=0.005956  clip_fraction=0.04854  explained_variance=0.8995  learning_rate=0.0001  p_lane_change=0.2977
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update   10] steps=  20480  ep_rew_mean=19.03  ep_len_mean=1101  completion_rate=0.5  collision_rate=0  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.5  avg_speed=3.923  lane_changes_per_episode=12.78  std=0.5574  policy_loss=-0.00106  value_loss=3.482  entropy=1.614  approx_kl=0.004429  clip_fraction=0.05493  explained_variance=0.8624  learning_rate=0.0001  p_lane_change=0.2703
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update   11] steps=  22528  ep_rew_mean=20.3  ep_len_mean=1080  completion_rate=0.45  collision_rate=0  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.55  avg_speed=4.019  lane_changes_per_episode=13.7  std=0.5593  policy_loss=-0.001371  value_loss=3.466  entropy=1.585  approx_kl=0.0004915  clip_fraction=0.004883  explained_variance=0.8991  learning_rate=0.0001  p_lane_change=0.2665
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update   12] steps=  24576  ep_rew_mean=19.23  ep_len_mean=1100  completion_rate=0.4545  collision_rate=0  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.5455  avg_speed=3.955  lane_changes_per_episode=13.91  std=0.5553  policy_loss=-0.004505  value_loss=1.609  entropy=1.616  approx_kl=0.0002636  clip_fraction=0.004199  explained_variance=0.9277  learning_rate=0.0001  p_lane_change=0.2988
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update   13] steps=  26624  ep_rew_mean=15.83  ep_len_mean=1109  completion_rate=0.4167  collision_rate=0  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.5833  avg_speed=3.924  lane_changes_per_episode=13.04  std=0.5572  policy_loss=-0.003758  value_loss=2.651  entropy=1.603  approx_kl=0.004499  clip_fraction=0.05439  explained_variance=0.9218  learning_rate=0.0001  p_lane_change=0.268
+ Retrying in 1 seconds
+[update   14] steps=  28672  ep_rew_mean=16.88  ep_len_mean=1121  completion_rate=0.44  collision_rate=0  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.56  avg_speed=3.889  lane_changes_per_episode=13.08  std=0.5602  policy_loss=-0.001218  value_loss=2.61  entropy=1.718  approx_kl=0.002295  clip_fraction=0.02354  explained_variance=0.8761  learning_rate=0.0001  p_lane_change=0.3559
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update   15] steps=  30720  ep_rew_mean=15.87  ep_len_mean=1120  completion_rate=0.4074  collision_rate=0  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.5926  avg_speed=3.886  lane_changes_per_episode=12.81  std=0.5588  policy_loss=-0.001774  value_loss=2.528  entropy=1.638  approx_kl=0.003613  clip_fraction=0.01582  explained_variance=0.9205  learning_rate=0.0001  p_lane_change=0.2787
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update   16] steps=  32768  ep_rew_mean=14.21  ep_len_mean=1127  completion_rate=0.4138  collision_rate=0  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.5862  avg_speed=3.872  lane_changes_per_episode=12.28  std=0.5582  policy_loss=-0.002144  value_loss=3.467  entropy=1.679  approx_kl=0.004936  clip_fraction=0.04937  explained_variance=0.9041  learning_rate=0.0001  p_lane_change=0.3351
+ Retrying in 1 seconds
+[update   17] steps=  34816  ep_rew_mean=15.54  ep_len_mean=1132  completion_rate=0.4333  collision_rate=0  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.5667  avg_speed=3.854  lane_changes_per_episode=12.77  std=0.5577  policy_loss=-0.001864  value_loss=1.929  entropy=1.725  approx_kl=0.001743  clip_fraction=0.0166  explained_variance=0.919  learning_rate=0.0001  p_lane_change=0.3482
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update   18] steps=  36864  ep_rew_mean=17.43  ep_len_mean=1130  completion_rate=0.4375  collision_rate=0  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.5625  avg_speed=3.862  lane_changes_per_episode=13  std=0.5605  policy_loss=-0.004579  value_loss=2.679  entropy=1.714  approx_kl=0.008177  clip_fraction=0.05688  explained_variance=0.9119  learning_rate=0.0001  p_lane_change=0.3451
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update   19] steps=  38912  ep_rew_mean=18.27  ep_len_mean=1126  completion_rate=0.4412  collision_rate=0  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.5588  avg_speed=3.873  lane_changes_per_episode=13.21  std=0.5616  policy_loss=-0.003218  value_loss=4.169  entropy=1.723  approx_kl=0.006397  clip_fraction=0.08608  explained_variance=0.9019  learning_rate=0.0001  p_lane_change=0.3626
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update   20] steps=  40960  ep_rew_mean=19.21  ep_len_mean=1127  completion_rate=0.4444  collision_rate=0  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.5556  avg_speed=3.866  lane_changes_per_episode=14.03  std=0.5646  policy_loss=-0.005925  value_loss=2.064  entropy=1.731  approx_kl=0.005616  clip_fraction=0.1293  explained_variance=0.91  learning_rate=0.0001  p_lane_change=0.3687
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update   21] steps=  43008  ep_rew_mean=17.37  ep_len_mean=1116  completion_rate=0.4211  collision_rate=0.02632  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.5789  avg_speed=3.863  lane_changes_per_episode=13.37  std=0.562  policy_loss=-0.007567  value_loss=4.166  entropy=1.714  approx_kl=0.003354  clip_fraction=0.04414  explained_variance=0.8717  learning_rate=0.0001  p_lane_change=0.3438
+ Retrying in 1 seconds
+[update   22] steps=  45056  ep_rew_mean=18.01  ep_len_mean=1124  completion_rate=0.4103  collision_rate=0.02564  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.5897  avg_speed=3.842  lane_changes_per_episode=13.56  std=0.5603  policy_loss=-0.005381  value_loss=2.727  entropy=1.702  approx_kl=0.004282  clip_fraction=0.06475  explained_variance=0.8819  learning_rate=0.0001  p_lane_change=0.329
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update   23] steps=  47104  ep_rew_mean=18.2  ep_len_mean=1126  completion_rate=0.3902  collision_rate=0.02439  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.6098  avg_speed=3.838  lane_changes_per_episode=13.44  std=0.5587  policy_loss=-0.004101  value_loss=2.659  entropy=1.624  approx_kl=0.003584  clip_fraction=0.02412  explained_variance=0.9258  learning_rate=0.0001  p_lane_change=0.2858
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update   24] steps=  49152  ep_rew_mean=16.87  ep_len_mean=1134  completion_rate=0.3721  collision_rate=0.02326  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.6279  avg_speed=3.814  lane_changes_per_episode=13.14  std=0.5578  policy_loss=0.0012  value_loss=6.113  entropy=1.655  approx_kl=0.00328  clip_fraction=0.03003  explained_variance=0.9191  learning_rate=0.0001  p_lane_change=0.3375
+ Retrying in 1 seconds
+[update   25] steps=  51200  ep_rew_mean=17.3  ep_len_mean=1138  completion_rate=0.3864  collision_rate=0.02273  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.6136  avg_speed=3.802  lane_changes_per_episode=13.16  std=0.5539  policy_loss=-0.003252  value_loss=2.996  entropy=1.743  approx_kl=0.007407  clip_fraction=0.1182  explained_variance=0.926  learning_rate=0.0001  p_lane_change=0.405
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+    [eval @51200] 20ep  충돌률=5%  완주율=90%  신호위반=0%  보행자충돌=0%  양보위반=0%  구역과속=0%  차로오류=0%  완주(정류장 포함)=40%  수동개입률=55.9%  정류장놓침=55%  평균속도=3.3m/s  평균차간=12.8m  최소차간=0.1m  차선변경=0.7회  보상=16.3
+    [검증 on] 완주(정류장 포함) 40% · 도착 90% · 충돌 5% · 적색 0% · 시간초과 5% · 정류장놓침 55% · 수동개입률 55.9% · 평균속도 3.31 m/s
+    [best @51200] → best_model.pt
+Exception in thread Thread-1:
+Traceback (most recent call last):
+  File "/home/min-gi/Desktop/2026_2/Artificial-Intelligence-and-Control-for-Autonomous-Driving/models/bc_ppo/bcppo.py", line 246, in train_loop
+    
+    
+  File "/home/min-gi/Desktop/2026_2/Artificial-Intelligence-and-Control-for-Autonomous-Driving/algorithms/ppo.py", line 430, in learn
+    logger.log_train(self.num_timesteps, metrics,
+  File "/home/min-gi/Desktop/2026_2/Artificial-Intelligence-and-Control-for-Autonomous-Driving/utils/logger.py", line 46, in log_train
+    self.writer.add_scalar(f"train/{k}", v, step)
+  File "/home/min-gi/venvs/sumo-rl/lib/python3.12/site-packages/torch/utils/tensorboard/writer.py", line 386, in add_scalar
+    self._get_file_writer().add_summary(summary, global_step, walltime)
+  File "/home/min-gi/venvs/sumo-rl/lib/python3.12/site-packages/torch/utils/tensorboard/writer.py", line 116, in add_summary
+    self.add_event(event, global_step, walltime)
+  File "/home/min-gi/venvs/sumo-rl/lib/python3.12/site-packages/torch/utils/tensorboard/writer.py", line 100, in add_event
+    self.event_writer.add_event(event)
+  File "/home/min-gi/venvs/sumo-rl/lib/python3.12/site-packages/tensorboard/summary/writer/event_file_writer.py", line 117, in add_event
+    self._async_writer.write(event.SerializeToString())
+  File "/home/min-gi/venvs/sumo-rl/lib/python3.12/site-packages/tensorboard/summary/writer/event_file_writer.py", line 178, in write
+    self._check_worker_status()
+  File "/home/min-gi/venvs/sumo-rl/lib/python3.12/site-packages/tensorboard/summary/writer/event_file_writer.py", line 212, in _check_worker_status
+    raise exception
+  File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+    self.run()
+  File "/home/min-gi/venvs/sumo-rl/lib/python3.12/site-packages/tensorboard/summary/writer/event_file_writer.py", line 244, in run
+    self._run()
+  File "/home/min-gi/venvs/sumo-rl/lib/python3.12/site-packages/tensorboard/summary/writer/event_file_writer.py", line 275, in _run
+    self._record_writer.write(data)
+  File "/home/min-gi/venvs/sumo-rl/lib/python3.12/site-packages/tensorboard/summary/writer/record_writer.py", line 40, in write
+    self._writer.write(header + header_crc + data + footer_crc)
+  File "/home/min-gi/venvs/sumo-rl/lib/python3.12/site-packages/tensorboard/compat/tensorflow_stub/io/gfile.py", line 775, in write
+    self.fs.append(self.filename, file_content, self.binary_mode)
+  File "/home/min-gi/venvs/sumo-rl/lib/python3.12/site-packages/tensorboard/compat/tensorflow_stub/io/gfile.py", line 167, in append
+    self._write(filename, file_content, "ab" if binary_mode else "a")
+  File "/home/min-gi/venvs/sumo-rl/lib/python3.12/site-packages/tensorboard/compat/tensorflow_stub/io/gfile.py", line 171, in _write
+    with io.open(filename, mode, encoding=encoding) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: b'models/bc_ppo/runs/s2_teacher_ts0/tb/events.out.tfevents.1795261983.mingi-desktop.33832.0'
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update   26] steps=  53248  ep_rew_mean=17.57  ep_len_mean=1149  completion_rate=0.4  collision_rate=0.02222  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.6  avg_speed=3.775  lane_changes_per_episode=12.98  std=0.5498  policy_loss=-0.001244  value_loss=1.393  entropy=1.744  approx_kl=0.003409  clip_fraction=0.02339  explained_variance=0.913  learning_rate=0.0001  p_lane_change=0.4179
+ Retrying in 1 seconds
+[update   27] steps=  55296  ep_rew_mean=17.21  ep_len_mean=1152  completion_rate=0.3913  collision_rate=0.02174  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.6087  avg_speed=3.765  lane_changes_per_episode=12.72  std=0.5493  policy_loss=0.0008813  value_loss=2.129  entropy=1.712  approx_kl=0.007691  clip_fraction=0.04302  explained_variance=0.9201  learning_rate=0.0001  p_lane_change=0.3789
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update   28] steps=  57344  ep_rew_mean=19.04  ep_len_mean=1155  completion_rate=0.4167  collision_rate=0.02083  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.5833  avg_speed=3.756  lane_changes_per_episode=13.27  std=0.5494  policy_loss=-0.002664  value_loss=2.055  entropy=1.7  approx_kl=0.007437  clip_fraction=0.0812  explained_variance=0.8729  learning_rate=0.0001  p_lane_change=0.3867
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update   29] steps=  59392  ep_rew_mean=19.75  ep_len_mean=1151  completion_rate=0.42  collision_rate=0.02  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.58  avg_speed=3.769  lane_changes_per_episode=13.36  std=0.5495  policy_loss=-0.002463  value_loss=2.235  entropy=1.759  approx_kl=0.005724  clip_fraction=0.02578  explained_variance=0.9257  learning_rate=0.0001  p_lane_change=0.4549
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update   30] steps=  61440  ep_rew_mean=19.41  ep_len_mean=1152  completion_rate=0.4231  collision_rate=0.01923  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.5769  avg_speed=3.763  lane_changes_per_episode=13.21  std=0.5489  policy_loss=-0.001657  value_loss=2.675  entropy=1.754  approx_kl=0.005221  clip_fraction=0.02612  explained_variance=0.9129  learning_rate=0.0001  p_lane_change=0.4538
+ Retrying in 1 seconds
+[update   31] steps=  63488  ep_rew_mean=19.13  ep_len_mean=1160  completion_rate=0.4151  collision_rate=0.01887  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.5849  avg_speed=3.745  lane_changes_per_episode=12.98  std=0.5513  policy_loss=-0.00408  value_loss=2.757  entropy=1.719  approx_kl=0.002505  clip_fraction=0.02666  explained_variance=0.9209  learning_rate=0.0001  p_lane_change=0.4555
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update   32] steps=  65536  ep_rew_mean=20.32  ep_len_mean=1158  completion_rate=0.4364  collision_rate=0.01818  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.5636  avg_speed=3.748  lane_changes_per_episode=13.09  std=0.5505  policy_loss=-0.00307  value_loss=3.766  entropy=1.702  approx_kl=0.002564  clip_fraction=0.03188  explained_variance=0.903  learning_rate=0.0001  p_lane_change=0.4621
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update   33] steps=  67584  ep_rew_mean=17.99  ep_len_mean=1145  completion_rate=0.4138  collision_rate=0.03448  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.5862  avg_speed=3.79  lane_changes_per_episode=12.74  std=0.5483  policy_loss=-0.005941  value_loss=4.875  entropy=1.72  approx_kl=0.003774  clip_fraction=0.05781  explained_variance=0.9016  learning_rate=0.0001  p_lane_change=0.4554
+ Retrying in 1 seconds
+[안내] 학습 곡선 PNG 저장 실패 (ModuleNotFoundError: No module named 'matplotlib')
+Traceback (most recent call last):
+  File "/home/min-gi/Desktop/2026_2/Artificial-Intelligence-and-Control-for-Autonomous-Driving/models/bc_ppo/bcppo.py", line 647, in <module>
+    q.add_argument("--lr", type=float, default=3e-4)
+    ^^^^^^
+  File "/home/min-gi/Desktop/2026_2/Artificial-Intelligence-and-Control-for-Autonomous-Driving/models/bc_ppo/bcppo.py", line 642, in main
+    q.add_argument("--data", nargs="+", required=True)
+  File "/home/min-gi/Desktop/2026_2/Artificial-Intelligence-and-Control-for-Autonomous-Driving/models/bc_ppo/bcppo.py", line 277, in cmd_expert
+    agent = make_agent(env, args.seed, lane_keep_bias=EXPERT_LANE_KEEP_BIAS)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/min-gi/Desktop/2026_2/Artificial-Intelligence-and-Control-for-Autonomous-Driving/models/bc_ppo/bcppo.py", line 255, in train_loop
+    checkpoint_interval=10, checkpoint_fn=checkpoint, eval_fn=on_eval,
+^^^^^^
+  File "/home/min-gi/Desktop/2026_2/Artificial-Intelligence-and-Control-for-Autonomous-Driving/utils/logger.py", line 156, in close
+    self.writer.close()
+  File "/home/min-gi/venvs/sumo-rl/lib/python3.12/site-packages/torch/utils/tensorboard/writer.py", line 1207, in close
+    writer.flush()
+  File "/home/min-gi/venvs/sumo-rl/lib/python3.12/site-packages/torch/utils/tensorboard/writer.py", line 154, in flush
+    self.event_writer.flush()
+  File "/home/min-gi/venvs/sumo-rl/lib/python3.12/site-packages/tensorboard/summary/writer/event_file_writer.py", line 125, in flush
+    self._async_writer.flush()
+  File "/home/min-gi/venvs/sumo-rl/lib/python3.12/site-packages/tensorboard/summary/writer/event_file_writer.py", line 186, in flush
+    self._check_worker_status()
+  File "/home/min-gi/venvs/sumo-rl/lib/python3.12/site-packages/tensorboard/summary/writer/event_file_writer.py", line 212, in _check_worker_status
+    raise exception
+  File "/home/min-gi/Desktop/2026_2/Artificial-Intelligence-and-Control-for-Autonomous-Driving/models/bc_ppo/bcppo.py", line 246, in train_loop
+    
+    
+  File "/home/min-gi/Desktop/2026_2/Artificial-Intelligence-and-Control-for-Autonomous-Driving/algorithms/ppo.py", line 430, in learn
+    logger.log_train(self.num_timesteps, metrics,
+  File "/home/min-gi/Desktop/2026_2/Artificial-Intelligence-and-Control-for-Autonomous-Driving/utils/logger.py", line 46, in log_train
+    self.writer.add_scalar(f"train/{k}", v, step)
+  File "/home/min-gi/venvs/sumo-rl/lib/python3.12/site-packages/torch/utils/tensorboard/writer.py", line 386, in add_scalar
+    self._get_file_writer().add_summary(summary, global_step, walltime)
+  File "/home/min-gi/venvs/sumo-rl/lib/python3.12/site-packages/torch/utils/tensorboard/writer.py", line 116, in add_summary
+    self.add_event(event, global_step, walltime)
+  File "/home/min-gi/venvs/sumo-rl/lib/python3.12/site-packages/torch/utils/tensorboard/writer.py", line 100, in add_event
+    self.event_writer.add_event(event)
+  File "/home/min-gi/venvs/sumo-rl/lib/python3.12/site-packages/tensorboard/summary/writer/event_file_writer.py", line 117, in add_event
+    self._async_writer.write(event.SerializeToString())
+  File "/home/min-gi/venvs/sumo-rl/lib/python3.12/site-packages/tensorboard/summary/writer/event_file_writer.py", line 178, in write
+    self._check_worker_status()
+  File "/home/min-gi/venvs/sumo-rl/lib/python3.12/site-packages/tensorboard/summary/writer/event_file_writer.py", line 212, in _check_worker_status
+    raise exception
+  File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+    self.run()
+  File "/home/min-gi/venvs/sumo-rl/lib/python3.12/site-packages/tensorboard/summary/writer/event_file_writer.py", line 244, in run
+    self._run()
+  File "/home/min-gi/venvs/sumo-rl/lib/python3.12/site-packages/tensorboard/summary/writer/event_file_writer.py", line 275, in _run
+    self._record_writer.write(data)
+  File "/home/min-gi/venvs/sumo-rl/lib/python3.12/site-packages/tensorboard/summary/writer/record_writer.py", line 40, in write
+    self._writer.write(header + header_crc + data + footer_crc)
+  File "/home/min-gi/venvs/sumo-rl/lib/python3.12/site-packages/tensorboard/compat/tensorflow_stub/io/gfile.py", line 775, in write
+    self.fs.append(self.filename, file_content, self.binary_mode)
+  File "/home/min-gi/venvs/sumo-rl/lib/python3.12/site-packages/tensorboard/compat/tensorflow_stub/io/gfile.py", line 167, in append
+    self._write(filename, file_content, "ab" if binary_mode else "a")
+  File "/home/min-gi/venvs/sumo-rl/lib/python3.12/site-packages/tensorboard/compat/tensorflow_stub/io/gfile.py", line 171, in _write
+    with io.open(filename, mode, encoding=encoding) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: b'models/bc_ppo/runs/s2_teacher_ts0/tb/events.out.tfevents.1795261983.mingi-desktop.33832.0'

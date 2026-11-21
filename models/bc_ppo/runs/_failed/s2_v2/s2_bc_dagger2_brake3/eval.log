@@ -1,0 +1,56 @@
+[단계별 맵] 2단계: bus_stop, signal
+노드 501개 (신호등 31, 추정 신호 23, 빠른 도로 중간 신호 5개 제외), 엣지 986개, 어린이보호구역 속도 0개, 차로 수 보정 30개 → /tmp/bcppo_58096_6b_qxd06
+배경 정리: 끊긴 끝 잇기 3곳, 막다른 토막·주차장 통로 107개 엣지 제거, 차로 수 채운 큰 도로 55개 way
+단계 요소: ['bus_stop', 'signal'] / 차량 최고속도: 8.33 m/s
+배달 트럭 주정차 엣지 없음: e218924602_5
+보행자 경로 후보 44쌍 중 걸어갈 수 있는 24쌍 사용
+보행자 경로 24쌍, 시간당 400명
+승객 6명 (노선 ['A01_east'], 정류장당 2명, 탑승 → 2정거장 뒤 하차)
+노상주차 줄 4곳, 주차 차량 32대
+[zone_markings] 정차금지 교차로가 도로망에 없음 (건너뜀): cluster_n5768277866_n871729539_n9040757788
+[zone_markings] 안전지대 e908646367_3 0~10 m (왼쪽, 폭 2.5→0.5 m)
+[zone_markings] 노상주차 칸 e1212424783_1 13~85 m, 10칸
+[zone_markings] 노상주차 칸 e1212424783_2 5~39 m, 4칸
+[zone_markings] 노상주차 칸 e1212424783_3 4~19 m, 2칸
+[zone_markings] 노상주차 칸 e1212424783_4 5~122 m, 16칸
+본선 24개 엣지 / 노선: A01_east (r0: 정류장 5곳, 24엣지), A01_loop (r0_loop: 정류장 11곳, 53엣지)
+측면 합류 7곳(+세종대로 1곳), 오토바이 주차 0대, 트럭 주정차 0대, 정류장 11개
+측면 합류 엣지: ['e183272596_1', 'e506252728_1b', 'e233651317_5a', 'e233651327_1b', 'e1499619439_1', 'e1562199592_1b', 'e233651275_1b']
+세종대로 합류 엣지: ['e378453707_3']
+[신호] 청계광장 동쪽(모전교) (무교로): 주기 139 s, 버스 방향 녹 55.5 / 황 4.3 / 적 79.2 s — 차용: 광교 실측값
+[신호] 광교 (남대문로): 주기 139 s, 버스 방향 녹 55.5 / 황 4.3 / 적 79.2 s — T-DATA API 21835 광교(연등) 2026-11-21 실측
+[신호] 청계2가 (삼일대로): 주기 170 s, 버스 방향 녹 72 / 황 3 / 적 95 s — 교통영향평가 2025-02-14 청계2가사거리
+[신호] 수표교 (수표로): 주기 139 s, 버스 방향 녹 55.5 / 황 4.3 / 적 79.2 s — 차용: 광교 실측값
+[신호] 청계3가 (충무로): 주기 130.6 s, 버스 방향 녹 32.6 / 황 4.4 / 적 93.6 s — T-DATA API 23331 청계3가(연등) 2026-11-21 실측
+[신호] 청계4가 (창경궁로): 주기 140 s, 버스 방향 녹 42 / 황 3 / 적 95 s — 교통영향평가 2022-07-22 청계4가 교차로
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[models/bc_ppo/runs/s2_bc_dagger2_brake3/bc.pt · 2단계 · shield shadow · 판 900100~900129] 완주(정류장 포함) 60% · 도착 67% · 충돌 10% · 적색 23% · 시간초과 0% · 정류장놓침 7% · 수동개입률 16.3% · 평균속도 3.90 m/s (336s)

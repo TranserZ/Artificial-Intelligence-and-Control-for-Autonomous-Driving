@@ -1,0 +1,155 @@
+  models/bc_ppo/data/s1_part0.npz: 17899 / 17899 step 사용 (좋은 판 25 / 25)
+  models/bc_ppo/data/s1_part1.npz: 17925 / 17925 step 사용 (좋은 판 25 / 25)
+  models/bc_ppo/data/s1_part2.npz: 17954 / 17954 step 사용 (좋은 판 25 / 25)
+  models/bc_ppo/data/s1_part3.npz: 17863 / 17863 step 사용 (좋은 판 25 / 25)
+[단계별 맵] 1단계: bus_stop
+노드 501개 (신호등 0, 추정 신호 23, 빠른 도로 중간 신호 5개 제외), 엣지 986개, 어린이보호구역 속도 0개, 차로 수 보정 30개 → /tmp/bcppo_34037_05_bv7z6
+배경 정리: 끊긴 끝 잇기 3곳, 막다른 토막·주차장 통로 107개 엣지 제거, 차로 수 채운 큰 도로 55개 way
+단계 요소: ['bus_stop'] / 차량 최고속도: 8.33 m/s
+배달 트럭 주정차 엣지 없음: e218924602_5
+승객 6명 (노선 ['A01_east'], 정류장당 2명, 탑승 → 2정거장 뒤 하차)
+노상주차 줄 4곳, 주차 차량 32대
+[zone_markings] 정차금지 교차로가 도로망에 없음 (건너뜀): cluster_n5768277866_n871729539_n9040757788
+[zone_markings] 안전지대 e908646367_3 0~10 m (왼쪽, 폭 2.5→0.5 m)
+[zone_markings] 노상주차 칸 e1212424783_1 13~85 m, 10칸
+[zone_markings] 노상주차 칸 e1212424783_2 5~39 m, 4칸
+[zone_markings] 노상주차 칸 e1212424783_3 4~19 m, 2칸
+[zone_markings] 노상주차 칸 e1212424783_4 5~122 m, 16칸
+본선 23개 엣지 / 노선: A01_east (r0: 정류장 5곳, 23엣지), A01_loop (r0_loop: 정류장 11곳, 52엣지)
+측면 합류 7곳(+세종대로 1곳), 오토바이 주차 0대, 트럭 주정차 0대, 정류장 11개
+측면 합류 엣지: ['e183272596_1', 'e506252728_1b', 'e233651317_5a', 'e233651327_1b', 'e1499619439_1', 'e1562199592_1b', 'e233651275_1b']
+세종대로 합류 엣지: ['e378453707_3']
+초기 가중치: models/bc_ppo/runs/s1_bc/bc.pt · BC λ 1.0 → 0 (10000 + 150000 step) · 시범 71641 step
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update    1] steps=   2048  ep_rew_mean=69.39  ep_len_mean=713  completion_rate=0.5  collision_rate=0  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.5  avg_speed=6.006  lane_changes_per_episode=1  std=0.1145  policy_loss=2.757e-08  value_loss=4.477  entropy=-0.7435  approx_kl=2.724e-08  clip_fraction=0  bc_loss=-0.9436  explained_variance=0.337  p_lane_change=0.002554  learning_rate=0.0001  bc_lambda=1  warmup=1
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update    2] steps=   4096  ep_rew_mean=67.29  ep_len_mean=702.6  completion_rate=0.4  collision_rate=0  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.6  avg_speed=6.093  lane_changes_per_episode=1  std=0.1145  policy_loss=-2.816e-08  value_loss=2.74  entropy=-0.7457  approx_kl=-1.208e-08  clip_fraction=0  bc_loss=-0.9381  explained_variance=0.5734  p_lane_change=0.001193  learning_rate=0.0001  bc_lambda=1  warmup=1
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update    3] steps=   6144  ep_rew_mean=72.92  ep_len_mean=706  completion_rate=0.625  collision_rate=0  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.375  avg_speed=6.062  lane_changes_per_episode=1  std=0.1145  policy_loss=-6.303e-08  value_loss=0.9247  entropy=-0.7454  approx_kl=-4.709e-08  clip_fraction=0  bc_loss=-0.9177  explained_variance=0.8112  p_lane_change=0.001314  learning_rate=0.0001  bc_lambda=1  warmup=1
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update    4] steps=   8192  ep_rew_mean=75.38  ep_len_mean=709.8  completion_rate=0.7273  collision_rate=0  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.2727  avg_speed=6.028  lane_changes_per_episode=1  std=0.1145  policy_loss=-5.343e-08  value_loss=0.8187  entropy=-0.7461  approx_kl=2.154e-09  clip_fraction=0  bc_loss=-0.9276  explained_variance=0.8355  p_lane_change=0.0009005  learning_rate=0.0001  bc_lambda=1  warmup=1
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update    5] steps=  10240  ep_rew_mean=76.8  ep_len_mean=711.7  completion_rate=0.7857  collision_rate=0  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.2143  avg_speed=6.012  lane_changes_per_episode=1  std=0.1116  policy_loss=0.02329  value_loss=0.6878  entropy=-0.7585  approx_kl=0.1389  clip_fraction=0.3064  bc_loss=-0.9561  explained_variance=0.8732  p_lane_change=0.0003752  learning_rate=0.0001  bc_lambda=0.9984  warmup=0
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update    6] steps=  12288  ep_rew_mean=63.44  ep_len_mean=695  completion_rate=0.6471  collision_rate=0  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.3529  avg_speed=6.176  lane_changes_per_episode=1  std=0.1099  policy_loss=0.036  value_loss=10.94  entropy=-0.7733  approx_kl=0.1224  clip_fraction=0.3742  bc_loss=-0.954  explained_variance=0.6343  p_lane_change=0.002998  learning_rate=0.0001  bc_lambda=0.9847  warmup=0
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update    7] steps=  14336  ep_rew_mean=54.63  ep_len_mean=674.9  completion_rate=0.5714  collision_rate=0.04762  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.4286  avg_speed=6.255  lane_changes_per_episode=1.143  std=0.108  policy_loss=0.04228  value_loss=7.998  entropy=-0.789  approx_kl=0.07714  clip_fraction=0.2605  bc_loss=-0.9507  explained_variance=0.7073  p_lane_change=0.001373  learning_rate=0.0001  bc_lambda=0.9711  warmup=0
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update    8] steps=  16384  ep_rew_mean=44.91  ep_len_mean=660.3  completion_rate=0.5  collision_rate=0.04167  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.5  avg_speed=6.431  lane_changes_per_episode=1.125  std=0.1061  policy_loss=0.01916  value_loss=9.138  entropy=-0.8101  approx_kl=0.045  clip_fraction=0.2204  bc_loss=-0.9773  explained_variance=0.813  p_lane_change=0.0004586  learning_rate=0.0001  bc_lambda=0.9574  warmup=0
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update    9] steps=  18432  ep_rew_mean=37.21  ep_len_mean=647.8  completion_rate=0.4286  collision_rate=0.03571  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.5714  avg_speed=6.582  lane_changes_per_episode=1  std=0.1042  policy_loss=0.01123  value_loss=7.071  entropy=-0.8296  approx_kl=0.01428  clip_fraction=0.1696  bc_loss=-0.9898  explained_variance=0.8692  p_lane_change=0.000768  learning_rate=0.0001  bc_lambda=0.9438  warmup=0
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update   10] steps=  20480  ep_rew_mean=29.93  ep_len_mean=635.8  completion_rate=0.375  collision_rate=0.03125  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.625  avg_speed=6.728  lane_changes_per_episode=0.875  std=0.1026  policy_loss=0.007827  value_loss=7.919  entropy=-0.8448  approx_kl=0.01582  clip_fraction=0.1535  bc_loss=-0.9962  explained_variance=0.8656  p_lane_change=0.001656  learning_rate=0.0001  bc_lambda=0.9301  warmup=0
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update   11] steps=  22528  ep_rew_mean=26.08  ep_len_mean=629  completion_rate=0.3429  collision_rate=0.02857  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.6571  avg_speed=6.81  lane_changes_per_episode=0.8  std=0.1009  policy_loss=0.006596  value_loss=7.313  entropy=-0.8569  approx_kl=0.01213  clip_fraction=0.1299  bc_loss=-1.021  explained_variance=0.8884  p_lane_change=0.001752  learning_rate=0.0001  bc_lambda=0.9165  warmup=0
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update   12] steps=  24576  ep_rew_mean=21.87  ep_len_mean=621.5  completion_rate=0.3077  collision_rate=0.02564  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.6923  avg_speed=6.901  lane_changes_per_episode=0.7692  std=0.09923  policy_loss=0.005555  value_loss=9.042  entropy=-0.8753  approx_kl=0.01762  clip_fraction=0.1445  bc_loss=-1.044  explained_variance=0.8722  p_lane_change=0.001839  learning_rate=0.0001  bc_lambda=0.9028  warmup=0
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update   13] steps=  26624  ep_rew_mean=18.46  ep_len_mean=615.5  completion_rate=0.2791  collision_rate=0.02326  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.7209  avg_speed=6.973  lane_changes_per_episode=0.7209  std=0.09758  policy_loss=0.00514  value_loss=8.563  entropy=-0.8922  approx_kl=0.02684  clip_fraction=0.1455  bc_loss=-1.037  explained_variance=0.8851  p_lane_change=0.001096  learning_rate=0.0001  bc_lambda=0.8892  warmup=0
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update   14] steps=  28672  ep_rew_mean=16.27  ep_len_mean=611.7  completion_rate=0.2609  collision_rate=0.02174  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.7391  avg_speed=7.02  lane_changes_per_episode=0.6957  std=0.09581  policy_loss=0.00428  value_loss=9.468  entropy=-0.9092  approx_kl=0.01502  clip_fraction=0.1256  bc_loss=-1.076  explained_variance=0.8711  p_lane_change=0.002083  learning_rate=0.0001  bc_lambda=0.8755  warmup=0
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update   15] steps=  30720  ep_rew_mean=13.77  ep_len_mean=607.4  completion_rate=0.24  collision_rate=0.02  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.76  avg_speed=7.072  lane_changes_per_episode=0.64  std=0.09443  policy_loss=0.007575  value_loss=8.394  entropy=-0.9228  approx_kl=0.02098  clip_fraction=0.1557  bc_loss=-1.065  explained_variance=0.8866  p_lane_change=0.003066  learning_rate=0.0001  bc_lambda=0.8619  warmup=0
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update   16] steps=  32768  ep_rew_mean=10.74  ep_len_mean=602.7  completion_rate=0.2222  collision_rate=0.01852  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.7778  avg_speed=7.131  lane_changes_per_episode=0.5926  std=0.09315  policy_loss=0.009964  value_loss=12.89  entropy=-0.9247  approx_kl=0.02289  clip_fraction=0.1804  bc_loss=-1.084  explained_variance=0.8427  p_lane_change=0.004701  learning_rate=0.0001  bc_lambda=0.8482  warmup=0
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update   17] steps=  34816  ep_rew_mean=7.292  ep_len_mean=597.9  completion_rate=0.2069  collision_rate=0.01724  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.7931  avg_speed=7.192  lane_changes_per_episode=0.569  std=0.09207  policy_loss=0.01798  value_loss=12  entropy=-0.9355  approx_kl=0.05104  clip_fraction=0.2375  bc_loss=-1.065  explained_variance=0.8658  p_lane_change=0.005586  learning_rate=0.0001  bc_lambda=0.8346  warmup=0
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update   18] steps=  36864  ep_rew_mean=6.606  ep_len_mean=597.5  completion_rate=0.1967  collision_rate=0.01639  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.8033  avg_speed=7.199  lane_changes_per_episode=0.5902  std=0.09115  policy_loss=0.01749  value_loss=10.82  entropy=-0.9488  approx_kl=0.04626  clip_fraction=0.2158  bc_loss=-1.087  explained_variance=0.8572  p_lane_change=0.005988  learning_rate=0.0001  bc_lambda=0.8209  warmup=0
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update   19] steps=  38912  ep_rew_mean=5.947  ep_len_mean=597.2  completion_rate=0.1875  collision_rate=0.01562  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.8125  avg_speed=7.203  lane_changes_per_episode=0.5938  std=0.09003  policy_loss=0.02636  value_loss=10.54  entropy=-0.9677  approx_kl=0.04821  clip_fraction=0.2454  bc_loss=-1.1  explained_variance=0.8287  p_lane_change=0.003526  learning_rate=0.0001  bc_lambda=0.8073  warmup=0
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update   20] steps=  40960  ep_rew_mean=6.146  ep_len_mean=598.3  completion_rate=0.1912  collision_rate=0.01471  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.8088  avg_speed=7.193  lane_changes_per_episode=0.6029  std=0.08889  policy_loss=0.01597  value_loss=12.62  entropy=-0.9791  approx_kl=0.03017  clip_fraction=0.1733  bc_loss=-1.101  explained_variance=0.8044  p_lane_change=0.004559  learning_rate=0.0001  bc_lambda=0.7936  warmup=0
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update   21] steps=  43008  ep_rew_mean=5.903  ep_len_mean=598.9  completion_rate=0.1831  collision_rate=0.01408  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.8169  avg_speed=7.184  lane_changes_per_episode=0.6197  std=0.0881  policy_loss=0.03163  value_loss=12.16  entropy=-0.9939  approx_kl=0.06525  clip_fraction=0.3102  bc_loss=-1.107  explained_variance=0.7884  p_lane_change=0.003212  learning_rate=0.0001  bc_lambda=0.7799  warmup=0
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update   22] steps=  45056  ep_rew_mean=6.032  ep_len_mean=600.4  completion_rate=0.1733  collision_rate=0.01333  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.8267  avg_speed=7.167  lane_changes_per_episode=0.64  std=0.08699  policy_loss=0.01782  value_loss=12.91  entropy=-1.007  approx_kl=0.02904  clip_fraction=0.2051  bc_loss=-1.116  explained_variance=0.77  p_lane_change=0.003163  learning_rate=0.0001  bc_lambda=0.7663  warmup=0
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update   23] steps=  47104  ep_rew_mean=7.717  ep_len_mean=603  completion_rate=0.1795  collision_rate=0.01282  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.8205  avg_speed=7.138  lane_changes_per_episode=0.6538  std=0.08572  policy_loss=0.02061  value_loss=9.603  entropy=-1.022  approx_kl=0.02913  clip_fraction=0.2038  bc_loss=-1.11  explained_variance=0.7394  p_lane_change=0.002153  learning_rate=0.0001  bc_lambda=0.7526  warmup=0
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update   24] steps=  49152  ep_rew_mean=9.266  ep_len_mean=605.7  completion_rate=0.1852  collision_rate=0.01235  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.8148  avg_speed=7.109  lane_changes_per_episode=0.6667  std=0.08495  policy_loss=0.02526  value_loss=8.366  entropy=-1.034  approx_kl=0.05104  clip_fraction=0.2677  bc_loss=-1.113  explained_variance=0.7021  p_lane_change=0.004134  learning_rate=0.0001  bc_lambda=0.739  warmup=0
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+[update   25] steps=  51200  ep_rew_mean=10.71  ep_len_mean=608.4  completion_rate=0.1786  collision_rate=0.0119  red_light_rate=0  lane_error_rate=0  timeout_rate=0  missed_stop_rate=0.8214  avg_speed=7.079  lane_changes_per_episode=0.6786  std=0.08446  policy_loss=0.02014  value_loss=8.258  entropy=-1.045  approx_kl=0.05772  clip_fraction=0.3017  bc_loss=-1.099  explained_variance=0.6743  p_lane_change=0.001708  learning_rate=0.0001  bc_lambda=0.7253  warmup=0
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+    [eval @51200] 20ep  충돌률=0%  완주율=100%  신호위반=0%  보행자충돌=0%  양보위반=0%  구역과속=0%  차로오류=0%  완주(정류장 포함)=5%  수동개입률=6.1%  정류장놓침=95%  평균속도=6.6m/s  평균차간=23.4m  최소차간=0.1m  차선변경=1.0회  보상=22.0
+    [검증 shadow] 완주(정류장 포함) 5% · 도착 100% · 충돌 0% · 적색 0% · 시간초과 0% · 정류장놓침 95% · 수동개입률 6.1% · 평균속도 6.62 m/s
+    [best @51200] → best_model.pt

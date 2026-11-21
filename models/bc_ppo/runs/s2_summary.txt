@@ -1,0 +1,22 @@
+저장: s2_part_part0.npz — 33097 step, 종료 {'completed': 24, 'timeout': 1}, shield 개입 step 51.1%
+저장: s2_part_part1.npz — 31882 step, 종료 {'completed': 24, 'timeout': 1}, shield 개입 step 48.4%
+저장: s2_part_part2.npz — 28638 step, 종료 {'completed': 25}, shield 개입 step 46.6%
+저장: s2_part_part3.npz — 28887 step, 종료 {'completed': 25}, shield 개입 step 42.1%
+시범 데이터 있음 — 수집 건너뜀
+s2_bc0: 완주(정류장 포함) 53% · 도착 53% · 충돌 0% · 적색 13% · 시간초과 33% · 정류장놓침 0% · 수동개입률 0.3% · 평균속도 1.38 m/s (626s)
+저장: s2_dagger1_part0.npz — 53928 step, 학생 종료 {'timeout': 10, 'completed': 12, 'red_light': 3}, 선생님 차선변경 정답 28.63%
+저장: s2_dagger1_part1.npz — 35874 step, 학생 종료 {'red_light': 6, 'completed': 14, 'timeout': 5}, 선생님 차선변경 정답 16.93%
+저장: s2_dagger1_part2.npz — 61552 step, 학생 종료 {'timeout': 11, 'completed': 14}, 선생님 차선변경 정답 29.11%
+저장: s2_dagger1_part3.npz — 52178 step, 학생 종료 {'completed': 17, 'timeout': 8}, 선생님 차선변경 정답 28.95%
+s2_bc1: 완주(정류장 포함) 97% · 도착 97% · 충돌 0% · 적색 0% · 시간초과 3% · 정류장놓침 0% · 수동개입률 1.0% · 평균속도 3.22 m/s (398s)
+저장: s2_dagger2_part0.npz — 33049 step, 학생 종료 {'completed': 22, 'red_light': 1, 'timeout': 1, 'collision': 1}, 선생님 차선변경 정답 0.08%
+저장: s2_dagger2_part1.npz — 31853 step, 학생 종료 {'collision': 2, 'completed': 21, 'timeout': 1, 'red_light': 1}, 선생님 차선변경 정답 0.07%
+저장: s2_dagger2_part2.npz — 26918 step, 학생 종료 {'completed': 20, 'red_light': 2, 'collision': 3}, 선생님 차선변경 정답 0.12%
+저장: s2_dagger2_part3.npz — 31415 step, 학생 종료 {'completed': 25}, 선생님 차선변경 정답 0.08%
+s2_bc2: 완주(정류장 포함) 87% · 도착 97% · 충돌 3% · 적색 0% · 시간초과 0% · 정류장놓침 10% · 수동개입률 3.4% · 평균속도 3.75 m/s (338s)
+저장: s2_dagger3_part0.npz — 29808 step, 학생 종료 {'completed': 24, 'missed_stop': 1}, 선생님 차선변경 정답 0.09%
+저장: s2_dagger3_part1.npz — 27052 step, 학생 종료 {'collision': 1, 'completed': 23, 'missed_stop': 1}, 선생님 차선변경 정답 0.14%
+저장: s2_dagger3_part2.npz — 26988 step, 학생 종료 {'completed': 24, 'collision': 1}, 선생님 차선변경 정답 0.10%
+저장: s2_dagger3_part3.npz — 29571 step, 학생 종료 {'completed': 25}, 선생님 차선변경 정답 0.17%
+s2_bc3: 완주(정류장 포함) 90% · 도착 90% · 충돌 7% · 적색 3% · 시간초과 0% · 정류장놓침 0% · 수동개입률 0.7% · 평균속도 3.82 m/s (319s)
+끝
