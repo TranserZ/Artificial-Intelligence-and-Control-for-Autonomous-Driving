@@ -59,14 +59,48 @@ COLLECT_SEED_BASE = 10_000   # 시범 데이터 판 (학습 판 범위, 테스�
 # ──────────────────────────────────────────────────────────────
 # 공통
 # ──────────────────────────────────────────────────────────────
-def make_env(shield_mode: str, replay_prob: float = 0.0):
+# 선생님 전용 차선변경 게이트 (팀 기본값보다 엄격). 팀 기본값(rear_tau 0.3 s, approach_horizon 0.6 s)은
+# 버스가 거의 서 있을 때 뒤차(8 m/s)와 5.4 m만 벌어져도 변경을 허용해, shield on 선생님 학습 3만 step에서
+# 충돌 48~61%가 전부 "차선변경 직후 뒤차가 버스를 받음"이었다 (뒤차가 4.5 m/s²로 서려면 7 m 이상 필요).
+# 선생님은 시범을 만드는 도구일 뿐이라 여기서만 강화한다. 학생 학습·평가(감시 모드)는 팀 기본값.
+EXPERT_LC_GATE = {"rear_tau": 1.0, "approach_horizon": 2.0}
+# 엄격한 간격으로도 충돌이 남았다: 거의 전부 교차로를 막 지난 엣지 0~3 m에서 바꾼 직후 옆 차로 차가 받음.
+# 1단계는 신호가 없어 팀 코드의 "교차로 직후 금지 구간"이 꺼져 있고, 게이트는 교차로 안을 지나는 차를
+# 못 본다. 그래서 선생님 게이트는 엣지 시작·끝 EXPERT_JUNCTION_GAP m 안의 변경을 막는다.
+EXPERT_JUNCTION_GAP = 20.0
+# 선생님 학습 초반 탐색: 기본 lane_keep_bias 0.5는 step마다 약 55% 차선변경 시도 → 2.0 (약 14%)
+EXPERT_LANE_KEEP_BIAS = 2.0
+
+
+class ExpertGateEnv(SumoHighwayEnv):
+    """선생님 전용: 교차로 앞뒤 EXPERT_JUNCTION_GAP m에서는 차선변경 게이트가 막는다 (shield on일 때)."""
+
+    def _lane_change_is_safe(self, direction: int) -> bool:
+        import traci
+        try:
+            edge = traci.vehicle.getRoadID(self.ego_id)
+            pos = traci.vehicle.getLanePosition(self.ego_id)
+            length = traci.lane.getLength(traci.vehicle.getLaneID(self.ego_id))
+        except traci.TraCIException:
+            return False
+        if edge.startswith(":") or pos < EXPERT_JUNCTION_GAP or length - pos < EXPERT_JUNCTION_GAP:
+            return False
+        return super()._lane_change_is_safe(direction)
+
+
+def make_env(shield_mode: str, replay_prob: float = 0.0, lc_gate: dict = None):
     work = tempfile.TemporaryDirectory(prefix=f"bcppo_{os.getpid()}_")
     cfg = road_builder.build(ROAD, EGO, TRAFFIC, work.name)
     sim = {**SIMULATION,
            "shield": {**SIMULATION["shield"], "mode": shield_mode},
            "replay": {"prob": replay_prob, "size": 200}}
-    env = SumoHighwayEnv(cfg_path=cfg, road=ROAD, ego=EGO, mdp_sim=sim,
-                         mdp_obs=OBSERVATION, action=ACTION, reward=T.REWARD,
+    action = ACTION
+    cls = SumoHighwayEnv
+    if lc_gate:
+        action = {**ACTION, "lane_change_safety": {**ACTION["lane_change_safety"], **lc_gate}}
+        cls = ExpertGateEnv
+    env = cls(cfg_path=cfg, road=ROAD, ego=EGO, mdp_sim=sim,
+                         mdp_obs=OBSERVATION, action=action, reward=T.REWARD,
                          traffic=TRAFFIC, gui=False)
     env._workdir = work          # 환경과 수명을 같이 하도록 붙여 둔다
     return env
@@ -74,6 +108,9 @@ def make_env(shield_mode: str, replay_prob: float = 0.0):
 
 def make_agent(env, seed: int, cls=PPO, **extra):
     hp = {**T.HPARAMS, "seed": seed}
+    for k in list(extra):
+        if k in hp:
+            hp[k] = extra.pop(k)
     return cls(obs_dim=env.observation_space.shape[0], act_dim=env.action_space.shape[0],
                buffer=RolloutBuffer(), **hp, **extra)
 
@@ -168,8 +205,8 @@ def train_loop(agent, env, args, eval_shield: str):
 # expert: 선생님 PPO (shield on)
 # ──────────────────────────────────────────────────────────────
 def cmd_expert(args):
-    env = make_env("on", replay_prob=args.replay_prob)
-    agent = make_agent(env, args.seed)
+    env = make_env("on", replay_prob=args.replay_prob, lc_gate=EXPERT_LC_GATE)
+    agent = make_agent(env, args.seed, lane_keep_bias=EXPERT_LANE_KEEP_BIAS)
     if args.init:
         load_weights(agent, args.init)
         print(f"초기 가중치: {args.init}")
@@ -195,7 +232,7 @@ def end_reason(info, terminated, truncated):
 
 
 def cmd_collect(args):
-    env = make_env("on")
+    env = make_env("on", lc_gate=EXPERT_LC_GATE)
     env.eval_mode = True
     agent = make_agent(env, 0)
     load_weights(agent, args.ckpt)
@@ -470,7 +507,7 @@ def cmd_finetune(args):
 # eval: 개발 판 평가
 # ──────────────────────────────────────────────────────────────
 def cmd_eval(args):
-    env = make_env(args.shield)
+    env = make_env(args.shield, lc_gate=EXPERT_LC_GATE if args.expert_gate else None)
     agent = make_agent(env, 0)
     load_weights(agent, args.ckpt)
     t0 = time.time()
@@ -533,6 +570,7 @@ def main():
     q.add_argument("--episodes", type=int, default=30)
     q.add_argument("--seed-base", type=int, default=DEV_SEED_BASE)
     q.add_argument("--json", default=None)
+    q.add_argument("--expert-gate", action="store_true", help="선생님 전용(엄격한) 차선변경 게이트로 평가")
 
     args = p.parse_args()
     if args.cmd in ("collect",) and SumoHighwayEnv.is_held_out_seed(args.seed_base):
