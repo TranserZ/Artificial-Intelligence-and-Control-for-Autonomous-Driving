@@ -112,7 +112,8 @@ REWARD_OVERRIDES = dict(
     shield_penalty=0.0,               # shield 개입 감점 — env-v2는 학습 중 shield off라 쓰지 않음
     shield_penalty_scale=0.0,
     stop_success_bonus=5.0,           # 정류장 정차 성공 (정류장 구간에서 10초 정지) +
-    missed_stop_penalty=5.0,          # 정류장 놓침 −
+    missed_stop_penalty=20.0,         # 정류장 놓침 − (5→20, env-v3 준비: ±5일 땐 GRU-PPO가 정류장 차로를 피하는 게
+                                      #   이득이 돼 5곳 중 첫 정류장만 섰다. 충돌·적색 위반과 같은 크기로 맞춤)
     lc_forbidden_penalty=1.0,         # 차선변경 금지 구간(정지선 앞 30 m·교차로 직후 20 m·지그재그)에서 변경 −
 )
 REWARD = {**REWARD_DEFAULTS, **REWARD_OVERRIDES}
