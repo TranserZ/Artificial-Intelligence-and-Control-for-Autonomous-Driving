@@ -1,0 +1,545 @@
+"""선생님(PPO + shield 켬) → 시범 데이터 → 모방학습(BC) → 학생 PPO(shield 끔) 파이프라인.
+
+공용 파일(env/, train.py, algorithms/)은 고치지 않고 가져다 쓴다. 보상·하이퍼파라미터는
+train.py의 REWARD / HPARAMS 그대로다 (바꾸는 축은 "학습 방식" 하나).
+도로 단계는 환경변수 CGC_STAGE로 정한다 (env/curriculum.py).
+
+모드
+  expert   : 선생님 학습. 학습·검증 모두 shield "on" (위험한 명령을 shield가 덮어씀)
+  collect  : 선생님이 shield "on"으로 운전한 시범 데이터 저장.
+             정답 행동 = shield가 고친 뒤 "실제로 적용된" 가감속과 실제 실행된 차선변경
+  bc       : HybridActorCritic(PPO와 같은 구조)으로 시범을 흉내 낸다.
+             가감속은 정규분포 log-likelihood, 차선은 cross-entropy,
+             가치 함수는 시범 판의 할인 수익으로 미리 맞춘다 (PPO 첫 업데이트 붕괴 방지)
+  finetune : 학생 PPO. 학습 shield "off", 검증 "shadow".
+             PPO 손실 + λ·BC 손실. λ는 bc_coef에서 decay_steps 동안 0으로 줄어든다.
+             처음 warmup_steps 동안은 가치 출력층(v_head)만 학습한다 (행동은 BC 그대로)
+  eval     : 체크포인트를 개발 판에서 평가 (기본 900100~900129, shield shadow)
+
+예시
+  CGC_STAGE=1 python models/bc_ppo/bcppo.py expert --seed 0 --steps 300000 --out models/bc_ppo/runs/s1_expert_ts0
+  CGC_STAGE=1 python models/bc_ppo/bcppo.py collect --ckpt .../best_model.pt --episodes 100 --data models/bc_ppo/data/s1.npz
+  CGC_STAGE=1 python models/bc_ppo/bcppo.py bc --data models/bc_ppo/data/s1.npz --out models/bc_ppo/runs/s1_bc
+  CGC_STAGE=1 python models/bc_ppo/bcppo.py finetune --init .../bc.pt --data ... --out models/bc_ppo/runs/s1_ft_ts0
+  CGC_STAGE=1 python models/bc_ppo/bcppo.py eval --ckpt .../final.pt --shield shadow
+"""
+import argparse
+import json
+import os
+import sys
+import tempfile
+import time
+
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.distributions import Categorical, Normal
+
+import train as T                                # REWARD, HPARAMS (공용 기본값)
+import algorithms.ppo as ppo_module
+from algorithms.ppo import PPO
+from env import road_builder
+from env.mdp_config import ACTION, OBSERVATION, SIMULATION
+from env.road_config import EGO, ROAD, TRAFFIC
+from env.sumo_env import SumoHighwayEnv
+from utils.buffer import RolloutBuffer
+from utils.evaluator import evaluate_policy
+from utils.logger import RunLogger
+
+VAL_SEED_BASE = 900_000      # 학습 중 best 고르기 (protocol 3-2)
+DEV_SEED_BASE = 900_100      # 개발·튜닝 확인 (900100~900129)
+COLLECT_SEED_BASE = 10_000   # 시범 데이터 판 (학습 판 범위, 테스트·검증 구간 밖)
+
+
+# ──────────────────────────────────────────────────────────────
+# 공통
+# ──────────────────────────────────────────────────────────────
+def make_env(shield_mode: str, replay_prob: float = 0.0):
+    work = tempfile.TemporaryDirectory(prefix=f"bcppo_{os.getpid()}_")
+    cfg = road_builder.build(ROAD, EGO, TRAFFIC, work.name)
+    sim = {**SIMULATION,
+           "shield": {**SIMULATION["shield"], "mode": shield_mode},
+           "replay": {"prob": replay_prob, "size": 200}}
+    env = SumoHighwayEnv(cfg_path=cfg, road=ROAD, ego=EGO, mdp_sim=sim,
+                         mdp_obs=OBSERVATION, action=ACTION, reward=T.REWARD,
+                         traffic=TRAFFIC, gui=False)
+    env._workdir = work          # 환경과 수명을 같이 하도록 붙여 둔다
+    return env
+
+
+def make_agent(env, seed: int, cls=PPO, **extra):
+    hp = {**T.HPARAMS, "seed": seed}
+    return cls(obs_dim=env.observation_space.shape[0], act_dim=env.action_space.shape[0],
+               buffer=RolloutBuffer(), **hp, **extra)
+
+
+def load_weights(agent, path):
+    sd = torch.load(path, map_location=agent.device, weights_only=True)
+    agent.policy.load_state_dict(sd)
+
+
+def force_eval_shield(mode: str):
+    """PPO.learn 안의 검증 평가가 쓸 shield 모드를 바꾼다 (기본은 shadow로 고정돼 있음)."""
+    def _ev(policy, env, **kw):
+        kw["shield_mode"] = mode
+        return evaluate_policy(policy, env, **kw)
+    ppo_module.evaluate_policy = _ev
+
+
+def write_json(path, obj):
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(obj, f, ensure_ascii=False, indent=2, default=str)
+        f.write("\n")
+
+
+def run_meta(args):
+    return {"stage": ROAD.get("stage"), "elements": ROAD.get("elements"),
+            "args": vars(args), "hparams": T.HPARAMS, "reward": T.REWARD,
+            "git": T._git("rev-parse", "HEAD"),
+            "git_dirty": bool(T._git("status", "--porcelain", "--untracked-files=no")),
+            "time": time.strftime("%Y-%m-%d %H:%M:%S")}
+
+
+def metric_line(m):
+    return (f"완주(정류장 포함) {m.completion_rate:.0%} · 도착 {m.success_rate:.0%} · "
+            f"충돌 {m.collision_rate:.0%} · 적색 {m.red_violation_rate:.0%} · "
+            f"시간초과 {m.timeout_rate:.0%} · 정류장놓침 {m.missed_stop_rate:.0%} · "
+            f"수동개입률 {m.intervention_rate:.1%} · 평균속도 {m.mean_speed:.2f} m/s")
+
+
+def score_of(m):
+    """best 기준: 완벽 완주율(정류장 포함) → 충돌 적음 → 도착률 → 주행 거리."""
+    return (m.completion_rate, -m.collision_rate, m.success_rate, m.mean_speed * m.ep_length)
+
+
+def train_loop(agent, env, args, eval_shield: str):
+    """train.py와 같은 산출물(model/best_model/final.pt, 로그, config)을 남기며 학습한다."""
+    os.makedirs(args.out, exist_ok=True)
+    logger = RunLogger(args.out)
+    write_json(os.path.join(args.out, "config.json"), {**run_meta(args), "eval_shield": eval_shield})
+    best = {"score": None}
+    model_path = os.path.join(args.out, "model.pt")
+
+    def on_eval(m):
+        print(f"    [검증 {eval_shield}] {metric_line(m)}", flush=True)
+        s = score_of(m)
+        if best["score"] is None or s > best["score"]:
+            best["score"] = s
+            agent.save(os.path.join(args.out, "best_model.pt"))
+            write_json(os.path.join(args.out, "best.json"),
+                       {"steps": agent.num_timesteps, **m.as_dict()})
+            print(f"    [best @{agent.num_timesteps}] → best_model.pt", flush=True)
+
+    def checkpoint():
+        agent.save(model_path)
+        agent.save_training_state(os.path.join(args.out, "model.resume.pt"))
+        logger.save_csv()
+
+    def save_step(step):
+        agent.save(os.path.join(args.out, f"step{step // 1000}k.pt"))
+
+    force_eval_shield(eval_shield)
+    done = False
+    try:
+        agent.learn(env, total_timesteps=args.steps, logger=logger, log_interval=1,
+                    eval_interval=args.eval_interval, eval_episodes=args.eval_episodes,
+                    checkpoint_interval=10, checkpoint_fn=checkpoint, eval_fn=on_eval,
+                    eval_seed_base=VAL_SEED_BASE,
+                    save_steps=tuple(int(s) for s in args.save_steps.split(",") if s),
+                    save_fn=save_step)
+        done = True
+    finally:
+        env.close()
+        logger.close()
+        agent.save(model_path)
+        agent.save_training_state(os.path.join(args.out, "model.resume.pt"))
+        if done:
+            agent.save(os.path.join(args.out, "final.pt"))
+            agent.save_training_state(os.path.join(args.out, "final.resume.pt"))
+        print(f"저장: {args.out} ({'완료' if done else '중단'}, {agent.num_timesteps} step)")
+
+
+# ──────────────────────────────────────────────────────────────
+# expert: 선생님 PPO (shield on)
+# ──────────────────────────────────────────────────────────────
+def cmd_expert(args):
+    env = make_env("on", replay_prob=args.replay_prob)
+    agent = make_agent(env, args.seed)
+    if args.init:
+        load_weights(agent, args.init)
+        print(f"초기 가중치: {args.init}")
+    if args.lr:
+        for g in agent.optimizer.param_groups:
+            g["lr"] = args.lr
+    train_loop(agent, env, args, eval_shield="on")
+
+
+# ──────────────────────────────────────────────────────────────
+# collect: 시범 데이터 (shield on, 실제 적용된 행동이 정답)
+# ──────────────────────────────────────────────────────────────
+def end_reason(info, terminated, truncated):
+    if info.get("collided"):
+        return "collision"
+    if info.get("red_violation") and terminated:
+        return "red_light"
+    if info.get("wrong_lane"):
+        return "lane_error"
+    if info.get("arrived"):
+        return "missed_stop" if int(info.get("missed_stops", 0) or 0) else "completed"
+    return "timeout" if truncated else "vanished"
+
+
+def cmd_collect(args):
+    env = make_env("on")
+    env.eval_mode = True
+    agent = make_agent(env, 0)
+    load_weights(agent, args.ckpt)
+    obs_l, act_l, rew_l, term_l, trunc_l, ep_l, shield_l = [], [], [], [], [], [], []
+    episodes = []
+    t0 = time.time()
+    try:
+        for i in range(args.episodes):
+            seed = args.seed_base + i
+            obs, _ = env.reset(seed=seed)
+            done, n, ret = False, 0, 0.0
+            while not done:
+                a = agent.predict(obs, deterministic=True)
+                nobs, r, te, tr, info = env.step(a)
+                # 정답 = 실제로 적용된 행동 (shield가 고쳤으면 고친 값, 막힌 차선변경은 유지 0)
+                lane = int(info["lane_change"]) if (info["lane_change"] != 0
+                                                   and info["lane_change_applied"]) else 0
+                obs_l.append(obs.astype(np.float32))
+                act_l.append((float(info["accel_raw"]), float(lane)))
+                rew_l.append(r)
+                term_l.append(te)
+                trunc_l.append(tr)
+                ep_l.append(i)
+                shield_l.append(bool(info["shield_active"]))
+                obs, done, n, ret = nobs, te or tr, n + 1, ret + r
+            why = end_reason(info, te, tr)
+            episodes.append({"episode": i, "seed": seed, "steps": n, "return": round(ret, 3),
+                             "end_reason": why, "stops_done": info.get("stops_done"),
+                             "stops_total": info.get("stops_total")})
+            print(f"[{i + 1}/{args.episodes}] seed {seed}: {why}, {n} step, "
+                  f"정류장 {info.get('stops_done')}/{info.get('stops_total')}, 보상 {ret:.1f} "
+                  f"({time.time() - t0:.0f}s)", flush=True)
+    finally:
+        env.close()
+    os.makedirs(os.path.dirname(os.path.abspath(args.data)), exist_ok=True)
+    np.savez_compressed(args.data, obs=np.array(obs_l), act=np.array(act_l, dtype=np.float32),
+                        rew=np.array(rew_l, dtype=np.float32), term=np.array(term_l),
+                        trunc=np.array(trunc_l), ep=np.array(ep_l, dtype=np.int32),
+                        shield=np.array(shield_l),
+                        end_reason=np.array([e["end_reason"] for e in episodes]))
+    reasons = {}
+    for e in episodes:
+        reasons[e["end_reason"]] = reasons.get(e["end_reason"], 0) + 1
+    write_json(args.data.replace(".npz", ".json"),
+               {**run_meta(args), "ckpt": args.ckpt, "transitions": len(obs_l),
+                "shield_step_ratio": float(np.mean(shield_l)) if shield_l else 0.0,
+                "end_reasons": reasons, "episodes": episodes})
+    print(f"저장: {args.data} — {len(obs_l)} step, 종료 {reasons}, "
+          f"shield 개입 step {np.mean(shield_l):.1%}")
+
+
+# ──────────────────────────────────────────────────────────────
+# bc: 모방학습 (데이터 읽기 · 손실)
+# ──────────────────────────────────────────────────────────────
+GOOD_ENDS = ("completed", "missed_stop")   # 충돌·적색·차로오류·시간초과 판은 흉내 내지 않는다
+
+
+def load_demos(paths, gamma, only_good=True):
+    """시범 데이터 → (obs, act, 할인 수익). 여러 파일을 이어 붙인다."""
+    obs_all, act_all, ret_all, ep_all = [], [], [], []
+    ep_offset = 0
+    for path in paths:
+        d = np.load(path)
+        ep, ends = d["ep"], d["end_reason"]
+        keep = np.isin(ends[ep], GOOD_ENDS) if only_good else np.ones(len(ep), bool)
+        # 판마다 뒤에서 앞으로 할인 수익 (시간 초과로 잘린 판은 만들지 않으므로 끝 가치 0)
+        ret = np.zeros(len(ep), np.float32)
+        g = 0.0
+        for t in range(len(ep) - 1, -1, -1):
+            if t == len(ep) - 1 or ep[t + 1] != ep[t]:
+                g = 0.0
+            g = d["rew"][t] + gamma * g
+            ret[t] = g
+        obs_all.append(d["obs"][keep])
+        act_all.append(d["act"][keep])
+        ret_all.append(ret[keep])
+        ep_all.append(ep[keep] + ep_offset)
+        ep_offset += int(ep.max()) + 1
+        print(f"  {path}: {keep.sum()} / {len(ep)} step 사용 "
+              f"(좋은 판 {len(set(ep[keep]))} / {len(set(ep))})")
+    return (np.concatenate(obs_all), np.concatenate(act_all),
+            np.concatenate(ret_all), np.concatenate(ep_all))
+
+
+def bc_losses(policy, obs, act):
+    """HybridActorCritic의 BC 손실: 가감속 정규분포 -log p, 차선 cross-entropy."""
+    mu, std, logits, value = policy(obs)
+    nll = -Normal(mu, std).log_prob(act[:, :1]).sum(-1).mean()
+    lane_idx = (1.0 - torch.round(act[:, 1])).long().clamp(0, 2)   # +1→0(좌), 0→1(유지), −1→2(우)
+    ce = F.cross_entropy(logits, lane_idx)
+    return nll, ce, value, mu, logits, lane_idx
+
+
+def cmd_bc(args):
+    torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
+    obs, act, ret, ep = load_demos(args.data, T.HPARAMS["gamma"], only_good=not args.all_episodes)
+    # 판 단위로 검증 10% 분리 (같은 판의 이웃 step이 양쪽에 섞이지 않게)
+    eps = np.unique(ep)
+    rng = np.random.default_rng(args.seed)
+    val_eps = rng.choice(eps, size=max(1, len(eps) // 10), replace=False)
+    val = np.isin(ep, val_eps)
+    print(f"학습 {int((~val).sum())} step / 검증 {int(val.sum())} step, "
+          f"차선변경 비율 {np.mean(act[:, 1] != 0):.2%}")
+
+    from utils.networks import HybridActorCritic
+    hp = T.HPARAMS
+    policy = HybridActorCritic(obs.shape[1], hidden_sizes=hp["hidden_sizes"],
+                               activation=hp["activation"], init_log_std=hp["init_log_std"],
+                               lane_keep_bias=hp["lane_keep_bias"])
+    if args.init:
+        policy.load_state_dict(torch.load(args.init, map_location="cpu", weights_only=True))
+        print(f"초기 가중치: {args.init}")
+    opt = torch.optim.Adam(policy.parameters(), lr=args.lr)
+    to = lambda x: torch.as_tensor(x)
+    O, A, R = to(obs), to(act), to(ret)
+    tr_idx, va_idx = np.where(~val)[0], np.where(val)[0]
+    # 차선변경은 드문 행동이라 가중치를 줘서 "항상 유지"로 무너지지 않게 한다 (lane_weight 배)
+    lane_w = torch.ones(3)
+    lane_w[[0, 2]] = args.lane_weight
+    os.makedirs(args.out, exist_ok=True)
+    log = []
+    for epoch in range(1, args.epochs + 1):
+        policy.train()
+        rng.shuffle(tr_idx)
+        tot = {"nll": 0.0, "ce": 0.0, "v": 0.0}
+        nb = 0
+        for s in range(0, len(tr_idx), args.batch):
+            b = tr_idx[s:s + args.batch]
+            mu, std, logits, value = policy(O[b])
+            nll = -Normal(mu, std).log_prob(A[b, :1]).sum(-1).mean()
+            lane_idx = (1.0 - torch.round(A[b, 1])).long().clamp(0, 2)
+            ce = F.cross_entropy(logits, lane_idx, weight=lane_w)
+            v_loss = F.mse_loss(value, R[b])
+            loss = nll + ce + args.value_coef * v_loss
+            opt.zero_grad()
+            loss.backward()
+            nn.utils.clip_grad_norm_(policy.parameters(), 1.0)
+            opt.step()
+            tot["nll"] += nll.item(); tot["ce"] += ce.item(); tot["v"] += v_loss.item()
+            nb += 1
+        policy.eval()
+        with torch.no_grad():
+            mu, std, logits, value = policy(O[va_idx])
+            lane_idx = (1.0 - torch.round(A[va_idx, 1])).long().clamp(0, 2)
+            pred = logits.argmax(-1)
+            chg = lane_idx != 1
+            row = {"epoch": epoch, **{k: v / nb for k, v in tot.items()},
+                   "val_accel_mae": float((mu.squeeze(-1) - A[va_idx, 0]).abs().mean()),
+                   "val_lane_acc": float((pred == lane_idx).float().mean()),
+                   "val_change_recall": float((pred[chg] == lane_idx[chg]).float().mean())
+                   if chg.any() else float("nan"),
+                   "val_value_mae": float((value - R[va_idx]).abs().mean()),
+                   "std": float(std.mean())}
+        log.append(row)
+        print(f"[epoch {epoch:>3}] nll {row['nll']:.3f} ce {row['ce']:.3f} v {row['v']:.2f} | "
+              f"검증 가감속 오차 {row['val_accel_mae']:.3f} · 차선 정확도 {row['val_lane_acc']:.3f} · "
+              f"변경 재현 {row['val_change_recall']:.2f} · 가치 오차 {row['val_value_mae']:.2f}",
+              flush=True)
+    torch.save(policy.state_dict(), os.path.join(args.out, "bc.pt"))
+    write_json(os.path.join(args.out, "bc_log.json"),
+               {**run_meta(args), "train_steps": int(len(tr_idx)), "val_steps": int(len(va_idx)),
+                "log": log})
+    print(f"저장: {os.path.join(args.out, 'bc.pt')}")
+
+
+# ──────────────────────────────────────────────────────────────
+# finetune: 학생 PPO + BC 보조 손실
+# ──────────────────────────────────────────────────────────────
+class BCPPO(PPO):
+    """PPO 손실 + λ(t)·BC 손실. warmup 동안은 가치 출력층(v_head)만 학습한다.
+
+    λ(t) = bc_coef × max(0, 1 − (t − warmup) / decay)  (t = 누적 학습 step)
+    trunk을 정책·가치가 같이 쓰므로 warmup 중에는 trunk·정책 head를 고정해 BC 행동을 지킨다.
+    """
+
+    def __init__(self, *a, demos=None, bc_coef=1.0, warmup_steps=10_000,
+                 decay_steps=150_000, bc_batch=64, **kw):
+        super().__init__(*a, **kw)
+        obs, act = demos
+        self.demo_obs = torch.as_tensor(obs, device=self.device)
+        self.demo_act = torch.as_tensor(act, device=self.device)
+        self.bc_coef, self.warmup, self.decay, self.bc_batch = bc_coef, warmup_steps, decay_steps, bc_batch
+
+    def bc_lambda(self):
+        t = self.num_timesteps
+        if t < self.warmup:
+            return self.bc_coef
+        return self.bc_coef * max(0.0, 1.0 - (t - self.warmup) / max(self.decay, 1))
+
+    def update(self, advantages, returns) -> dict:
+        obs_t, act_t, old_log_prob_t = self.buffer.to_tensors(self.device)
+        adv_t = torch.as_tensor(advantages, device=self.device)
+        ret_t = torch.as_tensor(returns, device=self.device)
+        if self.normalize_advantage:
+            adv_t = (adv_t - adv_t.mean()) / (adv_t.std() + 1e-8)
+        lam = self.bc_lambda()
+        warm = self.num_timesteps < self.warmup
+        T_ = len(self.buffer)
+        idx = np.arange(T_)
+        keys = ("policy_loss", "value_loss", "entropy", "approx_kl", "clip_fraction", "bc_loss")
+        stats = {k: 0.0 for k in keys}
+        nb = 0
+        for _ in range(self.n_epochs):
+            np.random.shuffle(idx)
+            for s in range(0, T_, self.minibatch_size):
+                mb = idx[s:s + self.minibatch_size]
+                log_prob, entropy, value = self.policy.evaluate_actions(obs_t[mb], act_t[mb])
+                ratio = torch.exp(log_prob - old_log_prob_t[mb])
+                s1 = ratio * adv_t[mb]
+                s2 = torch.clamp(ratio, 1 - self.clip_eps, 1 + self.clip_eps) * adv_t[mb]
+                policy_loss = -torch.min(s1, s2).mean()
+                value_loss = ((value - ret_t[mb]) ** 2).mean()
+                loss = self.value_coef * value_loss
+                if not warm:
+                    loss = loss + policy_loss - self.entropy_coef * entropy.mean()
+                    if self.lane_entropy_coef > 0:
+                        loss = loss - self.lane_entropy_coef * self.policy.lane_entropy(obs_t[mb]).mean()
+                bc_loss = torch.zeros((), device=self.device)
+                if lam > 0:
+                    j = torch.randint(0, len(self.demo_obs), (self.bc_batch,), device=self.device)
+                    nll, ce, *_ = bc_losses(self.policy, self.demo_obs[j], self.demo_act[j])
+                    bc_loss = nll + ce
+                    loss = loss + lam * bc_loss
+                self.optimizer.zero_grad()
+                if warm:
+                    # warmup: 가치 출력층만 학습 (trunk은 정책과 공유라 건드리면 BC 행동이 흔들린다.
+                    #   스모크에서 trunk까지 학습하면 첫 업데이트 approx_kl 0.67)
+                    (self.value_coef * value_loss).backward()
+                    for name, p in self.policy.named_parameters():
+                        if not name.startswith("v_head") and p.grad is not None:
+                            p.grad.zero_()
+                else:
+                    loss.backward()
+                nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
+                self.optimizer.step()
+                with torch.no_grad():
+                    stats["approx_kl"] += (old_log_prob_t[mb] - log_prob).mean().item()
+                    stats["clip_fraction"] += ((ratio - 1).abs() > self.clip_eps).float().mean().item()
+                stats["policy_loss"] += policy_loss.item()
+                stats["value_loss"] += value_loss.item()
+                stats["entropy"] += entropy.mean().item()
+                stats["bc_loss"] += bc_loss.item()
+                nb += 1
+        out = {k: v / max(nb, 1) for k, v in stats.items()}
+        with torch.no_grad():
+            _, _, v_after = self.policy.evaluate_actions(obs_t, act_t)
+            var = torch.var(ret_t)
+            out["explained_variance"] = float(1 - torch.var(ret_t - v_after) / var) if var > 1e-12 else float("nan")
+            out["p_lane_change"] = float(self.policy.lane_change_prob(obs_t).mean())
+        out["learning_rate"] = float(self.optimizer.param_groups[0]["lr"])
+        out["bc_lambda"] = lam
+        out["warmup"] = int(warm)
+        return out
+
+
+def cmd_finetune(args):
+    obs, act, _, _ = load_demos(args.data, T.HPARAMS["gamma"], only_good=not args.all_episodes)
+    env = make_env("off", replay_prob=args.replay_prob)
+    agent = make_agent(env, args.seed, cls=BCPPO, demos=(obs, act), bc_coef=args.bc_coef,
+                       warmup_steps=args.warmup_steps, decay_steps=args.decay_steps)
+    load_weights(agent, args.init)
+    print(f"초기 가중치: {args.init} · BC λ {args.bc_coef} → 0 ({args.warmup_steps} + "
+          f"{args.decay_steps} step) · 시범 {len(obs)} step")
+    if args.lr:
+        for g in agent.optimizer.param_groups:
+            g["lr"] = args.lr
+    train_loop(agent, env, args, eval_shield="shadow")
+
+
+# ──────────────────────────────────────────────────────────────
+# eval: 개발 판 평가
+# ──────────────────────────────────────────────────────────────
+def cmd_eval(args):
+    env = make_env(args.shield)
+    agent = make_agent(env, 0)
+    load_weights(agent, args.ckpt)
+    t0 = time.time()
+    try:
+        m = evaluate_policy(agent, env, n_episodes=args.episodes, seed_base=args.seed_base,
+                            shield_mode=args.shield)
+    finally:
+        env.close()
+    print(f"[{args.ckpt} · {ROAD.get('stage')}단계 · shield {args.shield} · "
+          f"판 {args.seed_base}~{args.seed_base + args.episodes - 1}] {metric_line(m)} "
+          f"({time.time() - t0:.0f}s)")
+    if args.json:
+        write_json(args.json, {**run_meta(args), **m.as_dict()})
+
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = p.add_subparsers(dest="cmd", required=True)
+
+    def train_opts(q):
+        q.add_argument("--seed", type=int, default=0)
+        q.add_argument("--steps", type=int, default=300_000)
+        q.add_argument("--out", required=True)
+        q.add_argument("--init", default=None)
+        q.add_argument("--lr", type=float, default=None)
+        q.add_argument("--replay-prob", type=float, default=0.3)
+        q.add_argument("--eval-interval", type=int, default=25)
+        q.add_argument("--eval-episodes", type=int, default=20)
+        q.add_argument("--save-steps", default="100000,200000,300000")
+
+    q = sub.add_parser("expert"); train_opts(q)
+    q = sub.add_parser("finetune"); train_opts(q)
+    q.add_argument("--data", nargs="+", required=True)
+    q.add_argument("--bc-coef", type=float, default=1.0)
+    q.add_argument("--warmup-steps", type=int, default=10_000)
+    q.add_argument("--decay-steps", type=int, default=150_000)
+    q.add_argument("--all-episodes", action="store_true", help="실패한 판도 흉내 낸다 (스모크용)")
+
+    q = sub.add_parser("collect")
+    q.add_argument("--ckpt", required=True)
+    q.add_argument("--episodes", type=int, default=100)
+    q.add_argument("--seed-base", type=int, default=COLLECT_SEED_BASE)
+    q.add_argument("--data", required=True)
+
+    q = sub.add_parser("bc")
+    q.add_argument("--data", nargs="+", required=True)
+    q.add_argument("--out", required=True)
+    q.add_argument("--init", default=None)
+    q.add_argument("--epochs", type=int, default=30)
+    q.add_argument("--batch", type=int, default=256)
+    q.add_argument("--lr", type=float, default=3e-4)
+    q.add_argument("--value-coef", type=float, default=0.5)
+    q.add_argument("--lane-weight", type=float, default=3.0)
+    q.add_argument("--seed", type=int, default=0)
+    q.add_argument("--all-episodes", action="store_true", help="실패한 판도 흉내 낸다")
+
+    q = sub.add_parser("eval")
+    q.add_argument("--ckpt", required=True)
+    q.add_argument("--shield", choices=["shadow", "on", "off"], default="shadow")
+    q.add_argument("--episodes", type=int, default=30)
+    q.add_argument("--seed-base", type=int, default=DEV_SEED_BASE)
+    q.add_argument("--json", default=None)
+
+    args = p.parse_args()
+    if args.cmd in ("collect",) and SumoHighwayEnv.is_held_out_seed(args.seed_base):
+        p.error("시범 데이터에 테스트·검증 판 시드를 쓸 수 없습니다")
+    {"expert": cmd_expert, "collect": cmd_collect, "bc": cmd_bc,
+     "finetune": cmd_finetune, "eval": cmd_eval}[args.cmd](args)
+
+
+if __name__ == "__main__":
+    main()

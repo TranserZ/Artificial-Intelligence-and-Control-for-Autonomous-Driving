@@ -1,0 +1,4 @@
+# 시범 데이터(npz)는 크므로 커밋하지 않는다. 요약(.json)만 커밋
+data/*.npz
+runs/*/tb/
+*.resume.pt
