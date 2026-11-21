@@ -88,7 +88,63 @@ class ExpertGateEnv(SumoHighwayEnv):
         return super()._lane_change_is_safe(direction)
 
 
-def make_env(shield_mode: str, replay_prob: float = 0.0, lc_gate: dict = None):
+# 선생님 정류장 정차 규칙 (규칙 + PPO = Optimal Bus). shield만 켠 선생님은 5만 step 동안 정차 성공 0회:
+# 정류장 차로·15 m 구간·10초 연속 정지를 탐색으로 우연히 해내기 어렵고, 놓침 −20 × 5 때문에
+# "첫 정류장 앞에 서 있기"(시드 1) 또는 "전부 지나치기"(시드 0)로 갔다.
+STOP_RULE_RANGE = 150.0    # m. 이 안에 다음 정류장이 있으면 정류장 차로로 옮긴다
+STOP_RULE_DECEL = 1.0      # m/s². 편한 감속 곡선 (ROii 감속 한계 2.5)
+STOP_RULE_TARGET = 2.0     # m. 앞범퍼를 정류장 끝보다 이만큼 앞에 세운다
+
+
+class TeacherEnv(ExpertGateEnv):
+    """선생님 = PPO + shield on + 정류장 정차 규칙. 규칙은 모델 명령보다 느리게만 바꾼다.
+
+    info["teacher_rule"]: 이번 step에 정차 규칙이 가감속·차선을 바꿨는가.
+    """
+
+    def _stop_rule(self, accel_raw, lane_raw):
+        import traci
+        st = self._current_stop()
+        ns = self._next_stop()
+        if st is None or ns is None or self.ego_id not in traci.vehicle.getIDList():
+            return accel_raw, lane_raw, False
+        dist_end, _, _ = ns
+        if dist_end < 0 or dist_end > STOP_RULE_RANGE:
+            return accel_raw, lane_raw, False
+        v = traci.vehicle.getSpeed(self.ego_id)
+        changed = False
+        # 차선: 정류장 차로 쪽으로 (관측 bus_stop.lane_diff: +왼쪽, −오른쪽). 반대쪽 변경은 막는다
+        diff = self._stop_obs()[1]
+        want = 0 if abs(diff) < 1e-6 else (1 if diff > 0 else -1)
+        cmd = self._quantize_lane_change(lane_raw)
+        if cmd != want and (want != 0 or cmd != 0):
+            lane_raw, changed = float(want), True
+        # 속도: 정류장 차로에 있을 때만 세운다 (다른 차로면 차선부터)
+        if want == 0:
+            d = max(dist_end - STOP_RULE_TARGET, 0.0)
+            if self._in_stop_area(st) and (self._dwell_steps > 0 or d <= 0.5):
+                target_v = 0.0                      # 목표 지점 도착 또는 정차 중: 10초 채울 때까지 정지
+            else:
+                target_v = float(np.sqrt(2.0 * STOP_RULE_DECEL * d))
+            if target_v < 0.05:
+                rule_a = -1.0
+            else:
+                need = (target_v - v) / self.step_length
+                rule_a = need / self.max_accel if need >= 0 else need / self.max_decel
+            rule_a = float(np.clip(rule_a, -1.0, 1.0))
+            if rule_a < accel_raw - 1e-6:
+                accel_raw, changed = rule_a, True
+        return accel_raw, lane_raw, changed
+
+    def step(self, action):
+        a = np.asarray(action, dtype=np.float32).reshape(-1).copy()
+        a[0], a[1], used = self._stop_rule(float(np.clip(a[0], -1, 1)), float(a[1]))
+        obs, r, te, tr, info = super().step(a)
+        info["teacher_rule"] = used
+        return obs, r, te, tr, info
+
+
+def make_env(shield_mode: str, replay_prob: float = 0.0, lc_gate: dict = None, teacher: bool = False):
     work = tempfile.TemporaryDirectory(prefix=f"bcppo_{os.getpid()}_")
     cfg = road_builder.build(ROAD, EGO, TRAFFIC, work.name)
     sim = {**SIMULATION,
@@ -98,7 +154,7 @@ def make_env(shield_mode: str, replay_prob: float = 0.0, lc_gate: dict = None):
     cls = SumoHighwayEnv
     if lc_gate:
         action = {**ACTION, "lane_change_safety": {**ACTION["lane_change_safety"], **lc_gate}}
-        cls = ExpertGateEnv
+        cls = TeacherEnv if teacher else ExpertGateEnv
     env = cls(cfg_path=cfg, road=ROAD, ego=EGO, mdp_sim=sim,
                          mdp_obs=OBSERVATION, action=action, reward=T.REWARD,
                          traffic=TRAFFIC, gui=False)
@@ -205,7 +261,8 @@ def train_loop(agent, env, args, eval_shield: str):
 # expert: 선생님 PPO (shield on)
 # ──────────────────────────────────────────────────────────────
 def cmd_expert(args):
-    env = make_env("on", replay_prob=args.replay_prob, lc_gate=EXPERT_LC_GATE)
+    env = make_env("on", replay_prob=args.replay_prob, lc_gate=EXPERT_LC_GATE,
+                   teacher=not args.no_stop_rule)
     agent = make_agent(env, args.seed, lane_keep_bias=EXPERT_LANE_KEEP_BIAS)
     if args.init:
         load_weights(agent, args.init)
@@ -232,7 +289,7 @@ def end_reason(info, terminated, truncated):
 
 
 def cmd_collect(args):
-    env = make_env("on", lc_gate=EXPERT_LC_GATE)
+    env = make_env("on", lc_gate=EXPERT_LC_GATE, teacher=not args.no_stop_rule)
     env.eval_mode = True
     agent = make_agent(env, 0)
     load_weights(agent, args.ckpt)
@@ -507,7 +564,8 @@ def cmd_finetune(args):
 # eval: 개발 판 평가
 # ──────────────────────────────────────────────────────────────
 def cmd_eval(args):
-    env = make_env(args.shield, lc_gate=EXPERT_LC_GATE if args.expert_gate else None)
+    env = make_env(args.shield, lc_gate=EXPERT_LC_GATE if args.expert_gate else None,
+                   teacher=args.expert_gate)
     agent = make_agent(env, 0)
     load_weights(agent, args.ckpt)
     t0 = time.time()
@@ -539,6 +597,7 @@ def main():
         q.add_argument("--save-steps", default="100000,200000,300000")
 
     q = sub.add_parser("expert"); train_opts(q)
+    q.add_argument("--no-stop-rule", action="store_true", help="정류장 정차 규칙 없이 (shield만)")
     q = sub.add_parser("finetune"); train_opts(q)
     q.add_argument("--data", nargs="+", required=True)
     q.add_argument("--bc-coef", type=float, default=1.0)
@@ -551,6 +610,7 @@ def main():
     q.add_argument("--episodes", type=int, default=100)
     q.add_argument("--seed-base", type=int, default=COLLECT_SEED_BASE)
     q.add_argument("--data", required=True)
+    q.add_argument("--no-stop-rule", action="store_true")
 
     q = sub.add_parser("bc")
     q.add_argument("--data", nargs="+", required=True)
