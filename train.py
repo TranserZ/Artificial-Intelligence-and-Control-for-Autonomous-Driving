@@ -46,10 +46,11 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 #  (무엇을 왜 바꿨는지 + 이전 결과의 어떤 문제를 고치려는지를 쉬운 말로)
 # ══════════════════════════════════════════════════════════════════
 TRAIN_PURPOSE = """
-env-v2 기본 설정 (rules/team/experiment_protocol.md). 규칙·SUMO 안전모드를 모두 빼고 모델 혼자 운전한다.
-shield(차량·신호·보행자 필터·차선변경 게이트)는 학습 내내 끄고, 평가는 감시 모드로 수동개입률을 잰다.
-정류장은 모델이 직접 선다 (정차 성공 +5, 놓침 -5). 차선변경 금지 구간은 막지 않고 -1.
-best 모델 = 검증 판(900000~)에서 자동 판정(공식 완주율 95% 이상, 충돌률 5% 미만) 통과 중 수동개입률이 가장 낮은 것. 없으면 공식 완주율→충돌률→주행 거리 순.
+CGC_STAGE=1 PPO (env-v3). 실행 중 보조 규칙 없음. 보상은 B 다음 칸:
+속도·근접·차선변경·회전과속·신호접근과속·보호구역 감점은 0.
+green_stop 0.05/0.10, 놓침 −20, 진행 10, gamma 0.99.
+학습 중 shield off. Kaggle 12시간마다 model.resume.pt로 이어 받는다.
+단계 성공 선언은 팀 문서: 공식 완주 95% + 수동개입(감시 모드 shield_step_ratio) 16% 이하.
 """
 
 # ══════════════════════════════════════════════════════════════════
@@ -68,13 +69,13 @@ SAVE_STEPS = (300_000, 500_000)
 #  이 파일이 run 폴더에 스냅샷되므로 "그 결과가 어떤 계수였는지"도 남는다.
 # ══════════════════════════════════════════════════════════════════
 REWARD_OVERRIDES = dict(
-    speed_weight=0.1,          # 속도 보상 (스텝당 최대 이 값)
+    speed_weight=0.0,          # B: 형태 항. 1단계는 0 유지 (Ng: 잠재함수 아님)
     collision_penalty=20.0,    # 충돌 시 -이 값, 즉시 종료 (5→20: 완주 보너스와 같은
                                #   크기. 5일 땐 무리한 끼어들기로 충돌 16%)
     arrival_bonus=20.0,        # 완주 보너스 (2→20: 500k run이 완주 0%로 수렴)
     progress_weight=10.0,      # 진행 보상 (완주까지 누적 +10)
     close_gap_threshold=6.0,   # 이 거리(m) 미만 접근 시
-    close_gap_penalty=0.1,     #   → 스텝당 감점
+    close_gap_penalty=0.0,     # B에서 끔. 1단계는 되돌리지 않음
     blocked_penalty=0.0,       # "느린 앞차에 막힘" 스텝당 감점 (고속도로 추월 학습용 0.05→0:
                                #   교차로에선 배경차 대부분이 기준 속도보다 느려 앞차를
                                #   따라가도 감점 → 감속 없이 들이받는 직진 충돌 2.5%)
@@ -82,8 +83,7 @@ REWARD_OVERRIDES = dict(
                                #   14.5 m/s 추종하는 "캠핑" 정책으로 수렴했음)
     blocked_speed_frac=0.85,   #   그리고 내 속도 < vmax × 이 값 (0.7→0.85 ≈ 28 m/s:
                                #   배경차 최고속 19 m/s로 따라가도 막힘으로 판정)
-    lane_change_penalty=0.02,  # 변경 실행당 감점 (0→0.02: 추월은 배웠으나
-                               #   에피소드당 275회 지그재그 → 재도입)
+    lane_change_penalty=0.0,   # B. 판당 변경이 수십 회가 되기 전에는 되돌리지 않음
     invalid_action_penalty=0.0,
     red_light_penalty=20.0,    # 적색 신호 위반 시 감점 (5→20: 일시정지(s)가 100~130초라
                                #   기다리면 할인된 완주 가치가 ~30→2~3으로 줄어 -5 받고
@@ -94,22 +94,17 @@ REWARD_OVERRIDES = dict(
     timeout_penalty=10.0,          # 시간초과 감점 (0일 땐 "끝까지 서 있기"로 수렴)
     wrong_lane_penalty=20.0,       # 차로 오류(경로 밖 차로 끝에서 갇힘) 종료 감점 (충돌과 같은
                                    #   크기. 없을 땐 우회전인데 직진 차로 끝에 서서 시간초과)
-    turn_overspeed_penalty=0.5,    # 교차로 안 회전 제한속도 초과 스텝당 감점
-                                   #   (best 모델이 9~14 m/s로 우회전하며 양보위반 32%)
+    turn_overspeed_penalty=0.0,    # B. 1단계 교차로 회전이 학습 목표가 아님
     green_stop_penalty=0.05,       # 멈출 이유 없이 서 있으면 스텝당 감점 (막힘 감점 0으로 바꾼 뒤
                                    #   초록불에 2~3분씩 서 있는 판이 5% 생김)
     green_stop_extra=0.10,         #   빈 거리가 15 m를 넘을수록 추가 감점 (45 m 이상이면 총 0.15).
                                    #   0.05 한 가지일 땐 정지선 30~50 m 앞에서 미리 섰음
-    approach_overspeed_penalty=0.02,  # 정지 신호 접근 시 편한 감속 곡선 초과 1 m/s당 스텝 감점
-                                      #   (없을 땐 가까이 서는 모델일수록 신호위반 5~6%)
-    zone_overspeed_penalty=0.25,   # 어린이 보호구역 안 30 km/h(+0.3 m/s) 초과 1 m/s당 스텝 감점
-                                   #   0.1: 구역 과속 7~45%, 85% 속도 30~31 km/h
-                                   #   0.4(상한 1.0): 학습 초반부터 거의 서서 다니게 배워 정지선 앞에서
-                                   #   출발을 못 함 (완주 23~60%, 시간초과 38~73%) → 중간값
-    zone_overspeed_cap=0.5,        #   스텝당 상한
-    zone_approach_penalty=0.05,    # 보호구역 입구에서 30 km/h가 되도록 감속 곡선 초과 1 m/s당 감점
-    no_stop_zone_penalty=0.1,         # 정차금지지대에서 서 있으면 스텝당 감점
-    school_zone_speeding_penalty=0.1, # 어린이보호구역 초과 1 m/s당 감점 (상한 0.5)
+    approach_overspeed_penalty=0.0,   # B. 2단계(신호) 이후 한 항씩
+    zone_overspeed_penalty=0.0,    # 4단계 진입 때 되돌림 순서: tools/diag/stage1_plan.md
+    zone_overspeed_cap=0.5,
+    zone_approach_penalty=0.0,
+    no_stop_zone_penalty=0.0,
+    school_zone_speeding_penalty=0.0,
     shield_penalty=0.0,               # shield 개입 감점 — env-v2는 학습 중 shield off라 쓰지 않음
     shield_penalty_scale=0.0,
     stop_success_bonus=5.0,           # 정류장 정차 성공 (정류장 구간에서 10초 정지) +
@@ -348,6 +343,8 @@ if __name__ == "__main__":
                         help="실패한 판 다시 열 확률 (기본 0.3, 0이면 끔)")
     parser.add_argument("--save-steps", default=None,
                         help="그 시점 모델을 따로 저장할 스텝 (쉼표, 기본 300000,500000)")
+    parser.add_argument("--eval-interval", type=int, default=None,
+                        help="몇 업데이트마다 검증 평가할지. 0이면 안 함 (Kaggle 12시간 컷)")
     args = parser.parse_args()
     if args.init and args.resume:
         parser.error("--init과 --resume은 동시에 쓸 수 없습니다")
@@ -360,6 +357,8 @@ if __name__ == "__main__":
         HPARAMS["lr"] = args.lr
     if args.timesteps:
         TOTAL_TIMESTEPS = args.timesteps
+    if args.eval_interval is not None:
+        EVAL_INTERVAL = args.eval_interval
     if args.run_name:
         RUN_NAME = args.run_name
 

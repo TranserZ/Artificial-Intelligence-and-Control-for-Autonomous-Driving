@@ -1,0 +1,71 @@
+{
+  "policy": "IDM keep-lane + 10s bus stop (not training data)",
+  "seeds": [
+    3000,
+    3001,
+    3002,
+    3003,
+    3004,
+    3005,
+    3006,
+    3007,
+    3008,
+    3009,
+    3010,
+    3011,
+    3012,
+    3013,
+    3014,
+    3015,
+    3016,
+    3017,
+    3018,
+    3019,
+    3020,
+    3021,
+    3022,
+    3023,
+    3024,
+    3025,
+    3026,
+    3027,
+    3028,
+    3029
+  ],
+  "held_out_not_used": true,
+  "summary": {
+    "1": {
+      "n": 30,
+      "official_complete": 0.0,
+      "collision": 0.0,
+      "timeout": 0.0,
+      "arrival": 1.0,
+      "ended": {
+        "arrival": 30
+      },
+      "mean_stop_success": 1.0,
+      "mean_missed_stops": 4.0,
+      "collision_distance_m": [],
+      "collision_partners": {},
+      "timeout_distance_m": [],
+      "timeout_last_speed_mps": []
+    },
+    "6": {
+      "n": 30,
+      "official_complete": 0.0,
+      "collision": 0.0,
+      "timeout": 0.0,
+      "arrival": 0.8,
+      "ended": {
+        "arrival": 24,
+        "red": 6
+      },
+      "mean_stop_success": 1.0,
+      "mean_missed_stops": 3.3666666666666667,
+      "collision_distance_m": [],
+      "collision_partners": {},
+      "timeout_distance_m": [],
+      "timeout_last_speed_mps": []
+    }
+  }
+}

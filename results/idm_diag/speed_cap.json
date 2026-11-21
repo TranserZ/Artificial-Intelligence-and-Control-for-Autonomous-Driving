@@ -1,0 +1,43 @@
+[
+  {
+    "stage": 1,
+    "elements": [
+      "bus_stop"
+    ],
+    "road_speed_limit_mps": 13.89,
+    "vehicle_max_speed": 8.33,
+    "ego_max_speed": 8.33,
+    "env.vmax_obs_norm": 13.89,
+    "env.ego_vmax_setSpeed_cap": 8.33,
+    "setSpeed_clip": "np.clip(v+dv, 0, ego_vmax)",
+    "speedMode": 0,
+    "school_zones_csv": "C:\\Users\\USER\\Desktop\\청계로드\\data\\road_data\\school_zones.csv",
+    "peak_speed_80steps_accel1": 8.33,
+    "in_school_zone_steps": 0,
+    "in_school_zone_peak": 0.0,
+    "can_exceed_road_30kmh": false,
+    "can_exceed_school_20kmh_by_command_cap": true
+  },
+  {
+    "stage": 4,
+    "elements": [
+      "bus_stop",
+      "signal",
+      "cutin",
+      "school_zone"
+    ],
+    "road_speed_limit_mps": 13.89,
+    "vehicle_max_speed": 8.33,
+    "ego_max_speed": 8.33,
+    "env.vmax_obs_norm": 13.89,
+    "env.ego_vmax_setSpeed_cap": 8.33,
+    "setSpeed_clip": "np.clip(v+dv, 0, ego_vmax)",
+    "speedMode": 0,
+    "school_zones_csv": "C:\\Users\\USER\\Desktop\\청계로드\\data\\road_data\\school_zones.csv",
+    "peak_speed_80steps_accel1": 8.33,
+    "in_school_zone_steps": 0,
+    "in_school_zone_peak": 0.0,
+    "can_exceed_road_30kmh": false,
+    "can_exceed_school_20kmh_by_command_cap": true
+  }
+]

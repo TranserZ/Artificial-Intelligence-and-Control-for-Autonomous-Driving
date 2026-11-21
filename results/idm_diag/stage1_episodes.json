@@ -1,0 +1,572 @@
+[
+  {
+    "stage": 1,
+    "seed": 3000,
+    "ended": "arrival",
+    "official_complete": false,
+    "collision": false,
+    "timeout": false,
+    "arrived": true,
+    "distance_m": 2137.16,
+    "last_speed_mps": 8.187,
+    "steps": 563,
+    "stop_success": 1,
+    "missed_stops": 4,
+    "collision_partners": [],
+    "road_stage": 1,
+    "elements": [
+      "bus_stop"
+    ]
+  },
+  {
+    "stage": 1,
+    "seed": 3001,
+    "ended": "arrival",
+    "official_complete": false,
+    "collision": false,
+    "timeout": false,
+    "arrived": true,
+    "distance_m": 2135.6,
+    "last_speed_mps": 8.33,
+    "steps": 555,
+    "stop_success": 1,
+    "missed_stops": 4,
+    "collision_partners": [],
+    "road_stage": 1,
+    "elements": [
+      "bus_stop"
+    ]
+  },
+  {
+    "stage": 1,
+    "seed": 3002,
+    "ended": "arrival",
+    "official_complete": false,
+    "collision": false,
+    "timeout": false,
+    "arrived": true,
+    "distance_m": 2135.6,
+    "last_speed_mps": 8.33,
+    "steps": 555,
+    "stop_success": 1,
+    "missed_stops": 4,
+    "collision_partners": [],
+    "road_stage": 1,
+    "elements": [
+      "bus_stop"
+    ]
+  },
+  {
+    "stage": 1,
+    "seed": 3003,
+    "ended": "arrival",
+    "official_complete": false,
+    "collision": false,
+    "timeout": false,
+    "arrived": true,
+    "distance_m": 2135.57,
+    "last_speed_mps": 8.33,
+    "steps": 555,
+    "stop_success": 1,
+    "missed_stops": 4,
+    "collision_partners": [],
+    "road_stage": 1,
+    "elements": [
+      "bus_stop"
+    ]
+  },
+  {
+    "stage": 1,
+    "seed": 3004,
+    "ended": "arrival",
+    "official_complete": false,
+    "collision": false,
+    "timeout": false,
+    "arrived": true,
+    "distance_m": 2135.45,
+    "last_speed_mps": 8.33,
+    "steps": 555,
+    "stop_success": 1,
+    "missed_stops": 4,
+    "collision_partners": [],
+    "road_stage": 1,
+    "elements": [
+      "bus_stop"
+    ]
+  },
+  {
+    "stage": 1,
+    "seed": 3005,
+    "ended": "arrival",
+    "official_complete": false,
+    "collision": false,
+    "timeout": false,
+    "arrived": true,
+    "distance_m": 2135.53,
+    "last_speed_mps": 8.33,
+    "steps": 555,
+    "stop_success": 1,
+    "missed_stops": 4,
+    "collision_partners": [],
+    "road_stage": 1,
+    "elements": [
+      "bus_stop"
+    ]
+  },
+  {
+    "stage": 1,
+    "seed": 3006,
+    "ended": "arrival",
+    "official_complete": false,
+    "collision": false,
+    "timeout": false,
+    "arrived": true,
+    "distance_m": 2135.56,
+    "last_speed_mps": 8.33,
+    "steps": 555,
+    "stop_success": 1,
+    "missed_stops": 4,
+    "collision_partners": [],
+    "road_stage": 1,
+    "elements": [
+      "bus_stop"
+    ]
+  },
+  {
+    "stage": 1,
+    "seed": 3007,
+    "ended": "arrival",
+    "official_complete": false,
+    "collision": false,
+    "timeout": false,
+    "arrived": true,
+    "distance_m": 2134.72,
+    "last_speed_mps": 8.33,
+    "steps": 555,
+    "stop_success": 1,
+    "missed_stops": 4,
+    "collision_partners": [],
+    "road_stage": 1,
+    "elements": [
+      "bus_stop"
+    ]
+  },
+  {
+    "stage": 1,
+    "seed": 3008,
+    "ended": "arrival",
+    "official_complete": false,
+    "collision": false,
+    "timeout": false,
+    "arrived": true,
+    "distance_m": 2135.16,
+    "last_speed_mps": 8.33,
+    "steps": 555,
+    "stop_success": 1,
+    "missed_stops": 4,
+    "collision_partners": [],
+    "road_stage": 1,
+    "elements": [
+      "bus_stop"
+    ]
+  },
+  {
+    "stage": 1,
+    "seed": 3009,
+    "ended": "arrival",
+    "official_complete": false,
+    "collision": false,
+    "timeout": false,
+    "arrived": true,
+    "distance_m": 2135.56,
+    "last_speed_mps": 8.33,
+    "steps": 555,
+    "stop_success": 1,
+    "missed_stops": 4,
+    "collision_partners": [],
+    "road_stage": 1,
+    "elements": [
+      "bus_stop"
+    ]
+  },
+  {
+    "stage": 1,
+    "seed": 3010,
+    "ended": "arrival",
+    "official_complete": false,
+    "collision": false,
+    "timeout": false,
+    "arrived": true,
+    "distance_m": 2135.64,
+    "last_speed_mps": 8.33,
+    "steps": 555,
+    "stop_success": 1,
+    "missed_stops": 4,
+    "collision_partners": [],
+    "road_stage": 1,
+    "elements": [
+      "bus_stop"
+    ]
+  },
+  {
+    "stage": 1,
+    "seed": 3011,
+    "ended": "arrival",
+    "official_complete": false,
+    "collision": false,
+    "timeout": false,
+    "arrived": true,
+    "distance_m": 2134.87,
+    "last_speed_mps": 8.33,
+    "steps": 556,
+    "stop_success": 1,
+    "missed_stops": 4,
+    "collision_partners": [],
+    "road_stage": 1,
+    "elements": [
+      "bus_stop"
+    ]
+  },
+  {
+    "stage": 1,
+    "seed": 3012,
+    "ended": "arrival",
+    "official_complete": false,
+    "collision": false,
+    "timeout": false,
+    "arrived": true,
+    "distance_m": 2135.47,
+    "last_speed_mps": 8.33,
+    "steps": 555,
+    "stop_success": 1,
+    "missed_stops": 4,
+    "collision_partners": [],
+    "road_stage": 1,
+    "elements": [
+      "bus_stop"
+    ]
+  },
+  {
+    "stage": 1,
+    "seed": 3013,
+    "ended": "arrival",
+    "official_complete": false,
+    "collision": false,
+    "timeout": false,
+    "arrived": true,
+    "distance_m": 2135.47,
+    "last_speed_mps": 8.33,
+    "steps": 555,
+    "stop_success": 1,
+    "missed_stops": 4,
+    "collision_partners": [],
+    "road_stage": 1,
+    "elements": [
+      "bus_stop"
+    ]
+  },
+  {
+    "stage": 1,
+    "seed": 3014,
+    "ended": "arrival",
+    "official_complete": false,
+    "collision": false,
+    "timeout": false,
+    "arrived": true,
+    "distance_m": 2135.59,
+    "last_speed_mps": 8.33,
+    "steps": 555,
+    "stop_success": 1,
+    "missed_stops": 4,
+    "collision_partners": [],
+    "road_stage": 1,
+    "elements": [
+      "bus_stop"
+    ]
+  },
+  {
+    "stage": 1,
+    "seed": 3015,
+    "ended": "arrival",
+    "official_complete": false,
+    "collision": false,
+    "timeout": false,
+    "arrived": true,
+    "distance_m": 2135.64,
+    "last_speed_mps": 8.33,
+    "steps": 555,
+    "stop_success": 1,
+    "missed_stops": 4,
+    "collision_partners": [],
+    "road_stage": 1,
+    "elements": [
+      "bus_stop"
+    ]
+  },
+  {
+    "stage": 1,
+    "seed": 3016,
+    "ended": "arrival",
+    "official_complete": false,
+    "collision": false,
+    "timeout": false,
+    "arrived": true,
+    "distance_m": 2135.56,
+    "last_speed_mps": 8.33,
+    "steps": 555,
+    "stop_success": 1,
+    "missed_stops": 4,
+    "collision_partners": [],
+    "road_stage": 1,
+    "elements": [
+      "bus_stop"
+    ]
+  },
+  {
+    "stage": 1,
+    "seed": 3017,
+    "ended": "arrival",
+    "official_complete": false,
+    "collision": false,
+    "timeout": false,
+    "arrived": true,
+    "distance_m": 2134.66,
+    "last_speed_mps": 8.33,
+    "steps": 555,
+    "stop_success": 1,
+    "missed_stops": 4,
+    "collision_partners": [],
+    "road_stage": 1,
+    "elements": [
+      "bus_stop"
+    ]
+  },
+  {
+    "stage": 1,
+    "seed": 3018,
+    "ended": "arrival",
+    "official_complete": false,
+    "collision": false,
+    "timeout": false,
+    "arrived": true,
+    "distance_m": 2135.61,
+    "last_speed_mps": 8.33,
+    "steps": 555,
+    "stop_success": 1,
+    "missed_stops": 4,
+    "collision_partners": [],
+    "road_stage": 1,
+    "elements": [
+      "bus_stop"
+    ]
+  },
+  {
+    "stage": 1,
+    "seed": 3019,
+    "ended": "arrival",
+    "official_complete": false,
+    "collision": false,
+    "timeout": false,
+    "arrived": true,
+    "distance_m": 2134.87,
+    "last_speed_mps": 8.33,
+    "steps": 555,
+    "stop_success": 1,
+    "missed_stops": 4,
+    "collision_partners": [],
+    "road_stage": 1,
+    "elements": [
+      "bus_stop"
+    ]
+  },
+  {
+    "stage": 1,
+    "seed": 3020,
+    "ended": "arrival",
+    "official_complete": false,
+    "collision": false,
+    "timeout": false,
+    "arrived": true,
+    "distance_m": 2134.45,
+    "last_speed_mps": 8.33,
+    "steps": 556,
+    "stop_success": 1,
+    "missed_stops": 4,
+    "collision_partners": [],
+    "road_stage": 1,
+    "elements": [
+      "bus_stop"
+    ]
+  },
+  {
+    "stage": 1,
+    "seed": 3021,
+    "ended": "arrival",
+    "official_complete": false,
+    "collision": false,
+    "timeout": false,
+    "arrived": true,
+    "distance_m": 2133.96,
+    "last_speed_mps": 8.33,
+    "steps": 555,
+    "stop_success": 1,
+    "missed_stops": 4,
+    "collision_partners": [],
+    "road_stage": 1,
+    "elements": [
+      "bus_stop"
+    ]
+  },
+  {
+    "stage": 1,
+    "seed": 3022,
+    "ended": "arrival",
+    "official_complete": false,
+    "collision": false,
+    "timeout": false,
+    "arrived": true,
+    "distance_m": 2135.59,
+    "last_speed_mps": 8.33,
+    "steps": 555,
+    "stop_success": 1,
+    "missed_stops": 4,
+    "collision_partners": [],
+    "road_stage": 1,
+    "elements": [
+      "bus_stop"
+    ]
+  },
+  {
+    "stage": 1,
+    "seed": 3023,
+    "ended": "arrival",
+    "official_complete": false,
+    "collision": false,
+    "timeout": false,
+    "arrived": true,
+    "distance_m": 2135.19,
+    "last_speed_mps": 8.33,
+    "steps": 555,
+    "stop_success": 1,
+    "missed_stops": 4,
+    "collision_partners": [],
+    "road_stage": 1,
+    "elements": [
+      "bus_stop"
+    ]
+  },
+  {
+    "stage": 1,
+    "seed": 3024,
+    "ended": "arrival",
+    "official_complete": false,
+    "collision": false,
+    "timeout": false,
+    "arrived": true,
+    "distance_m": 2135.23,
+    "last_speed_mps": 8.33,
+    "steps": 555,
+    "stop_success": 1,
+    "missed_stops": 4,
+    "collision_partners": [],
+    "road_stage": 1,
+    "elements": [
+      "bus_stop"
+    ]
+  },
+  {
+    "stage": 1,
+    "seed": 3025,
+    "ended": "arrival",
+    "official_complete": false,
+    "collision": false,
+    "timeout": false,
+    "arrived": true,
+    "distance_m": 2135.5,
+    "last_speed_mps": 8.33,
+    "steps": 555,
+    "stop_success": 1,
+    "missed_stops": 4,
+    "collision_partners": [],
+    "road_stage": 1,
+    "elements": [
+      "bus_stop"
+    ]
+  },
+  {
+    "stage": 1,
+    "seed": 3026,
+    "ended": "arrival",
+    "official_complete": false,
+    "collision": false,
+    "timeout": false,
+    "arrived": true,
+    "distance_m": 2135.56,
+    "last_speed_mps": 8.33,
+    "steps": 555,
+    "stop_success": 1,
+    "missed_stops": 4,
+    "collision_partners": [],
+    "road_stage": 1,
+    "elements": [
+      "bus_stop"
+    ]
+  },
+  {
+    "stage": 1,
+    "seed": 3027,
+    "ended": "arrival",
+    "official_complete": false,
+    "collision": false,
+    "timeout": false,
+    "arrived": true,
+    "distance_m": 2135.49,
+    "last_speed_mps": 8.33,
+    "steps": 555,
+    "stop_success": 1,
+    "missed_stops": 4,
+    "collision_partners": [],
+    "road_stage": 1,
+    "elements": [
+      "bus_stop"
+    ]
+  },
+  {
+    "stage": 1,
+    "seed": 3028,
+    "ended": "arrival",
+    "official_complete": false,
+    "collision": false,
+    "timeout": false,
+    "arrived": true,
+    "distance_m": 2135.52,
+    "last_speed_mps": 8.33,
+    "steps": 555,
+    "stop_success": 1,
+    "missed_stops": 4,
+    "collision_partners": [],
+    "road_stage": 1,
+    "elements": [
+      "bus_stop"
+    ]
+  },
+  {
+    "stage": 1,
+    "seed": 3029,
+    "ended": "arrival",
+    "official_complete": false,
+    "collision": false,
+    "timeout": false,
+    "arrived": true,
+    "distance_m": 2135.65,
+    "last_speed_mps": 8.33,
+    "steps": 555,
+    "stop_success": 1,
+    "missed_stops": 4,
+    "collision_partners": [],
+    "road_stage": 1,
+    "elements": [
+      "bus_stop"
+    ]
+  }
+]

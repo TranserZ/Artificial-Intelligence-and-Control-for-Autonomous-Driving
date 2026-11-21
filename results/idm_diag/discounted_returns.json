@@ -1,0 +1,41 @@
+{
+  "gamma": 0.99,
+  "max_steps": 3600,
+  "reward_used": {
+    "speed_weight": 0.0,
+    "green_stop_penalty": 0.05,
+    "green_stop_extra": 0.1,
+    "progress_weight": 10.0,
+    "collision_penalty": 20.0,
+    "arrival_bonus": 20.0,
+    "timeout_penalty": 10.0,
+    "stop_success_bonus": 5.0,
+    "missed_stop_penalty": 20.0
+  },
+  "G": {
+    "crash_t0": -20.0,
+    "idle_empty_road": -15.0,
+    "complete": 7.925
+  },
+  "idle_step_penalty": 0.15000000000000002,
+  "complete_end_step": 614,
+  "complete_stop_times_steps": [
+    0,
+    7,
+    27,
+    139,
+    159,
+    266,
+    286,
+    375,
+    395,
+    491,
+    511,
+    614
+  ],
+  "crash_lt_idle_lt_complete": true,
+  "p_crash_below_which_moving_beats_idle": 0.8209,
+  "one_term_if_fail": null,
+  "gamma_T_timeout": 1.9546335846760953e-16,
+  "gamma_T_complete": 0.0020893417514969773
+}
