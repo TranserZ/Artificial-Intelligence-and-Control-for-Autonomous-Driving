@@ -2,3 +2,8 @@
 data/*.npz
 runs/*/tb/
 *.resume.pt
+data/**/*.npz
+data/**/*.log
+data/*.log
+runs/**/stdout.log
+runs/**/eval*.log
