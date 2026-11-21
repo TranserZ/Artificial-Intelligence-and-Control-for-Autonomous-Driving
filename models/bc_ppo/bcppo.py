@@ -123,10 +123,17 @@ class TeacherEnv(ExpertGateEnv):
         cmd = self._quantize_lane_change(lane_raw)
         if cmd != want and (want != 0 or cmd != 0):
             lane_raw, changed = float(want), True
-        # 속도: 정류장 차로에 있을 때만 세운다 (다른 차로면 차선부터)
-        if want == 0:
-            d = max(dist_end - STOP_RULE_TARGET, 0.0)
-            if self._in_stop_area(st) and (self._dwell_steps > 0 or d <= 0.5):
+        # 속도: 정류장 차로면 정류장 끝 2 m 앞에 선다. 아직 다른 차로면 정류장 "시작점" 앞에 설 수 있게
+        #   감속하며 차로 틈을 기다린다 (2단계: 오른쪽 차로가 신호 대기줄로 막혀 게이트가 계속 막고,
+        #   감속 없이 왼쪽 차로로 지나쳐 정류장 놓침 55%)
+        if True:
+            if want == 0:
+                d = max(dist_end - STOP_RULE_TARGET, 0.0)
+                hold = self._in_stop_area(st) and (self._dwell_steps > 0 or d <= 0.5)
+            else:
+                d = max(dist_end - (st["end"] - st["start"]), 0.0)
+                hold = False
+            if hold:
                 target_v = 0.0                      # 목표 지점 도착 또는 정차 중: 10초 채울 때까지 정지
             else:
                 target_v = float(np.sqrt(2.0 * STOP_RULE_DECEL * d))
@@ -461,22 +468,68 @@ def cmd_bc(args):
 
 
 # ──────────────────────────────────────────────────────────────
-# finetune: 학생 PPO + BC 보조 손실
+# finetune: 학생 PPO + BC 보조 손실 + 분리한 가치 신경망
 # ──────────────────────────────────────────────────────────────
 class BCPPO(PPO):
-    """PPO 손실 + λ(t)·BC 손실. warmup 동안은 가치 출력층(v_head)만 학습한다.
+    """PPO 손실 + λ(t)·BC 손실, 가치 함수는 정책과 몸통(trunk)을 나누지 않는 별도 신경망.
 
     λ(t) = bc_coef × max(0, 1 − (t − warmup) / decay)  (t = 누적 학습 step)
-    trunk을 정책·가치가 같이 쓰므로 warmup 중에는 trunk·정책 head를 고정해 BC 행동을 지킨다.
+
+    왜 가치 신경망을 나눴나: HybridActorCritic은 정책·가치가 trunk을 같이 쓴다. warmup이 끝나자
+    가치 오차가 0.7 → 11로 뛰고, 그 기울기가 trunk을 바꿔 정차 행동이 무너졌다 (lr 1e-4, lr 3e-5 +
+    KL 제한, BC 가중치 5 모두 5만 step에서 완주 87% → 0~5%). 정책의 v_head는 저장 형식 호환용으로
+    남기고 쓰지 않는다. 그래서 저장된 .pt는 test.py·평가에서 그대로 읽힌다.
+    warmup 동안은 정책을 고정하고 가치 신경망만 학생 수익에 맞춘다.
     """
 
-    def __init__(self, *a, demos=None, bc_coef=1.0, warmup_steps=10_000,
-                 decay_steps=150_000, bc_batch=64, **kw):
+    def __init__(self, *a, demos=None, demo_returns=None, bc_coef=1.0, warmup_steps=10_000,
+                 decay_steps=150_000, bc_batch=64, target_kl=None, critic_lr=3e-4, **kw):
         super().__init__(*a, **kw)
+        from utils.networks import build_mlp, orthogonal_init
+        hp = T.HPARAMS
+        obs_dim = self.policy.trunk[0].in_features
+        self.critic = build_mlp(obs_dim, hp["hidden_sizes"], 1, hp["activation"]).to(self.device)
+        orthogonal_init(self.critic[-1], gain=1.0)
+        self.critic_opt = torch.optim.Adam(self.critic.parameters(), lr=critic_lr)
+        # KL 조기 종료: 한 업데이트에서 approx_kl이 1.5 × target_kl을 넘으면 남은 epoch를 건너뛴다
+        self.target_kl = target_kl
         obs, act = demos
         self.demo_obs = torch.as_tensor(obs, device=self.device)
         self.demo_act = torch.as_tensor(act, device=self.device)
+        self.demo_ret = None if demo_returns is None else torch.as_tensor(demo_returns, device=self.device)
         self.bc_coef, self.warmup, self.decay, self.bc_batch = bc_coef, warmup_steps, decay_steps, bc_batch
+
+    def value(self, obs_t):
+        return self.critic(obs_t).squeeze(-1)
+
+    @torch.no_grad()
+    def act(self, obs):
+        obs_t = torch.as_tensor(obs, dtype=torch.float32, device=self.device).unsqueeze(0)
+        action, log_prob, _ = self.policy.sample(obs_t)
+        return (action.squeeze(0).cpu().numpy().astype(np.float32),
+                float(log_prob.item()), float(self.value(obs_t).item()))
+
+    @torch.no_grad()
+    def get_value(self, obs) -> float:
+        obs_t = torch.as_tensor(obs, dtype=torch.float32, device=self.device).unsqueeze(0)
+        return float(self.value(obs_t).item())
+
+    def pretrain_critic(self, epochs=5, batch=256):
+        """시범 판 할인 수익으로 가치 신경망을 먼저 맞춘다 (학생 수익에는 warmup에서 다시 맞춤)."""
+        if self.demo_ret is None:
+            return
+        n = len(self.demo_obs)
+        for ep in range(epochs):
+            perm = torch.randperm(n, device=self.device)
+            tot, nb = 0.0, 0
+            for s in range(0, n, batch):
+                j = perm[s:s + batch]
+                loss = F.mse_loss(self.value(self.demo_obs[j]), self.demo_ret[j])
+                self.critic_opt.zero_grad()
+                loss.backward()
+                self.critic_opt.step()
+                tot += loss.item(); nb += 1
+            print(f"  가치 신경망 사전학습 {ep + 1}/{epochs}: MSE {tot / nb:.2f}", flush=True)
 
     def bc_lambda(self):
         t = self.num_timesteps
@@ -497,72 +550,82 @@ class BCPPO(PPO):
         keys = ("policy_loss", "value_loss", "entropy", "approx_kl", "clip_fraction", "bc_loss")
         stats = {k: 0.0 for k in keys}
         nb = 0
-        for _ in range(self.n_epochs):
+        actor_on = not warm
+        stopped_epoch = self.n_epochs
+        for epoch in range(self.n_epochs):
             np.random.shuffle(idx)
+            epoch_kl, epoch_nb = 0.0, 0
             for s in range(0, T_, self.minibatch_size):
                 mb = idx[s:s + self.minibatch_size]
-                log_prob, entropy, value = self.policy.evaluate_actions(obs_t[mb], act_t[mb])
+                # ---- 가치 신경망 (정책과 따로) ----
+                value_loss = F.mse_loss(self.value(obs_t[mb]), ret_t[mb])
+                self.critic_opt.zero_grad()
+                value_loss.backward()
+                nn.utils.clip_grad_norm_(self.critic.parameters(), self.max_grad_norm)
+                self.critic_opt.step()
+                # ---- 정책 (warmup 동안은 고정) ----
+                log_prob, entropy, _ = self.policy.evaluate_actions(obs_t[mb], act_t[mb])
                 ratio = torch.exp(log_prob - old_log_prob_t[mb])
                 s1 = ratio * adv_t[mb]
                 s2 = torch.clamp(ratio, 1 - self.clip_eps, 1 + self.clip_eps) * adv_t[mb]
                 policy_loss = -torch.min(s1, s2).mean()
-                value_loss = ((value - ret_t[mb]) ** 2).mean()
-                loss = self.value_coef * value_loss
-                if not warm:
-                    loss = loss + policy_loss - self.entropy_coef * entropy.mean()
+                bc_loss = torch.zeros((), device=self.device)
+                if actor_on:
+                    loss = policy_loss - self.entropy_coef * entropy.mean()
                     if self.lane_entropy_coef > 0:
                         loss = loss - self.lane_entropy_coef * self.policy.lane_entropy(obs_t[mb]).mean()
-                bc_loss = torch.zeros((), device=self.device)
-                if lam > 0:
-                    j = torch.randint(0, len(self.demo_obs), (self.bc_batch,), device=self.device)
-                    nll, ce, *_ = bc_losses(self.policy, self.demo_obs[j], self.demo_act[j])
-                    bc_loss = nll + ce
-                    loss = loss + lam * bc_loss
-                self.optimizer.zero_grad()
-                if warm:
-                    # warmup: 가치 출력층만 학습 (trunk은 정책과 공유라 건드리면 BC 행동이 흔들린다.
-                    #   스모크에서 trunk까지 학습하면 첫 업데이트 approx_kl 0.67)
-                    (self.value_coef * value_loss).backward()
-                    for name, p in self.policy.named_parameters():
-                        if not name.startswith("v_head") and p.grad is not None:
-                            p.grad.zero_()
-                else:
+                    if lam > 0:
+                        j = torch.randint(0, len(self.demo_obs), (self.bc_batch,), device=self.device)
+                        nll, ce, *_ = bc_losses(self.policy, self.demo_obs[j], self.demo_act[j])
+                        bc_loss = nll + ce
+                        loss = loss + lam * bc_loss
+                    self.optimizer.zero_grad()
                     loss.backward()
-                nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
-                self.optimizer.step()
+                    nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
+                    self.optimizer.step()
                 with torch.no_grad():
-                    stats["approx_kl"] += (old_log_prob_t[mb] - log_prob).mean().item()
+                    kl = (old_log_prob_t[mb] - log_prob).mean().item()
+                    stats["approx_kl"] += kl
+                    epoch_kl += kl
+                    epoch_nb += 1
                     stats["clip_fraction"] += ((ratio - 1).abs() > self.clip_eps).float().mean().item()
                 stats["policy_loss"] += policy_loss.item()
                 stats["value_loss"] += value_loss.item()
                 stats["entropy"] += entropy.mean().item()
                 stats["bc_loss"] += bc_loss.item()
                 nb += 1
+            # KL이 넘치면 이번 업데이트의 남은 epoch는 가치 신경망만 학습한다
+            if (actor_on and self.target_kl
+                    and epoch_kl / max(epoch_nb, 1) > 1.5 * self.target_kl):
+                actor_on = False
+                stopped_epoch = epoch + 1
         out = {k: v / max(nb, 1) for k, v in stats.items()}
         with torch.no_grad():
-            _, _, v_after = self.policy.evaluate_actions(obs_t, act_t)
             var = torch.var(ret_t)
-            out["explained_variance"] = float(1 - torch.var(ret_t - v_after) / var) if var > 1e-12 else float("nan")
+            out["explained_variance"] = (float(1 - torch.var(ret_t - self.value(obs_t)) / var)
+                                         if var > 1e-12 else float("nan"))
             out["p_lane_change"] = float(self.policy.lane_change_prob(obs_t).mean())
         out["learning_rate"] = float(self.optimizer.param_groups[0]["lr"])
         out["bc_lambda"] = lam
+        out["epochs_run"] = 0 if warm else stopped_epoch
         out["warmup"] = int(warm)
         return out
 
 
 def cmd_finetune(args):
-    obs, act, _, _ = load_demos(args.data, T.HPARAMS["gamma"], only_good=not args.all_episodes)
+    obs, act, ret, _ = load_demos(args.data, T.HPARAMS["gamma"], only_good=not args.all_episodes)
     env = make_env("off", replay_prob=args.replay_prob)
-    agent = make_agent(env, args.seed, cls=BCPPO, demos=(obs, act), bc_coef=args.bc_coef,
-                       warmup_steps=args.warmup_steps, decay_steps=args.decay_steps)
+    agent = make_agent(env, args.seed, cls=BCPPO, demos=(obs, act), demo_returns=ret,
+                       bc_coef=args.bc_coef, warmup_steps=args.warmup_steps,
+                       decay_steps=args.decay_steps, target_kl=args.target_kl)
     load_weights(agent, args.init)
     print(f"초기 가중치: {args.init} · BC λ {args.bc_coef} → 0 ({args.warmup_steps} + "
-          f"{args.decay_steps} step) · 시범 {len(obs)} step")
+          f"{args.decay_steps} step) · 시범 {len(obs)} step · 가치 신경망 분리")
     if args.lr:
         for g in agent.optimizer.param_groups:
             g["lr"] = args.lr
+    agent.pretrain_critic()
     train_loop(agent, env, args, eval_shield="shadow")
-
 
 # ──────────────────────────────────────────────────────────────
 # eval: 개발 판 평가
@@ -608,6 +671,7 @@ def main():
     q.add_argument("--warmup-steps", type=int, default=10_000)
     q.add_argument("--decay-steps", type=int, default=150_000)
     q.add_argument("--all-episodes", action="store_true", help="실패한 판도 흉내 낸다 (스모크용)")
+    q.add_argument("--target-kl", type=float, default=0.02, help="KL 조기 종료 기준 (0이면 끔)")
 
     q = sub.add_parser("collect")
     q.add_argument("--ckpt", required=True)
