@@ -98,6 +98,10 @@ class ExpertGateEnv(SumoHighwayEnv):
 STOP_RULE_RANGE = 150.0    # m. 이 안에 다음 정류장이 있으면 정류장 차로로 옮긴다
 STOP_RULE_DECEL = 1.0      # m/s². 편한 감속 곡선 (ROii 감속 한계 2.5)
 STOP_RULE_TARGET = 2.0     # m. 앞범퍼를 정류장 끝보다 이만큼 앞에 세운다
+# 선생님 신호 접근 규칙 (2단계~)
+SIGNAL_RULE_DECEL = 1.5         # m/s². 적색 앞 감속 곡선
+SIGNAL_RULE_YELLOW_DECEL = 2.0  # m/s². 황색에서 이 감속으로 설 수 있을 때만 선다
+SIGNAL_RULE_MARGIN = 1.0        # m. 정지선 앞 여유
 
 
 class TeacherEnv(ExpertGateEnv):
@@ -147,9 +151,49 @@ class TeacherEnv(ExpertGateEnv):
                 accel_raw, changed = rule_a, True
         return accel_raw, lane_raw, changed
 
+    def _signal_rule(self, accel_raw):
+        """적색(또는 편하게 설 수 있는 황색·멈추기 전 일시정지)이면 미리 감속해 정지선 앞에 선다.
+
+        신호 shield는 "멈출 수 있는 마지막 순간"에 최대 감속으로 세워서, 그 시범을 흉내 낸 2단계 BC가
+        정지선 26 m 앞까지 30 km/h로 달리다 한 박자 늦어 적색 위반 50% (개발 30판)."""
+        import traci
+        sig = self._next_signal()
+        if sig is None or self.ego_id not in traci.vehicle.getIDList():
+            return accel_raw, False
+        _, dist, state, _ = sig
+        if dist > self.signal_visibility:
+            return accel_raw, False
+        v = traci.vehicle.getSpeed(self.ego_id)
+        d = max(dist - SIGNAL_RULE_MARGIN, 0.0)
+        if state == "s" and self._stopped_at == sig[0]:
+            return accel_raw, False                 # 일시정지 후 진행: 이미 멈췄음
+        if state in ("y",) and v * v > 2.0 * SIGNAL_RULE_YELLOW_DECEL * d:
+            return accel_raw, False                 # 황색인데 편하게 못 섬 → 통과
+        if state not in ("r", "u", "y", "s"):
+            return accel_raw, False
+        target_v = float(np.sqrt(2.0 * SIGNAL_RULE_DECEL * d))
+        if target_v < 0.05:
+            rule_a = -1.0
+        else:
+            need = (target_v - v) / self.step_length
+            rule_a = need / self.max_accel if need >= 0 else need / self.max_decel
+        rule_a = float(np.clip(rule_a, -1.0, 1.0))
+        if rule_a < accel_raw - 1e-6:
+            return rule_a, True
+        return accel_raw, False
+
+    def teacher_rules(self, accel_raw, lane_raw):
+        """선생님 규칙 전부: 정류장 정차 → 신호 접근 (둘 다 모델 명령보다 느리게만 바꿈)."""
+        accel_raw, lane_raw, used_stop = self._stop_rule(accel_raw, lane_raw)
+        if self.signal_obs:
+            accel_raw, used_sig = self._signal_rule(accel_raw)
+        else:
+            used_sig = False
+        return accel_raw, lane_raw, used_stop or used_sig
+
     def step(self, action):
         a = np.asarray(action, dtype=np.float32).reshape(-1).copy()
-        a[0], a[1], used = self._stop_rule(float(np.clip(a[0], -1, 1)), float(a[1]))
+        a[0], a[1], used = self.teacher_rules(float(np.clip(a[0], -1, 1)), float(a[1]))
         obs, r, te, tr, info = super().step(a)
         info["teacher_rule"] = used
         return obs, r, te, tr, info
@@ -174,7 +218,7 @@ class DaggerEnv(TeacherEnv):
         if self.ego_id not in traci.vehicle.getIDList() or self._last_obs is None:
             return 0.0, 0.0
         t = self.teacher.predict(self._last_obs, deterministic=True)
-        acc, lane, _ = self._stop_rule(float(np.clip(t[0], -1, 1)), float(t[1]))
+        acc, lane, _ = self.teacher_rules(float(np.clip(t[0], -1, 1)), float(t[1]))
         v = traci.vehicle.getSpeed(self.ego_id)
         out = acc
         p_cmd, p_hit = self.ped_filter.apply(acc, self.ego_id)
