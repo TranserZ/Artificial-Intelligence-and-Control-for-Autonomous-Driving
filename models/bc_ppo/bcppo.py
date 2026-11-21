@@ -155,7 +155,56 @@ class TeacherEnv(ExpertGateEnv):
         return obs, r, te, tr, info
 
 
-def make_env(shield_mode: str, replay_prob: float = 0.0, lc_gate: dict = None, teacher: bool = False):
+class DaggerEnv(TeacherEnv):
+    """DAgger 수집: 운전은 학생 행동 그대로, 매 step "선생님이라면 무엇을 했을지"를 info에 남긴다.
+
+    선생님 행동 = 선생님 PPO(결정적) → 정류장 정차 규칙 → shield(보행자·차량·신호, 선생님 게이트).
+    학생 행동에는 규칙·shield를 적용하지 않는다 (shield는 감시 모드로 기록만).
+    """
+    teacher = None          # PPO 에이전트 (cmd_dagger가 붙인다)
+    _last_obs = None
+
+    def reset(self, *a, **kw):
+        obs, info = super().reset(*a, **kw)
+        self._last_obs = obs
+        return obs, info
+
+    def _teacher_label(self):
+        import traci
+        if self.ego_id not in traci.vehicle.getIDList() or self._last_obs is None:
+            return 0.0, 0.0
+        t = self.teacher.predict(self._last_obs, deterministic=True)
+        acc, lane, _ = self._stop_rule(float(np.clip(t[0], -1, 1)), float(t[1]))
+        v = traci.vehicle.getSpeed(self.ego_id)
+        out = acc
+        p_cmd, p_hit = self.ped_filter.apply(acc, self.ego_id)
+        v_cmd, v_hit = self._shield_accel(acc, v)
+        s_cmd, s_hit = self._signal_shield_accel(acc, v, self._next_signal())
+        for cmd, hit in ((p_cmd, p_hit), (v_cmd, v_hit), (s_cmd, s_hit)):
+            if hit:
+                out = min(out, cmd)
+        lc = self._quantize_lane_change(lane)
+        if lc != 0:
+            try:
+                edge = traci.vehicle.getRoadID(self.ego_id)
+                ok = (not edge.startswith(":")
+                      and self._is_car_lane(edge, traci.vehicle.getLaneIndex(self.ego_id) + lc)
+                      and self._lane_change_is_safe(lc))
+            except traci.TraCIException:
+                ok = False
+            lc = lc if ok else 0
+        return float(np.clip(out, -1.0, 1.0)), float(lc)
+
+    def step(self, action):
+        label = self._teacher_label()
+        obs, r, te, tr, info = ExpertGateEnv.step(self, action)   # 정차 규칙 없이 학생 행동 그대로
+        info["teacher_label"] = label
+        self._last_obs = obs
+        return obs, r, te, tr, info
+
+
+def make_env(shield_mode: str, replay_prob: float = 0.0, lc_gate: dict = None, teacher: bool = False,
+             env_cls=None):
     work = tempfile.TemporaryDirectory(prefix=f"bcppo_{os.getpid()}_")
     cfg = road_builder.build(ROAD, EGO, TRAFFIC, work.name)
     sim = {**SIMULATION,
@@ -166,6 +215,8 @@ def make_env(shield_mode: str, replay_prob: float = 0.0, lc_gate: dict = None, t
     if lc_gate:
         action = {**ACTION, "lane_change_safety": {**ACTION["lane_change_safety"], **lc_gate}}
         cls = TeacherEnv if teacher else ExpertGateEnv
+    if env_cls is not None:
+        cls = env_cls
     env = cls(cfg_path=cfg, road=ROAD, ego=EGO, mdp_sim=sim,
                          mdp_obs=OBSERVATION, action=action, reward=T.REWARD,
                          traffic=TRAFFIC, gui=False)
@@ -299,6 +350,53 @@ def end_reason(info, terminated, truncated):
     return "timeout" if truncated else "vanished"
 
 
+def cmd_dagger(args):
+    """학생(BC)이 운전한 상태에 선생님 정답을 붙여 저장 (DAgger 1회분)."""
+    env = make_env("shadow", lc_gate=EXPERT_LC_GATE, env_cls=DaggerEnv)
+    env.eval_mode = True
+    student = make_agent(env, 0)
+    load_weights(student, args.ckpt)
+    teacher = make_agent(env, 0)
+    load_weights(teacher, args.teacher)
+    env.teacher = teacher
+    obs_l, act_l, rew_l, ep_l, episodes = [], [], [], [], []
+    t0 = time.time()
+    try:
+        for i in range(args.episodes):
+            seed = args.seed_base + i
+            obs, _ = env.reset(seed=seed)
+            done, n = False, 0
+            while not done:
+                a = student.predict(obs, deterministic=not args.stochastic)
+                nobs, r, te, tr, info = env.step(a)
+                obs_l.append(obs.astype(np.float32))
+                act_l.append(info["teacher_label"])
+                rew_l.append(r)
+                ep_l.append(i)
+                obs, done, n = nobs, te or tr, n + 1
+            why = end_reason(info, te, tr)
+            episodes.append({"episode": i, "seed": seed, "steps": n, "end_reason": why,
+                             "stops_done": info.get("stops_done")})
+            print(f"[{i + 1}/{args.episodes}] seed {seed}: 학생 {why}, {n} step, "
+                  f"정류장 {info.get('stops_done')}/{info.get('stops_total')} ({time.time() - t0:.0f}s)",
+                  flush=True)
+    finally:
+        env.close()
+    act = np.array(act_l, dtype=np.float32)
+    np.savez_compressed(args.data, obs=np.array(obs_l), act=act, rew=np.array(rew_l, dtype=np.float32),
+                        ep=np.array(ep_l, dtype=np.int32), dagger=np.array(True),
+                        end_reason=np.array([e["end_reason"] for e in episodes]))
+    reasons = {}
+    for e in episodes:
+        reasons[e["end_reason"]] = reasons.get(e["end_reason"], 0) + 1
+    write_json(args.data.replace(".npz", ".json"),
+               {**run_meta(args), "student": args.ckpt, "teacher": args.teacher,
+                "transitions": len(obs_l), "student_end_reasons": reasons,
+                "label_lane_change_ratio": float(np.mean(act[:, 1] != 0)), "episodes": episodes})
+    print(f"저장: {args.data} — {len(obs_l)} step, 학생 종료 {reasons}, "
+          f"선생님 차선변경 정답 {np.mean(act[:, 1] != 0):.2%}")
+
+
 def cmd_collect(args):
     env = make_env("on", lc_gate=EXPERT_LC_GATE, teacher=not args.no_stop_rule)
     env.eval_mode = True
@@ -365,7 +463,9 @@ def load_demos(paths, gamma, only_good=True):
     for path in paths:
         d = np.load(path)
         ep, ends = d["ep"], d["end_reason"]
-        keep = np.isin(ends[ep], GOOD_ENDS) if only_good else np.ones(len(ep), bool)
+        dagger = bool(d["dagger"]) if "dagger" in d.files else False
+        keep = (np.isin(ends[ep], GOOD_ENDS) if only_good and not dagger
+                else np.ones(len(ep), bool))
         # 판마다 뒤에서 앞으로 할인 수익 (시간 초과로 잘린 판은 만들지 않으므로 끝 가치 0)
         ret = np.zeros(len(ep), np.float32)
         g = 0.0
@@ -688,6 +788,14 @@ def main():
     q.add_argument("--data", required=True)
     q.add_argument("--no-stop-rule", action="store_true")
 
+    q = sub.add_parser("dagger")
+    q.add_argument("--ckpt", required=True, help="운전할 학생 (BC) 모델")
+    q.add_argument("--teacher", required=True, help="정답을 낼 선생님 모델")
+    q.add_argument("--episodes", type=int, default=50)
+    q.add_argument("--seed-base", type=int, default=20_000)
+    q.add_argument("--data", required=True)
+    q.add_argument("--stochastic", action="store_true", help="학생 행동을 확률적으로 (상태를 더 다양하게)")
+
     q = sub.add_parser("bc")
     q.add_argument("--data", nargs="+", required=True)
     q.add_argument("--out", required=True)
@@ -709,9 +817,9 @@ def main():
     q.add_argument("--expert-gate", action="store_true", help="선생님 전용(엄격한) 차선변경 게이트로 평가")
 
     args = p.parse_args()
-    if args.cmd in ("collect",) and SumoHighwayEnv.is_held_out_seed(args.seed_base):
+    if args.cmd in ("collect", "dagger") and SumoHighwayEnv.is_held_out_seed(args.seed_base):
         p.error("시범 데이터에 테스트·검증 판 시드를 쓸 수 없습니다")
-    {"expert": cmd_expert, "collect": cmd_collect, "bc": cmd_bc,
+    {"expert": cmd_expert, "collect": cmd_collect, "dagger": cmd_dagger, "bc": cmd_bc,
      "finetune": cmd_finetune, "eval": cmd_eval}[args.cmd](args)
 
 
