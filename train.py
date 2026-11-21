@@ -50,7 +50,7 @@ CGC_STAGE=1 PPO (env-v3). 실행 중 보조 규칙 없음. 보상은 B 다음 �
 속도·근접·차선변경·회전과속·신호접근과속·보호구역 감점은 0.
 green_stop 0.05/0.10, 놓침 −20, 진행 10, gamma 0.99.
 학습 중 shield off. Kaggle 12시간마다 model.resume.pt로 이어 받는다.
-단계 성공 선언은 팀 문서: 공식 완주 95% + 수동개입(감시 모드 shield_step_ratio) 16% 이하.
+1단계 목표는 완벽 완주(정류장 5곳). 표에는 공식 완주와 완벽 완주를 같이 적는다.
 """
 
 # ══════════════════════════════════════════════════════════════════
@@ -100,11 +100,11 @@ REWARD_OVERRIDES = dict(
     green_stop_extra=0.10,         #   빈 거리가 15 m를 넘을수록 추가 감점 (45 m 이상이면 총 0.15).
                                    #   0.05 한 가지일 땐 정지선 30~50 m 앞에서 미리 섰음
     approach_overspeed_penalty=0.0,   # B. 2단계(신호) 이후 한 항씩
-    zone_overspeed_penalty=0.0,    # 4단계 진입 때 되돌림 순서: tools/diag/stage1_plan.md
+    zone_overspeed_penalty=0.0,    # 보호구역 과속은 공식 판정 외. 감점 없음
     zone_overspeed_cap=0.5,
     zone_approach_penalty=0.0,
     no_stop_zone_penalty=0.0,
-    school_zone_speeding_penalty=0.0,
+    school_zone_speeding_penalty=0.0,  # 위와 같음. 4단계에서 되돌리지 않음
     shield_penalty=0.0,               # shield 개입 감점 — env-v2는 학습 중 shield off라 쓰지 않음
     shield_penalty_scale=0.0,
     stop_success_bonus=5.0,           # 정류장 정차 성공 (정류장 구간에서 10초 정지) +

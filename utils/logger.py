@@ -138,11 +138,12 @@ class RunLogger:
         plot("entropy.png", "Policy exploration", self.train_rows,
              [("entropy", "entropy"), ("p_lane_change", "lane-change probability")])
         plot("training_outcomes.png", "Recent training outcomes", self.train_rows,
-             [("completion_rate", "completion"),
+             [("official_completion_rate", "official complete"),
+              ("perfect_completion_rate", "perfect complete"),
               ("collision_rate", "collision"),
-              ("red_light_rate", "red light"),
               ("timeout_rate", "timeout"),
-              ("missed_stop_rate", "missed stop")])
+              ("stop_success_mean", "stops done / episode"),
+              ("lane_changes_per_episode", "lane changes / episode")])
         plot("validation.png", "Validation metrics", self.eval_rows,
              [("completion_rate", "completion rate"),
               ("intervention_rate", "intervention rate"),

@@ -67,5 +67,39 @@
       "timeout_distance_m": [],
       "timeout_last_speed_mps": []
     }
-  }
+  },
+  "common_eval_from_existing_logs": {
+    "1": {
+      "n": 30,
+      "common_eval_official": 1.0,
+      "common_eval_official_n": 30,
+      "perfect": 0.0,
+      "perfect_n": 0,
+      "idm_script_official_was_perfect": true,
+      "collision": 0.0,
+      "timeout": 0.0,
+      "ended": {
+        "arrival": 30
+      },
+      "mean_stop_success": 1.0,
+      "mean_missed_stops": 4.0
+    },
+    "6": {
+      "n": 30,
+      "common_eval_official": 0.8,
+      "common_eval_official_n": 24,
+      "perfect": 0.0,
+      "perfect_n": 0,
+      "idm_script_official_was_perfect": true,
+      "collision": 0.0,
+      "timeout": 0.0,
+      "ended": {
+        "arrival": 24,
+        "red": 6
+      },
+      "mean_stop_success": 1.0,
+      "mean_missed_stops": 3.3666666666666667
+    }
+  },
+  "note": "IDM official_complete 칸은 완벽 완주(도착+놓침0)였다. common_eval 공식 완주는 도착(충돌·적색·차로오류 없음)이다."
 }

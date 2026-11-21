@@ -222,6 +222,7 @@ class PPO:
             ep_stats["lane_error"] |= bool(info.get("wrong_lane"))
             ep_stats["arrived"] |= bool(info.get("arrived"))
             ep_stats["missed_stops"] = int(info.get("missed_stops", 0) or 0)
+            ep_stats["stops_done"] = int(info.get("stops_done", 0) or 0)
             ep_stats["lane_changes"] += int(
                 info.get("lane_change", 0) != 0
                 and bool(info.get("lane_change_applied")))
@@ -249,6 +250,11 @@ class PPO:
                     **ep_stats,
                     "completed": bool(ep_stats["arrived"]
                                       and ep_stats["missed_stops"] == 0),
+                    "official": bool(
+                        ep_stats["arrived"]
+                        and not ep_stats["collided"]
+                        and not ep_stats["red_light"]
+                        and not ep_stats["lane_error"]),
                     "missed_stop": bool(ep_stats["missed_stops"] > 0),
                     "timeout": bool(truncated and not terminated),
                     "avg_speed": (ep_stats["speed_sum"] / ep_stats["speed_count"]
@@ -260,7 +266,7 @@ class PPO:
                 ep_stats.update({
                     "return": 0.0, "length": 0, "collided": False,
                     "red_light": False, "lane_error": False,
-                    "arrived": False, "missed_stops": 0,
+                    "arrived": False, "missed_stops": 0, "stops_done": 0,
                     "lane_changes": 0, "speed_sum": 0.0, "speed_count": 0,
                 })
                 obs, _ = env.reset()
@@ -386,7 +392,7 @@ class PPO:
         ep_stats = {
             "return": 0.0, "length": 0, "collided": False,
             "red_light": False, "lane_error": False, "arrived": False,
-            "missed_stops": 0, "lane_changes": 0,
+            "missed_stops": 0, "stops_done": 0, "lane_changes": 0,
             "speed_sum": 0.0, "speed_count": 0,
         }
         recent_episodes = deque(maxlen=100)
@@ -416,6 +422,9 @@ class PPO:
                 "ep_rew_mean": recent_mean("return"),
                 "ep_len_mean": recent_mean("length"),
                 "completion_rate": recent_mean("completed"),
+                "official_completion_rate": recent_mean("official"),
+                "perfect_completion_rate": recent_mean("completed"),
+                "stop_success_mean": recent_mean("stops_done"),
                 "collision_rate": recent_mean("collided"),
                 "red_light_rate": recent_mean("red_light"),
                 "lane_error_rate": recent_mean("lane_error"),
@@ -452,7 +461,7 @@ class PPO:
                 ep_stats.update({
                     "return": 0.0, "length": 0, "collided": False,
                     "red_light": False, "lane_error": False,
-                    "arrived": False, "missed_stops": 0,
+                    "arrived": False, "missed_stops": 0, "stops_done": 0,
                     "lane_changes": 0, "speed_sum": 0.0, "speed_count": 0,
                 })
 
