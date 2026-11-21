@@ -1,0 +1,2 @@
+{"teacher": "models.dongyeon.expert.rule_expert:RuleExpert", "version": "rule_expert_v3",
+ "note": "공통 평가 스크립트 --ckpt 자리에 넣는 선생 설명 파일. 가중치 없음 (규칙 운전자)."}
