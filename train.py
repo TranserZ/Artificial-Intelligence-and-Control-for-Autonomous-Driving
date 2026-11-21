@@ -48,7 +48,7 @@ TRAIN_PURPOSE = """
 env-v2 기본 설정 (experiment_protocol.md). 규칙·SUMO 안전모드를 모두 빼고 모델 혼자 운전한다.
 shield(차량·신호·보행자 필터·차선변경 게이트)는 학습 내내 끄고, 평가는 감시 모드로 수동개입률을 잰다.
 정류장은 모델이 직접 선다 (정차 성공 +5, 놓침 -5). 차선변경 금지 구간은 막지 않고 -1.
-best 모델 = 검증 판(900000~)에서 완주율 95% 이상 중 수동개입률이 가장 낮은 것.
+best 모델 = 검증 판(900000~)에서 자동 판정(공식 완주율 95% 이상, 충돌률 5% 미만) 통과 중 수동개입률이 가장 낮은 것. 없으면 공식 완주율→충돌률→주행 거리 순.
 """
 
 # ══════════════════════════════════════════════════════════════════
@@ -447,16 +447,22 @@ if __name__ == "__main__":
         print(f"    [checkpoint @{agent.num_timesteps}] {model_path}", flush=True)
 
     def on_eval(m):
-        # best 기준 (experiment_protocol.md A10): 검증 판에서 감시 모드로
-        #   완주율(도착 + 정류장 놓침 0) 95% 이상인 것 중 수동개입률이 가장 낮은 것.
-        #   아직 95%가 없으면 완주율 높은 순, 같으면 수동개입률 낮은 순.
-        reached = m.completion_rate >= 0.95 - 1e-9
-        score = (reached, -m.intervention_rate if reached else m.completion_rate,
-                 -m.intervention_rate)
+        # best 기준 (experiment_protocol.md 3-1 자동 판정과 같은 순서): 검증 판에서 감시 모드로
+        #   1) 자동 판정 통과(공식 완주율 ≥95%, 충돌률 <5%)한 것 중 수동개입률이 가장 낮은 것
+        #   2) 통과한 게 없으면 공식 완주율 높은 순 → 충돌률 낮은 순 → 주행 거리 긴 순
+        #   공식 완주율 = success_rate (도착, 정류장 놓침 포함).
+        #   예전 기준은 완주 0%일 때 수동개입률이 가장 낮은 것 = 서 있기만 하는 모델을 골랐다.
+        passed = m.success_rate >= 0.95 - 1e-9 and m.collision_rate < 0.05
+        if passed:
+            score = (1, -m.intervention_rate, 0.0, 0.0)
+        else:
+            score = (0, m.success_rate, -m.collision_rate,
+                     m.mean_speed * m.ep_length)          # 평균 속도 × 평균 길이 ∝ 주행 거리
         if best["score"] is None or score > best["score"]:
             best["score"] = score
             agent.save(best_path)
-            print(f"    [best @{agent.num_timesteps}] 완주율={m.completion_rate:.0%} "
+            print(f"    [best @{agent.num_timesteps}] 공식완주율={m.success_rate:.0%} "
+                  f"충돌률={m.collision_rate:.0%} "
                   f"수동개입률={m.intervention_rate:.1%} → {best_path}", flush=True)
 
     def save_step(step):
