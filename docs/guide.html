@@ -202,9 +202,9 @@
           <p><code>reports/{이름}-{모델}</code>에서 평가 CSV·메타·요약·그래프·보고서만 <code>main/docs/reports/</code>로 보냅니다.</p>
         </div>
       </div>
-      <p>팀 원칙과 목표의 근거: <span class="src">experiment_protocol.md:1-6</span>,
-        <span class="src">experiment_protocol.md:125-147</span>,
-        <span class="src">experiment_protocol.md:331-359</span></p>
+      <p>팀 원칙과 목표의 근거: <span class="src">rules/team/experiment_protocol.md:1-6</span>,
+        <span class="src">rules/team/experiment_protocol.md:125-147</span>,
+        <span class="src">rules/team/experiment_protocol.md:331-359</span></p>
     </section>
 
     <section id="git">
@@ -217,7 +217,7 @@
 ├─ model/{이름}-{모델}         개인 모델·학습 산출물
 ├─ reports/{이름}-{모델}       평가 결과·보고서만 main으로 PR
 └─ env/fix-{내용}              공통 환경 버그 수정 후 새 태그</pre>
-      <p>프로토콜 구조: <span class="src">experiment_protocol.md:174-185</span>. 현재 실행 설정에는 아직 정확한 태그가 기록되지 않았습니다.</p>
+      <p>프로토콜 구조: <span class="src">rules/team/experiment_protocol.md:174-185</span>. 현재 실행 설정에는 아직 정확한 태그가 기록되지 않았습니다.</p>
 
       <h3>폴더 지도</h3>
       <div class="table-wrap">
@@ -387,13 +387,13 @@
       <pre><button class="copy">복사</button># Windows
 py -3.13 --version
 sumo --version
-py -3.13 -m pip install -r requirements-env-v2.txt
+py -3.13 -m pip install -r rules/setup/requirements-env-v2.txt
 
 # env-v2 태그가 공개된 뒤
 git fetch origin --tags
 git switch -c model/내이름-모델명 env-v2
 git describe --tags --exact-match</pre>
-      <p>고정 패키지 목록: <span class="src">requirements-env-v2.txt:1-8</span>. 현재 이 파일은 작업 트리에는 있지만 기준 커밋 포함 여부가 확정되지 않았으므로 PR 전 확인이 필요합니다.</p>
+      <p>고정 패키지 목록: <span class="src">rules/setup/requirements-env-v2.txt:1-8</span>. 현재 이 파일은 작업 트리에는 있지만 기준 커밋 포함 여부가 확정되지 않았으므로 PR 전 확인이 필요합니다.</p>
 
       <h3>내 모델 폴더 준비</h3>
       <pre><button class="copy">복사</button>models/내이름/
@@ -404,7 +404,7 @@ git describe --tags --exact-match</pre>
    ├─ ts0/
    ├─ ts1/
    └─ ts2/</pre>
-      <p>현재 저장소에는 이 구조를 자동 생성하는 명령이 없습니다. 공용 <code>train.py</code>를 모델 폴더에 복사하고 모델 전용 import·경로를 확인하는 작업이 필요합니다. 프로토콜 근거: <span class="src">experiment_protocol.md:220-234</span>.</p>
+      <p>현재 저장소에는 이 구조를 자동 생성하는 명령이 없습니다. 공용 <code>train.py</code>를 모델 폴더에 복사하고 모델 전용 import·경로를 확인하는 작업이 필요합니다. 프로토콜 근거: <span class="src">rules/team/experiment_protocol.md:220-234</span>.</p>
 
       <h3>스모크 → 본 학습 → resume</h3>
       <pre><button class="copy">복사</button># 먼저 2만 step
@@ -466,7 +466,7 @@ python models/내이름/train_ppo.py \
   --seed 0 --total-steps 500000 \
   --save-steps 300000,500000 \
   --out-dir models/내이름/checkpoints/ts0</pre>
-      <p>Kaggle 표준 노트북·설치 스크립트는 저장소 코드에서 확인되지 않았습니다. 세션 종료 전에 체크포인트, resume, <code>tb/</code>, CSV, config를 모두 내려받아야 합니다. <span class="src">experiment_protocol.md:260-270</span></p>
+      <p>Kaggle 표준 노트북·설치 스크립트는 저장소 코드에서 확인되지 않았습니다. 세션 종료 전에 체크포인트, resume, <code>tb/</code>, CSV, config를 모두 내려받아야 합니다. <span class="src">rules/team/experiment_protocol.md:260-270</span></p>
 
       <h3 id="baseline">현재 베이스라인은 실제로 이렇게 실행 중</h3>
       <p>세 시드는 <strong>서로 다른 worktree</strong>에서 실행되고, 결과만 본 저장소의 공통 <code>models/baseline_ppo/checkpoints/</code>로 저장됩니다. CPU 과다 경쟁을 줄이기 위해 OMP/MKL thread를 각각 2로 제한했습니다.</p>
@@ -637,7 +637,7 @@ git commit -m "results: 내이름 ppo 50만/최종 평가"
 git push -u origin reports/내이름-ppo</pre>
       <p>그다음 <code>reports/내이름-ppo → main</code> PR을 만들고 팀원 한 명 이상이 확인합니다.
         환경·공통 평가 도구는 완료 즉시 검토 후 main, 모델 코드는 평가와 반칙 체크 후 main입니다.
-        <span class="src">experiment_protocol.md:319-369</span></p>
+        <span class="src">rules/team/experiment_protocol.md:319-369</span></p>
     </section>
 
     <section id="rules">
@@ -656,7 +656,7 @@ git push -u origin reports/내이름-ppo</pre>
         <li>☐ 세 학습 시드 모두 30만·50만·final, TensorBoard, 곡선을 남겼다.</li>
         <li>☐ 모델 브랜치에 공용 <code>env/</code>, 루트 <code>train.py</code>, 공통 평가기 변경을 섞지 않았다.</li>
       </ul>
-      <p>원문: <span class="src">experiment_protocol.md:382-394</span>.</p>
+      <p>원문: <span class="src">rules/team/experiment_protocol.md:382-394</span>.</p>
     </section>
 
     <section id="gaps">
@@ -689,7 +689,7 @@ git push -u origin reports/내이름-ppo</pre>
         <table>
           <thead><tr><th>질문</th><th>가장 먼저 볼 파일</th></tr></thead>
           <tbody>
-            <tr><td>팀 규칙·브랜치·평가 시드</td><td><code>experiment_protocol.md</code></td></tr>
+            <tr><td>팀 규칙·브랜치·평가 시드</td><td><code>rules/team/experiment_protocol.md</code></td></tr>
             <tr><td>시뮬레이션·관측·행동 기본값</td><td><code>env/mdp_config.py</code></td></tr>
             <tr><td>ROii·교통 설정</td><td><code>env/road_config.py</code>, <code>tools/make_cgc_scenario.py</code></td></tr>
             <tr><td>관측 계산·step·보상·종료·shield</td><td><code>env/sumo_env.py</code></td></tr>

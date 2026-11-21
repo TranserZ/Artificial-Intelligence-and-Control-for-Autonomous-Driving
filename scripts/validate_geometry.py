@@ -4,7 +4,7 @@
 
 기준값(실제)
   - 차로 수        : data/road_data/cgc_lanes.csv (로드뷰 실측)
-  - 정류장 좌표    : 청계A01_정류소_좌표*.csv (경도/위도 + 이전정류소_직선거리_m)
+  - 정류장 좌표    : data/road_data/청계A01_정류소_좌표*.csv (경도/위도 + 이전정류소_직선거리_m)
   - 어린이보호구역 : 로드뷰 노선 거리 1333 m(기점) ~ 1610 m(종점)
   - 정차금지지대   : data/road_data/no_stop_zones.csv (엣지 내 위치만 있음, 노선 거리 기준값 없음)
   - 노선 지점      : 무교로 161, 광교 463, 삼일대로 911, 청계3가 1333, 세운상가 1610,
@@ -19,7 +19,7 @@
     현재 경로의 가장 가까운 엣지/교차로 내부 차로에 공간 매칭한다 (두 net은 같은 투영).
 
 실행:  py -X utf8 scripts/validate_geometry.py [--rebuild]
-출력:  data_huiyoung/report/geometry_validation.md / .csv
+출력:  docs/reports/huiyoung/geometry_validation.md / .csv
 """
 import argparse
 import csv
@@ -53,7 +53,7 @@ NO_STOP_CSV = os.path.join(BASE, "data", "road_data", "no_stop_zones.csv")
 SCHOOL_CSV = os.path.join(BASE, "data", "road_data", "school_zones.csv")
 OLD_NET_REV = "88bd499"                      # 도로망 정리(bus_line) 이전 net
 OLD_NET_PATH = "env/cheonggyecheon/cgc.net.xml"
-OUT_DIR = os.path.join(BASE, "data_huiyoung", "report")
+OUT_DIR = os.path.join(BASE, "docs", "reports", "huiyoung")
 
 ROUTE_ID = "r0"
 ROUTE_REAL_LENGTH = 2146.0
@@ -216,7 +216,7 @@ def read_csv(path):
 
 
 def find_stop_csv():
-    hits = sorted(glob.glob(os.path.join(BASE, "청계A01_정류소_좌표*.csv")))
+    hits = sorted(glob.glob(os.path.join(BASE, "data", "road_data", "청계A01_정류소_좌표*.csv")))
     return hits[0] if hits else None
 
 

@@ -75,7 +75,7 @@ git describe --tags --exact-match    # 브랜치를 만든 직후 env-v2가 나�
 
 **③ 학습 전·평가 전·push 전에 같은 환경인지 확인**
 ```bash
-git diff --stat env-v2 -- env/ scripts/evaluate_all.py scripts/common_eval.py train.py algorithms/ requirements-env-v2.txt
+git diff --stat env-v2 -- env/ scripts/evaluate_all.py scripts/common_eval.py train.py algorithms/ rules/setup/requirements-env-v2.txt
 ```
 아무것도 안 나오면 같은 환경이다. 뭔가 나오면 공용 파일을 고친 것이니 되돌린다.
 
@@ -194,11 +194,11 @@ main ─── env-v2 태그 (확정 환경 + 공통 평가 스크립트 + docs)
 ```bash
 py -3.13 --version
 sumo --version
-py -3.13 -m pip install -r requirements-env-v2.txt
+py -3.13 -m pip install -r rules/setup/requirements-env-v2.txt
 py -3.13 -c "import gymnasium, torch, traci, matplotlib, tensorboard, numpy; print(gymnasium.__version__, torch.__version__, matplotlib.__version__, tensorboard.__version__, numpy.__version__)"
 ```
 - `env-v2` 검증 환경은 Python **3.13.15**, SUMO **1.27.1**이다.
-- Python 패키지는 `requirements-env-v2.txt`에 고정한다. 위 마지막 명령은 차례대로 `1.4.0 / 2.15.0+cpu(또는 2.15.0) / 3.11.2 / 2.21.0 / 2.5.4`가 나와야 한다. `traci` 패키지 버전은 `py -3.13 -m pip show traci`에서 **1.28.0**인지 확인한다.
+- Python 패키지는 `rules/setup/requirements-env-v2.txt`에 고정한다. 위 마지막 명령은 차례대로 `1.4.0 / 2.15.0+cpu(또는 2.15.0) / 3.11.2 / 2.21.0 / 2.5.4`가 나와야 한다. `traci` 패키지 버전은 `py -3.13 -m pip show traci`에서 **1.28.0**인지 확인한다.
 - 이 프로젝트에서는 `python` 명령이 구형 Python 3.8을 가리킬 수 있으므로 Windows에서는 학습·평가도 `py -3.13`으로 실행한다.
 
 **② 확정 코드 가져오기**
@@ -211,7 +211,7 @@ git describe --tags --exact-match             # 브랜치를 만든 직후 "env-
 **③ 같은 코드 환경인지 확인** (학습 전, 평가 전, push 전에 한 번씩)
 
 ```bash
-git diff --stat env-v2 -- env/ scripts/evaluate_all.py scripts/common_eval.py train.py algorithms/ requirements-env-v2.txt
+git diff --stat env-v2 -- env/ scripts/evaluate_all.py scripts/common_eval.py train.py algorithms/ rules/setup/requirements-env-v2.txt
 ```
 
 - **아무것도 안 나와야 정상**이다. 뭔가 나오면 공용 파일을 고친 것이니 되돌린다.
@@ -385,7 +385,7 @@ git merge env-v3                 # 예: 새 환경 반영
 ## 2-12. 반칙 체크리스트 (결과 올리기 전 각자, 머지 전 다른 팀원이 확인)
 
 - [ ] 팀 비교·최종 평가 판(1000~1099, 2000~2999)으로 학습, 튜닝, best 선택을 하지 않았다 (튜닝은 900100~에서만)
-- [ ] `git diff --stat env-v2 -- env/ scripts/evaluate_all.py scripts/common_eval.py train.py algorithms/ requirements-env-v2.txt` 결과가 비어 있다
+- [ ] `git diff --stat env-v2 -- env/ scripts/evaluate_all.py scripts/common_eval.py train.py algorithms/ rules/setup/requirements-env-v2.txt` 결과가 비어 있다
 - [ ] 결과가 좋은 학습 시드만 골라서 보고하지 않았다 (CSV 전체 제출)
 - [ ] 규칙(if문으로 감속, 차로 지정 등)으로 운전을 돕지 않았다. 판단 모듈을 쓴다면 보상으로 학습한 RL(PPO 등)이고, 규칙을 정답으로 지도학습한 분류기(MLP 등)가 아니다
 - [ ] 신호 정보는 선두 차량만 받는다
@@ -727,15 +727,15 @@ tensorboard --logdir models/huiyoung/checkpoints/   # 브라우저에서 http://
 
 | 시기 | 버전 | 주요 변경 | 학습 step | 결과 | 위치 / 담당 |
 |---|---|---|---|---|---|
-| 09-07 | 고속도로 추월 | 12 km 직선, 추월 보너스 | 20만 | — | `results/run_20260907_*` / 9hyeon1225 |
-| 10-29~30 | 신호등 | 신호, 적색·충돌·차선변경 감점 | 50만 | — | `results/run_20261029~` / 조민기 |
-| 11-02~04 | 천호사거리 | 실제 교차로, 우회전, 보행자 양보·시간 초과·차로 오류 감점 | 50만~100만 | — | `results/run_20261102~1104_*` / 조민기 |
-| 11-06~08 | 보행자 안전 필터 | 필터 + 초록불 처리 | 150만 | 천호사거리 1000판 완주 99.4%, 충돌 0.5% | `results/run_20261108_*` / 조민기 |
-| 11-10 | 정지 위치 | 접근 감속, 멀리 서면 감점 | 100만 | — | `results/run_20261110_*` / 조민기 |
-| 11-11~13 | 어린이 보호구역 | 보호구역 과속 감점 | 100만~150만 | — | `results/run_20261111~` / 조민기 |
+| 09-07 | 고속도로 추월 | 12 km 직선, 추월 보너스 | 20만 | — | `backup/results/run_20260907_*` / 9hyeon1225 |
+| 10-29~30 | 신호등 | 신호, 적색·충돌·차선변경 감점 | 50만 | — | `backup/results/run_20261029~` / 조민기 |
+| 11-02~04 | 천호사거리 | 실제 교차로, 우회전, 보행자 양보·시간 초과·차로 오류 감점 | 50만~100만 | — | `backup/results/run_20261102~1104_*` / 조민기 |
+| 11-06~08 | 보행자 안전 필터 | 필터 + 초록불 처리 | 150만 | 천호사거리 1000판 완주 99.4%, 충돌 0.5% | `backup/results/run_20261108_*` / 조민기 |
+| 11-10 | 정지 위치 | 접근 감속, 멀리 서면 감점 | 100만 | — | `backup/results/run_20261110_*` / 조민기 |
+| 11-11~13 | 어린이 보호구역 | 보호구역 과속 감점 | 100만~150만 | — | `backup/results/run_20261111~` / 조민기 |
 | 11-15 | CGC 1차 | 11/08 모델에서 이어 학습, Kaggle, shield 켬 | 100만 × 3 | 50판 82% → 신호 shield 추가 후 92~96% | 저장소에 모델 없음 / 강동연 |
 | 11-15 | CGC 2차 | shield 의존이 커서 중단 | — | shield 끔 완주 8% | 저장소에 모델 없음 / 강동연 |
-| 11-16 | CGC 3차 (`cgc3` = 로그상 `cgc4` = Kaggle `cgc-ppo-train4`) | shield 점점 끄기(0→70%), 개입 감점 강화 | 약 73만 | 50판: shield 끔 시드별 48 / 52 / 92% (평균 약 64%), 켬 90% (시드 2) | `results/cgc3_ft_s{0,1,2}` / 강동연 |
+| 11-16 | CGC 3차 (`cgc3` = 로그상 `cgc4` = Kaggle `cgc-ppo-train4`) | shield 점점 끄기(0→70%), 개입 감점 강화 | 약 73만 | 50판: shield 끔 시드별 48 / 52 / 92% (평균 약 64%), 켬 90% (시드 2) | `backup/results/cgc3_ft_s{0,1,2}` / 강동연 |
 | 11-16 | ROii 이전 | 3차 모델을 ROii 셔틀 환경에서 재평가, 환경 버그 3개 수정 | (학습 없음) | 30판: 켬 29/30, 끔 28/30 | `cgc-roii` `9ee06b7` / 강동연 |
 | 11-17 | ROii 미세조정 (roii1) | 3차 모델에서 이어 학습 (Kaggle `cgc-ppo-roii2` 추정) | 약 86만 | 출발 모델보다 나빠짐 | `cgc-roii` `7bebdb8` / 강동연 |
 

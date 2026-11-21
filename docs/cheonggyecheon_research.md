@@ -65,5 +65,5 @@
 
 ```bash
 SUMO_HOME=~/src/sumo-1.27.1-mesa tools/build_cgc.sh
-sumo-gui -c env/cheonggyecheon/cgc.sumocfg
+sumo-gui -c env/cheonggyecheon/cgc.sumocfg   # 단독 도구 출력 (git 제외). 학습용 도로 보기는 CGC_STAGE=6 python view_road.py
 ```

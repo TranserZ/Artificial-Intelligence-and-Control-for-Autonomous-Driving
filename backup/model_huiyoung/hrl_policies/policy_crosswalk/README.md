@@ -1,6 +1,6 @@
 # policy_crosswalk
 
-- **내용**: `model_huiyoung/baselines/rule_based_expert` 그대로
+- **내용**: `backup/model_huiyoung/baselines/rule_based_expert` 그대로
   (`scripts/rule_based_expert.py`의 `RuleBasedExpert`).
 - **용도**: HRL 상위 컨트롤러가 "경로상 다음 횡단보도가 가까워질 때" 호출하는
   하위 정책. 보행자가 있거나 다가오는 중이면 정지, 아니면 통과.

@@ -1,7 +1,7 @@
 """env-v2 공통 평가 진입점.
 
 사용법은 `py -3.13 scripts/evaluate_all.py --help` 또는
-`experiment_protocol.md` 2-6을 따른다. 실제 구현은 common_eval.py에 있다.
+`rules/team/experiment_protocol.md` 2-6을 따른다. 실제 구현은 common_eval.py에 있다.
 아래의 구버전 함수들은 이전 결과를 읽는 코드와의 import 호환용으로 남긴다.
 """
 if __name__ == "__main__":

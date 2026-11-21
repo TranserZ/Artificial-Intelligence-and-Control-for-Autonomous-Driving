@@ -143,10 +143,10 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--episodes", type=int, default=100)
     ap.add_argument("--out", default=None,
-                    help="생략 시 data_huiyoung/bc_expert_data/rule_based_<timestamp>/")
+                    help="생략 시 data/huiyoung/bc_expert_data/rule_based_<timestamp>/")
     ap.add_argument("--no-filter", action="store_true")
     a = ap.parse_args()
     out_dir = a.out or os.path.join(
-        ROOT, "data_huiyoung", "bc_expert_data",
+        ROOT, "data", "huiyoung", "bc_expert_data",
         f"rule_based_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
     collect(a.episodes, out_dir, a.no_filter)

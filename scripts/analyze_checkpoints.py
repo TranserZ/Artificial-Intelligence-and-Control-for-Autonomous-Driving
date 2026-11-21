@@ -2,7 +2,7 @@
 
 사용법:
     py -3.13 scripts/analyze_checkpoints.py \
-        data_huiyoung/trajectories/baseline_run_<timestamp>/summary.csv
+        data/huiyoung/trajectories/baseline_run_<timestamp>/summary.csv
 """
 import argparse
 import csv
@@ -57,5 +57,5 @@ if __name__ == "__main__":
     a = ap.parse_args()
     out = a.out or os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        "data_huiyoung", "eval_logs", "checkpoint_analysis.csv")
+        "data", "huiyoung", "eval_logs", "checkpoint_analysis.csv")
     analyze(a.summary_csv, out)

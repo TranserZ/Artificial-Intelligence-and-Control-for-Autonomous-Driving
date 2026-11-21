@@ -22,11 +22,11 @@ API 제한 (실측):
   - 신호 API 는 itstId 또는 sggCd 필수 → itstId 를 자동으로 붙인다
 
 사용법:
-  python crossroad_data_collector.py --name 양평동사거리
-  python crossroad_data_collector.py --name 양평동사거리 천호사거리 --duration 1200
-  python crossroad_data_collector.py --name 천호사거리 --id 1234        # ID 직접 지정
-  python crossroad_data_collector.py --search 양평                      # MAP 에서 후보 검색
-  python crossroad_data_collector.py --name 양평동사거리 --analyze-only # 기존 원본 재분석
+  python tools/crossroad_data_collect/crossroad_data_collector.py --name 양평동사거리
+  python tools/crossroad_data_collect/crossroad_data_collector.py --name 양평동사거리 천호사거리 --duration 1200
+  python tools/crossroad_data_collect/crossroad_data_collector.py --name 천호사거리 --id 1234        # ID 직접 지정
+  python tools/crossroad_data_collect/crossroad_data_collector.py --search 양평                      # MAP 에서 후보 검색
+  python tools/crossroad_data_collect/crossroad_data_collector.py --name 양평동사거리 --analyze-only # 기존 원본 재분석
 """
 
 import argparse
@@ -43,10 +43,11 @@ import urllib.request
 from datetime import datetime
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
-OUT_ROOT = ROOT / "data" / "road_data"
+HERE = Path(__file__).resolve().parent             # tools/crossroad_data_collect/
+ROOT = HERE.parents[1]                             # 저장소 맨 위
+OUT_ROOT = ROOT / "data" / "road_data"             # 수집 결과는 여기에 저장
 MAP_CACHE = OUT_ROOT / "_map_cache.json"
-CONFIG_PATH = ROOT / "crossroad_api_config.py"
+CONFIG_PATH = HERE / "crossroad_api_config.py"     # 인증키 (git 미추적)
 CONFIG_TEMPLATE = '''"""
 crossroad_data_collector.py 설정 (git 미추적 — 인증키 포함)
 

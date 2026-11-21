@@ -51,13 +51,13 @@ conda activate sumo-rl
 현재 데이터 수집 시 학습된 모델을 읽는 `--model` 옵션을 추가하여 데이터 수집이 가능함. `--policy`를 생략하면 모델 파일에서 PPO/BC를 자동 판별하며, 모델도 생략하면 랜덤 정책을 사용함.
 
 ```bash
-python collect_pomdp_data.py --model results/run_20260907_202220/model.pt --episodes 10 --name bc_demo
+python collect_pomdp_data.py --model backup/results/run_20260907_202220/model.pt --episodes 10 --name bc_demo
 ```
 
 화면을 보며 수집하려면 다음과 같이 옵션 추가
 
 ```bash
-python collect_pomdp_data.py --model results/run_20260907_202220/model.pt --episodes 10 --gui --name bc_demo_gui
+python collect_pomdp_data.py --model backup/results/run_20260907_202220/model.pt --episodes 10 --gui --name bc_demo_gui
 ```
 
 랜덤 정책은 가감속을 `[-1, 1]`에서 균등하게 뽑고, 차선 명령을 오른쪽 15%, 유지 70%, 왼쪽 15%로 선택하고, 차선 유지 정책은 `[0.25, 0.0]`을 반환함. 
@@ -340,7 +340,7 @@ python test.py results/bc_모델폴더명/model.pt --episodes 5 --nogui
 기존 PPO 모델도 평가할 수 있음.
 
 ```bash
-python test.py results/run_20260907_202220/model.pt --algorithm ppo --episodes 5 --nogui
+python test.py backup/results/run_20260907_202220/model.pt --algorithm ppo --episodes 5 --nogui
 ```
 
 <img width="1000" alt="4주차" src="https://github.com/user-attachments/assets/2d5334ac-95e1-4a55-94c3-1f4a3b050c94" />

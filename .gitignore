@@ -1,10 +1,14 @@
 *.pyc
 __pycache__/
+tools/crossroad_data_collect/crossroad_api_config.py
 crossroad_api_config.py
 data/road_data/국토교통부_교통영향평가_기하구조정보_*.csv
 env/sumo/cgc.*
 docs/cheonggyecheon_solution.md
 results/run_20261029_200354/
+backup/results/run_20261029_200354/
+# 청계천로 도로 파일은 학습 때 env/sumo/에 매번 새로 만든다. 단독 도구(tools/osm_to_sumo.py 등)의 출력 폴더
+env/cheonggyecheon/
 
 # 국가 표준노드링크 (국가교통정보센터, ~870 MB) — 각자 내려받아 data/road_data/에 둔다
 data/road_data/MOCT_*

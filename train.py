@@ -41,11 +41,11 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 
 # ══════════════════════════════════════════════════════════════════
 #  이번 학습의 목적 — 학습 방식을 바꿀 때마다 여기부터 고친다.
-#  train_file_backup/train_<날짜_시각>.py 맨 위 [목적]에 그대로 들어간다.
+#  backup/train_file_backup/train_<날짜_시각>.py 맨 위 [목적]에 그대로 들어간다.
 #  (무엇을 왜 바꿨는지 + 이전 결과의 어떤 문제를 고치려는지를 쉬운 말로)
 # ══════════════════════════════════════════════════════════════════
 TRAIN_PURPOSE = """
-env-v2 기본 설정 (experiment_protocol.md). 규칙·SUMO 안전모드를 모두 빼고 모델 혼자 운전한다.
+env-v2 기본 설정 (rules/team/experiment_protocol.md). 규칙·SUMO 안전모드를 모두 빼고 모델 혼자 운전한다.
 shield(차량·신호·보행자 필터·차선변경 게이트)는 학습 내내 끄고, 평가는 감시 모드로 수동개입률을 잰다.
 정류장은 모델이 직접 선다 (정차 성공 +5, 놓침 -5). 차선변경 금지 구간은 막지 않고 -1.
 best 모델 = 검증 판(900000~)에서 자동 판정(공식 완주율 95% 이상, 충돌률 5% 미만) 통과 중 수동개입률이 가장 낮은 것. 없으면 공식 완주율→충돌률→주행 거리 순.
@@ -318,7 +318,7 @@ def write_run_config(run_dir, *, seed, requested_steps, actual_steps,
         f.write("\n")
 
 
-BACKUP_DIR = os.path.join(BASE, "train_file_backup")
+BACKUP_DIR = os.path.join(BASE, "backup", "train_file_backup")
 
 
 if __name__ == "__main__":
@@ -371,7 +371,7 @@ if __name__ == "__main__":
     logger = RunLogger(run_dir)
     print(f"결과 폴더: {run_dir}")
 
-    # 학습 방식(train.py)이 지난 백업과 달라졌으면 train_file_backup/에 머리말과 함께 저장
+    # 학습 방식(train.py)이 지난 백업과 달라졌으면 backup/train_file_backup/에 머리말과 함께 저장
     saved = train_backup.backup(os.path.join(BASE, "train.py"), BACKUP_DIR,
                                 TRAIN_PURPOSE, os.path.basename(run_dir))
     if saved:
@@ -448,7 +448,7 @@ if __name__ == "__main__":
         print(f"    [checkpoint @{agent.num_timesteps}] {model_path}", flush=True)
 
     def on_eval(m):
-        # best 기준 (experiment_protocol.md 3-1 자동 판정과 같은 순서): 검증 판에서 감시 모드로
+        # best 기준 (rules/team/experiment_protocol.md 3-1 자동 판정과 같은 순서): 검증 판에서 감시 모드로
         #   1) 자동 판정 통과(공식 완주율 ≥95%, 충돌률 <5%)한 것 중 수동개입률이 가장 낮은 것
         #   2) 통과한 게 없으면 공식 완주율 높은 순 → 충돌률 낮은 순 → 주행 거리 긴 순
         #   공식 완주율 = success_rate (도착, 정류장 놓침 포함).

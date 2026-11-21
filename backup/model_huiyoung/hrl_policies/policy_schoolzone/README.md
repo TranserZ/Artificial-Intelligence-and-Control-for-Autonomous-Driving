@@ -1,6 +1,6 @@
 # policy_schoolzone
 
-- **내용**: `model_huiyoung/baselines/rule_based_expert` 그대로
+- **내용**: `backup/model_huiyoung/baselines/rule_based_expert` 그대로
   (`scripts/rule_based_expert.py`의 `RuleBasedExpert`).
 - **용도**: HRL 상위 컨트롤러가 세운상가 어린이보호구역(e218924602_1~3,
   3차로, 제한 8.33 m/s)에 진입했을 때 호출하는 하위 정책. 제한속도 이상이면

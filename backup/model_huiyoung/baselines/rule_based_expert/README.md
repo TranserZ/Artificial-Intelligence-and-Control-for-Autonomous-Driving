@@ -10,6 +10,6 @@
 - **용도**:
   1) HRL 하위 정책(crosswalk/schoolzone)의 베이스 — 규칙이 이미 그 상황의
      정답에 가깝기 때문에 별도 학습 없이 그대로 쓴다.
-  2) BC 전문가 시범 데이터 생성 (`data_huiyoung/bc_expert_data/`).
+  2) BC 전문가 시범 데이터 생성 (`data/huiyoung/bc_expert_data/`).
   3) `evaluate_policy`/`evaluate_all.py`와 같은 `predict(obs, deterministic)`
      인터페이스를 맞춰 다른 정책과 동일 조건으로 비교 평가 가능.

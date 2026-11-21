@@ -1,4 +1,4 @@
-"""train.py 버전 백업 (train_file_backup/train_<날짜_시각>.py).
+"""train.py 버전 백업 (backup/train_file_backup/train_<날짜_시각>.py).
 
 train.py는 하나뿐이라 학습 방식을 바꾸면 예전 내용이 덮어써진다.
 그래서 학습을 시작할 때 train.py가 지난 백업과 달라졌으면 새 파일로 저장하고,

@@ -3,7 +3,7 @@
 - 운전: keep-lane(목표 속도) + 상황별 강제 조작. 감점은 같은 판을 감점 켬/끔으로 돌려
   같은 행동을 재생한 보상 차이(끔 − 켬)로 잰다 (scripts/check_special_zones.py와 같은 방식).
 - 청계5가 교차로는 r0가 지나지 않아 회차 경로 r0_loop로 확인한다.
-결과: data_huiyoung/report/zone_checks_v2.json, 스크린샷 data_huiyoung/report/zone_screens/v2_*.png
+결과: docs/reports/huiyoung/zone_checks_v2.json, 스크린샷 docs/reports/huiyoung/zone_screens/v2_*.png
 실행: py -X utf8 scripts/check_zones_v2.py [--no-gui]
 """
 import json, math, os, re, sys
@@ -21,8 +21,8 @@ from train import REWARD  # noqa: E402
 
 CFG = os.path.join(BASE, "env", "sumo", "cgc.sumocfg")
 NETF = os.path.join(BASE, "env", "sumo", "cgc.net.xml")
-OUT = os.path.join(BASE, "data_huiyoung", "report", "zone_checks_v2.json")
-SHOTS = os.path.join(BASE, "data_huiyoung", "report", "zone_screens")
+OUT = os.path.join(BASE, "docs", "reports", "huiyoung", "zone_checks_v2.json")
+SHOTS = os.path.join(BASE, "docs", "reports", "huiyoung", "zone_screens")
 J5 = "cluster_n5768277866_n871729539_n9040757788"   # 청계5가 사거리
 EGO_ID = "ego"
 net = sumolib.net.readNet(NETF, withInternal=True)

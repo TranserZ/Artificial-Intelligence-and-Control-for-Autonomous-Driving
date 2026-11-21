@@ -1,12 +1,12 @@
 """학습된(민기) PPO 모델로 청계천로 편도 환경을 N 에피소드 평가하며
-스텝별 궤적과 지점 통과 여부를 data_huiyoung/trajectories/ 에 저장한다.
+스텝별 궤적과 지점 통과 여부를 data/huiyoung/trajectories/ 에 저장한다.
 
 사용법:
     py -3.13 scripts/collect_trajectories.py \
-        --model results/run_20261108_114607/best_model.pt --episodes 100
+        --model backup/results/run_20261108_114607/best_model.pt --episodes 100
 
 저장 구조:
-    data_huiyoung/trajectories/baseline_run_<timestamp>/
+    data/huiyoung/trajectories/baseline_run_<timestamp>/
         episode_001.csv ... episode_100.csv   (스텝별: t,ego_x,ego_y,speed,accel_raw,
                                                 lane_change,lane_change_applied,reward)
         summary.csv                           (에피소드별 종료 사유·종료 엣지·
@@ -127,11 +127,11 @@ if __name__ == "__main__":
         ROOT, "results", "run_20261108_114607", "best_model.pt"))
     ap.add_argument("--episodes", type=int, default=100)
     ap.add_argument("--out", default=None,
-                    help="생략 시 data_huiyoung/trajectories/baseline_run_<timestamp>/")
+                    help="생략 시 data/huiyoung/trajectories/baseline_run_<timestamp>/")
     ap.add_argument("--no-filter", action="store_true")
     a = ap.parse_args()
 
     out_dir = a.out or os.path.join(
-        ROOT, "data_huiyoung", "trajectories",
+        ROOT, "data", "huiyoung", "trajectories",
         f"baseline_run_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
     collect(a.model, a.episodes, out_dir, a.no_filter)

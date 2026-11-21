@@ -16,7 +16,7 @@ from env.sumo_env import SumoHighwayEnv  # noqa: E402
 from train import REWARD  # noqa: E402
 
 CFG = os.path.join(BASE, "env", "sumo", "cgc.sumocfg")
-OUT = os.path.join(BASE, "data_huiyoung", "report", "special_zone_checks.json")
+OUT = os.path.join(BASE, "docs", "reports", "huiyoung", "special_zone_checks.json")
 EGO_ID = "ego"
 
 

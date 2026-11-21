@@ -90,7 +90,7 @@ def _load_zone_rows(filename, columns):
 # 아래는 메타 파일이 없는 구버전 시나리오용 fallback (청계A01 동행 5곳).
 BUS_STOPS_ORDER = ["bs_01", "bs_02", "bs_03", "bs_04", "bs_05"]
 
-# 학습 판에서 빼는 판 시드 구간 (테스트·검증용, experiment_protocol.md 3-2)
+# 학습 판에서 빼는 판 시드 구간 (테스트·검증용, rules/team/experiment_protocol.md 3-2)
 #   1000~1099: 팀 비교, 2000~2999: 최종 후보 평가,
 #   900000~999999: 학습 중 best 고르기·튜닝.
 # 1100~1999도 이전 프로토콜에서 테스트로 예약했으므로 계속 제외한다.
@@ -242,7 +242,7 @@ class SumoHighwayEnv(gym.Env):
         self.zone_visibility = float(szo.get("visibility", 100.0))
         # 버스정류장 (mdp_config.OBSERVATION["bus_stop"]): 관측 3개. 정차는 모델이 직접 한다.
         #   정차 성공 = 정류장 차로·정류장 구간 안에서 stop_speed 이하로 dwell_time 초 이상 정지
-        #   (SUMO 정류장 등록·속도 위임·정류장 규칙은 쓰지 않는다: experiment_protocol.md A1, A5)
+        #   (SUMO 정류장 등록·속도 위임·정류장 규칙은 쓰지 않는다: rules/team/experiment_protocol.md A1, A5)
         bso = (mdp_obs.get("bus_stop") or {})
         self.stop_obs = bool(bso.get("enabled", False))
         self.stop_visibility = float(bso.get("visibility", 150.0))
@@ -1394,7 +1394,7 @@ class SumoHighwayEnv(gym.Env):
 
         traci getNextTLS가 돌려주는 가장 가까운 신호 그대로다 (거리는 ego 앞범퍼 → 정지선).
         env-v1부터 가공하지 않는다: 황색을 "지나갈 수 있으면 녹색"으로 바꾸던 것과 연달아 있는
-        정지선의 더 엄격한 색을 앞당겨 쓰던 것은 규칙이라 지웠다 (experiment_protocol.md 4-1).
+        정지선의 더 엄격한 색을 앞당겨 쓰던 것은 규칙이라 지웠다 (rules/team/experiment_protocol.md 4-1).
         남은 시간은 판정·보상·데이터용이고 관측에는 넣지 않는다.
         신호를 이미 지났거나 ego가 없으면 None.
         """

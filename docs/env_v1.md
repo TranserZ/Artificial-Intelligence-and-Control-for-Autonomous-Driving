@@ -4,7 +4,7 @@
 
 | 작성일 | 작성자 | 브랜치 | 기준 | 관련 문서 |
 |---|---|---|---|---|
-| 2026-11-17 | 강동연 | `env/v1-cleanup` (`a48f0af`) | 팀 main `26307b5` | `experiment_protocol.md` 1부 A |
+| 2026-11-17 | 강동연 | `env/v1-cleanup` (`a48f0af`) | 팀 main `26307b5` | `rules/team/experiment_protocol.md` 1부 A |
 
 ## 1. 무엇을 뺐나 (A1)
 

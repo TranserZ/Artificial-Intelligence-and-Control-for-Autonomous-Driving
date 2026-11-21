@@ -1,6 +1,6 @@
 # minki_run_20261108_114607 (베이스라인 PPO)
 
-- **원본**: `results/run_20261108_114607/best_model.pt` (학습자: 민기, 왕복 route 기준 학습)
+- **원본**: `backup/results/run_20261108_114607/best_model.pt` (학습자: 민기, 왕복 route 기준 학습)
 - **알고리즘**: PPO (단일 Gaussian 정책, 가감속+차선변경 2차원 연속 행동)
 - **학습 당시 환경**: `road_config_snapshot.py` / `mdp_config_snapshot.py` 참고.
   왕복(r0_loop) route, 정류장 11곳, ego vType=passenger(5m) 기준으로 학습됨.
@@ -12,4 +12,4 @@
   accel/decel 5.4/5.4 → bus 12m, 1.2/4.0) 성능 저하가 나타나는 것이 정상이며,
   이것이 바로 HRL 하위 정책이 필요한 근거 데이터가 된다.
 - **평가**: `scripts/evaluate_all.py`의 `minki_ppo` 항목, 또는
-  `py -3.13 test.py model_huiyoung/baselines/minki_run_20261108_114607/best_model.pt --nogui`
+  `py -3.13 test.py backup/model_huiyoung/baselines/minki_run_20261108_114607/best_model.pt --nogui`
