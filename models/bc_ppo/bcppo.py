@@ -497,7 +497,8 @@ def cmd_collect(args):
 # ──────────────────────────────────────────────────────────────
 # bc: 모방학습 (데이터 읽기 · 손실)
 # ──────────────────────────────────────────────────────────────
-GOOD_ENDS = ("completed", "missed_stop")   # 충돌·적색·차로오류·시간초과 판은 흉내 내지 않는다
+GOOD_ENDS = ("completed", "missed_stop")
+BRAKE_LABEL = -0.2   # 정답 가감속이 이보다 작으면 "감속 step" (BC 가중치 대상)   # 충돌·적색·차로오류·시간초과 판은 흉내 내지 않는다
 
 
 def load_demos(paths, gamma, only_good=True):
@@ -565,6 +566,11 @@ def cmd_bc(args):
     # 차선변경은 드문 행동이라 가중치를 줘서 "항상 유지"로 무너지지 않게 한다 (lane_weight 배)
     lane_w = torch.ones(3)
     lane_w[[0, 2]] = args.lane_weight
+    # 감속 구간 가중치: 정답이 감속인 step은 드물지만(2단계 적색 접근 5~20 m는 전체의 0.4%) 틀리면 위반·충돌이다.
+    #   가중치 없이 학습한 2단계 BC는 감속을 평균 쪽으로 약하게 배워 (정답 −0.6, 학생 −0.45) 적색 위반 53%
+    sample_w = torch.ones(len(A))
+    sample_w[A[:, 0] < BRAKE_LABEL] = args.brake_weight
+    print(f"감속 정답 step {int((A[:, 0] < BRAKE_LABEL).sum())}개 (×{args.brake_weight:g})")
     os.makedirs(args.out, exist_ok=True)
     log = []
     for epoch in range(1, args.epochs + 1):
@@ -575,7 +581,8 @@ def cmd_bc(args):
         for s in range(0, len(tr_idx), args.batch):
             b = tr_idx[s:s + args.batch]
             mu, std, logits, value = policy(O[b])
-            nll = -Normal(mu, std).log_prob(A[b, :1]).sum(-1).mean()
+            w = sample_w[b]
+            nll = (-Normal(mu, std).log_prob(A[b, :1]).sum(-1) * w).sum() / w.sum()
             lane_idx = (1.0 - torch.round(A[b, 1])).long().clamp(0, 2)
             ce = F.cross_entropy(logits, lane_idx, weight=lane_w)
             v_loss = F.mse_loss(value, R[b])
@@ -849,6 +856,7 @@ def main():
     q.add_argument("--lr", type=float, default=3e-4)
     q.add_argument("--value-coef", type=float, default=0.5)
     q.add_argument("--lane-weight", type=float, default=3.0)
+    q.add_argument("--brake-weight", type=float, default=1.0, help="정답이 감속인 step의 가중치")
     q.add_argument("--seed", type=int, default=0)
     q.add_argument("--all-episodes", action="store_true", help="실패한 판도 흉내 낸다")
 
