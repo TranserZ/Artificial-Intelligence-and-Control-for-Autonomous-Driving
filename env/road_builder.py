@@ -88,7 +88,9 @@ def _build_cheonggyecheon(ego: dict, out_dir: str, demo_ego: bool = False,
          "--no-turnarounds", "true", "--junctions.join", "true", "--tls.join", "true", "--tls.join-dist", "30",
          "--junctions.corner-detail", "5", "--output.street-names", "true",
          "--offset.disable-normalization", "true",
-         "--sidewalks.guess", "true", "--sidewalks.guess.max-speed", "14",
+         # min-speed 기본값 5.8 m/s 이하 도로엔 인도를 안 만든다 → 어린이보호구역 20 km/h(5.56 m/s)
+         # 엣지에서 인도가 사라져 보행자가 버스 차로를 걸었다 (4단계 이상). 1 m/s로 낮춘다.
+         "--sidewalks.guess", "true", "--sidewalks.guess.max-speed", "14", "--sidewalks.guess.min-speed", "1",
          "--crossings.guess", "true", "--crossings.guess.speed-threshold", "14",
          # 배경 정리: 본 도로망과 이어지지 않은 '섬' 도로와 외톨이 엣지를 지운다
          # (가장 큰 연결 덩어리 = 청계천로가 있는 도로망만 남김)
