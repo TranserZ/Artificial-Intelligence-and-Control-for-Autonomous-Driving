@@ -41,12 +41,24 @@ from models.dongyeon import train_gru_ppo as tg  # noqa: E402  (GRU_HPARAMS·wri
 from models.dongyeon.gru_ppo import FORMAT, GRUActorCritic, load_policy  # noqa: E402
 
 
-def load_episodes(dirs, gamma):
-    """폴더들의 demos.npz → 판 목록. 판마다 obs·prev·accel·lane(학생 head 순서)·ret."""
+def load_episodes(dirs, gamma, disagree_w=0.0, crash_w=0.0, crash_steps=40):
+    """폴더들의 demos.npz → 판 목록. 판마다 obs·prev·accel·lane(학생 head 순서)·ret·w(가감속 가중치).
+
+    가감속 가중치 (DAgger 데이터에서만 의미가 있다):
+      - 학생이 운전한 스텝(src=0)은 1 + disagree_w·|선생 가감속 − 학생 가감속|. 학생 정책이 선생과 크게
+        어긋난 상태가 학습에서 묻히지 않게 한다. 1차 결과: 앞차에 30초 동안 다가가며 선생은 −0.9,
+        학생은 0을 냈는데, 이런 스텝은 전체 50만 스텝 중 1천 개 정도라 평균 MSE에서 거의 안 보였다.
+      - 충돌로 끝난 판의 마지막 crash_steps 스텝은 ×(1 + crash_w).
+    """
     eps = []
     for d in dirs:
         z = np.load(os.path.join(d, "demos.npz"))
         ep = z["ep"]
+        src = z["src"] if "src" in z.files else np.ones(len(ep), np.int8)
+        ends = {}
+        if os.path.isfile(os.path.join(d, "episodes.csv")):
+            import csv
+            ends = {int(r["ep"]): r["end_reason"] for r in csv.DictReader(open(os.path.join(d, "episodes.csv")))}
         cuts = np.flatnonzero(np.diff(ep)) + 1
         for a, b in zip(np.r_[0, cuts], np.r_[cuts, len(ep)]):
             r = z["reward"][a:b].astype(np.float64)
@@ -55,8 +67,11 @@ def load_episodes(dirs, gamma):
             for t in range(len(r) - 1, -1, -1):
                 g = r[t] + gamma * g
                 ret[t] = g
+            w = 1.0 + disagree_w * np.abs(z["act"][a:b, 0] - z["exec_act"][a:b, 0]) * (src[a:b] == 0)
+            if ends.get(int(ep[a])) == "collision":
+                w[-crash_steps:] *= 1.0 + crash_w
             eps.append(dict(
-                src=d, obs=z["obs"][a:b].astype(np.float32), prev=z["prev_act"][a:b].astype(np.float32),
+                w=w.astype(np.float32), src=d, obs=z["obs"][a:b].astype(np.float32), prev=z["prev_act"][a:b].astype(np.float32),
                 acc=np.clip(z["act"][a:b, 0], -1, 1).astype(np.float32),
                 # 학생 차선 head: 0=왼쪽(+1) 1=유지 2=오른쪽(−1) (gru_ppo.LANE_CMDS)
                 lane=(1 - np.round(z["act"][a:b, 1])).astype(np.int64),
@@ -81,13 +96,15 @@ def pad(group, device, prev_mode):
     lane = np.ones((T, B), np.int64)
     ret = np.zeros((T, B), np.float32)
     mask = np.zeros((T, B), np.float32)
+    wacc = np.zeros((T, B), np.float32)
     for j, e in enumerate(group):
         n = len(e["acc"])
+        wacc[:n, j] = e["w"]
         obs[:n, j], acc[:n, j], lane[:n, j], ret[:n, j], mask[:n, j] = e["obs"], e["acc"], e["lane"], e["ret"], 1
         if prev_mode == "data":
             prev[:n, j] = e["prev"]
     t = lambda a: torch.as_tensor(a, device=device)  # noqa: E731
-    return t(obs), t(prev), t(acc), t(lane), t(ret), t(mask)
+    return t(obs), t(prev), t(acc), t(lane), t(ret), t(mask), t(wacc)
 
 
 def forward(policy, obs, prev):
@@ -103,11 +120,11 @@ def run_epoch(policy, eps, opt, args, cw, device, rng, train):
     policy.train(train)
     s = dict(n=0.0, acc_mse=0.0, lane_ce=0.0, v_mse=0.0, n_change=0.0, hit=0.0, n_keep=0.0, false_change=0.0)
     for group in batches(eps, args.batch_eps, rng, shuffle=train):
-        obs, prev, acc, lane, ret, mask = pad(group, device, args.prev)
+        obs, prev, acc, lane, ret, mask, wacc = pad(group, device, args.prev)
         with torch.set_grad_enabled(train):
             mu, logits, value = forward(policy, obs, prev)
             m = mask.sum()
-            acc_mse = (((mu - acc) ** 2) * mask).sum() / m
+            acc_mse = (((mu - acc) ** 2) * wacc).sum() / wacc.sum()
             ce = F.cross_entropy(logits.reshape(-1, 3), lane.reshape(-1), weight=cw, reduction="none")
             w = cw[lane.reshape(-1)] * mask.reshape(-1)
             lane_ce = (ce * mask.reshape(-1)).sum() / w.sum()
@@ -163,6 +180,8 @@ def main():
     p.add_argument("--lane-coef", type=float, default=1.0)
     p.add_argument("--value-coef", type=float, default=0.01, help="critic 손실 (actor와 파라미터가 따로라 크기만 조절)")
     p.add_argument("--lane-weight-cap", type=float, default=30.0)
+    p.add_argument("--disagree-weight", type=float, default=0.0, help="학생 운전 스텝 가감속 가중치 1+α|선생−학생|")
+    p.add_argument("--crash-weight", type=float, default=0.0, help="충돌 판 마지막 40스텝 가중치 ×(1+β)")
     p.add_argument("--max-grad-norm", type=float, default=1.0)
     p.add_argument("--prev", choices=("data", "zero"), default="data")
     p.add_argument("--no-prev-action", action="store_true",
@@ -176,7 +195,7 @@ def main():
     rng = np.random.default_rng(args.seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     gamma = tg.GRU_HPARAMS["gamma"]
-    eps = load_episodes(args.data, gamma)
+    eps = load_episodes(args.data, gamma, args.disagree_weight, args.crash_weight)
     idx = rng.permutation(len(eps))
     n_val = max(1, int(round(len(eps) * args.val_frac)))
     val = [eps[i] for i in idx[:n_val]]

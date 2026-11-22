@@ -30,6 +30,8 @@ from env import road_builder                            # noqa: E402
 from env.sumo_env import HELD_OUT_SEEDS, SumoHighwayEnv  # noqa: E402
 from utils.logger import RunLogger                      # noqa: E402
 from models.dongyeon.gru_ppo import GRUPPO, load_policy # noqa: E402
+import numpy as np                                      # noqa: E402
+import torch                                            # noqa: E402
 
 SIMULATION, REWARD = base.SIMULATION, base.REWARD       # train.py가 shield off·replay 0.3을 이미 넣어 둠
 
@@ -121,6 +123,8 @@ def main():
     p.add_argument("--init", default=None,
                    help="앞 단계 모델 .pt (가중치만 가져오고 optimizer·step은 새로 시작, 팀 단계별 학습 방식)")
     p.add_argument("--save-steps", default=None, help="기본 300000,500000")
+    p.add_argument("--init-log-std", type=float, default=None,
+                   help="--init 뒤 가감속 σ의 log를 이 값으로 (BC 모델은 σ를 학습하지 않으므로 탐험 크기를 정한다)")
     p.add_argument("--max-hours", type=float, default=None,
                    help="이 시간이 지나면 업데이트 경계에서 멈추고 model.resume.pt를 남긴다 (Kaggle 12시간 제한 대비)")
     p.add_argument("--eval-interval", type=int, default=None)
@@ -151,6 +155,10 @@ def main():
     if args.init:
         agent.policy.load_state_dict(load_policy(args.init, device=str(agent.device)).state_dict())
         print(f"앞 단계 모델에서 시작: {args.init}", flush=True)
+        if args.init_log_std is not None:
+            with torch.no_grad():
+                agent.policy.log_std.fill_(args.init_log_std)
+            print(f"초기 σ = {np.exp(args.init_log_std):.2f}", flush=True)
     if args.resume:
         agent.load_training_state(args.resume)
         if agent.num_timesteps >= args.total_steps:
