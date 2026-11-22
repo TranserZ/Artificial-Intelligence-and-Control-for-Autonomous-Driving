@@ -132,6 +132,10 @@ def main():
     base.SAVE_STEPS = save_steps
     eval_interval = EVAL_INTERVAL if args.eval_interval is None else args.eval_interval
     GRU_HPARAMS["seed"] = args.seed
+    if args.init:   # BC 모델(직전 행동 입력 없음 등)에서 시작하면 그 구성을 따른다
+        from models.dongyeon.gru_ppo import _torch_load
+        arch = _torch_load(args.init, "cpu")["arch"]
+        GRU_HPARAMS["prev_action"] = bool(arch.get("prev_action", True))
 
     work = tempfile.TemporaryDirectory(prefix=f"cheonggye_gru_{os.getpid()}_")
     cfg_path = road_builder.build(ROAD, EGO, TRAFFIC, work.name)

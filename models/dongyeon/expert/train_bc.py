@@ -165,6 +165,9 @@ def main():
     p.add_argument("--lane-weight-cap", type=float, default=30.0)
     p.add_argument("--max-grad-norm", type=float, default=1.0)
     p.add_argument("--prev", choices=("data", "zero"), default="data")
+    p.add_argument("--no-prev-action", action="store_true",
+                   help="GRU 입력에서 직전 행동을 뺀다 (copycat 대책, Wen et al. 2020). 1회차 결과: 직전 행동을 넣으면 "
+                        "정류장에 선 뒤 안 떠나고(서 있는 행동 베끼기) 앞차 앞에서 가속을 이어 갔다")
     p.add_argument("--log-std", type=float, default=None, help="저장할 σ의 log (기본: 베이스라인 초기값 그대로)")
     args = p.parse_args()
     started = time.time()
@@ -189,9 +192,12 @@ def main():
 
     h = tg.GRU_HPARAMS
     policy = GRUActorCritic(train[0]["obs"].shape[1], h["hidden"], h["gru_hidden"], h["init_log_std"],
-                            h["lane_keep_bias"], h["prev_action"]).to(device)
+                            h["lane_keep_bias"], h["prev_action"] and not args.no_prev_action).to(device)
     if args.init:
-        policy.load_state_dict(load_policy(args.init, device=str(device)).state_dict())
+        init = load_policy(args.init, device=str(device))
+        if init.arch != policy.arch:
+            raise SystemExit(f"네트워크 구성이 다릅니다: {init.arch} ≠ {policy.arch}")
+        policy.load_state_dict(init.state_dict())
         print(f"이어서: {args.init}", flush=True)
     params = actor_params(policy) + critic_params(policy)   # log_std 제외
     opt = torch.optim.Adam(params, lr=args.lr)
