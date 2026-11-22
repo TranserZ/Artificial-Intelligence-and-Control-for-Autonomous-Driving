@@ -7,7 +7,8 @@
 |---|---|
 | `rule_expert.py` | 규칙 선생 `RuleExpert` (traci 특권 정보). 공통 평가 policy factory `make_policy` |
 | `rule_expert_v3.json` | 공통 평가 `--ckpt` 자리에 넣는 선생 설명 파일 (가중치 없음) |
-| `collect_demos.py` | 선생이 운전하며 (관측, 선생 행동) 기록 → `demos.npz`, `episodes.csv`, `meta.json` |
+| `collect_demos.py` | 선생이 운전하며 (관측, 선생 행동) 기록 → `demos.npz`, `episodes.csv`, `meta.json`. `--student <bc.pt> --beta β`면 DAgger 수집 (학생이 운전, 라벨은 선생) |
+| `train_bc.py` | GRU 학생 BC: 가감속 MSE + 차선 CE(클래스 가중치) + critic 수익 회귀 → `bc.pt`(GRU-PPO 형식) + `config.json` |
 
 ## 선생 성능 측정 (공통 평가 그대로)
 
@@ -76,6 +77,17 @@ CGC_STAGE=1 python models/dongyeon/expert/collect_demos.py --episodes 200 --out 
 | 4 | 236,647 | 97.5% | 0.35% |
 | 5 | 245,409 | 99% | 0.30% |
 | 6 | 344,201 | 82% | 0.77% |
+
+## 3단계: BC → DAgger (Kaggle `cgc-gru-bc1-ts{0,1,2}`)
+
+```bash
+CGC_STAGE=1 python models/dongyeon/expert/train_bc.py --data <시범 폴더> --out r0 --epochs 30
+CGC_STAGE=1 python models/dongyeon/expert/collect_demos.py --student r0/bc.pt --beta 0.5 --episodes 25 --seed-base 31000 --out d1
+CGC_STAGE=1 python models/dongyeon/expert/train_bc.py --data <시범 폴더> d1 --init r0/bc.pt --out r1 --epochs 12
+```
+
+회차 β = 0.5, 0.2, 0, 0 (회차당 100판, 데이터는 누적). r0·r2·r4를 공통 평가.
+주의: `demos.npz`의 `lane_cls`는 0=오른쪽이고 학생 차선 head는 0=왼쪽이라, `train_bc.py`는 `act[:,1]`에서 직접 만든다.
 
 ## 참고 문헌
 
