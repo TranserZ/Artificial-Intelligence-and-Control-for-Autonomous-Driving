@@ -7,3 +7,4 @@ data/**/*.log
 data/*.log
 runs/**/stdout.log
 runs/**/eval*.log
+runs/**/e90_*.log

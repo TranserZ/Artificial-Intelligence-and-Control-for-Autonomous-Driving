@@ -1,0 +1,29 @@
+저장: s3_part0.npz — 30384 step, 종료 {'completed': 25}, shield 개입 step 47.6%
+저장: s3_part1.npz — 30365 step, 종료 {'completed': 25}, shield 개입 step 50.1%
+저장: s3_part2.npz — 30141 step, 종료 {'completed': 25}, shield 개입 step 48.5%
+저장: s3_part3.npz — 29129 step, 종료 {'completed': 25}, shield 개입 step 47.8%
+s3_bc0: 완주(정류장 포함) 90% · 도착 90% · 충돌 7% · 적색 3% · 시간초과 0% · 정류장놓침 0% · 수동개입률 0.4% · 평균속도 3.39 m/s (381s)
+저장: s3_dagger1_part0.npz — 34279 step, 학생 종료 {'completed': 25}, 선생님 차선변경 정답 0.16%
+저장: s3_dagger1_part1.npz — 34424 step, 학생 종료 {'completed': 23, 'collision': 1, 'timeout': 1}, 선생님 차선변경 정답 0.11%
+저장: s3_dagger1_part2.npz — 32728 step, 학생 종료 {'completed': 25}, 선생님 차선변경 정답 0.18%
+저장: s3_dagger1_part3.npz — 31965 step, 학생 종료 {'completed': 22, 'collision': 1, 'red_light': 2}, 선생님 차선변경 정답 0.18%
+s3_bc1: 완주(정류장 포함) 97% · 도착 97% · 충돌 3% · 적색 0% · 시간초과 0% · 정류장놓침 0% · 수동개입률 0.3% · 평균속도 3.50 m/s (377s)
+저장: s3_dagger2_part0.npz — 29815 step, 학생 종료 {'completed': 23, 'collision': 2}, 선생님 차선변경 정답 0.17%
+저장: s3_dagger2_part1.npz — 29807 step, 학생 종료 {'completed': 23, 'collision': 2}, 선생님 차선변경 정답 0.17%
+저장: s3_dagger2_part2.npz — 29167 step, 학생 종료 {'completed': 24, 'collision': 1}, 선생님 차선변경 정답 0.12%
+저장: s3_dagger2_part3.npz — 27450 step, 학생 종료 {'completed': 22, 'collision': 3}, 선생님 차선변경 정답 0.10%
+s3_bc2: 완주(정류장 포함) 100% · 도착 100% · 충돌 0% · 적색 0% · 시간초과 0% · 정류장놓침 0% · 수동개입률 1.1% · 평균속도 3.09 m/s (442s)
+저장: s3_dagger3_part0.npz — 35442 step, 학생 종료 {'completed': 24, 'timeout': 1}, 선생님 차선변경 정답 12.26%
+저장: s3_dagger3_part1.npz — 35172 step, 학생 종료 {'completed': 23, 'timeout': 1, 'collision': 1}, 선생님 차선변경 정답 9.98%
+저장: s3_dagger3_part2.npz — 34355 step, 학생 종료 {'completed': 24, 'red_light': 1}, 선생님 차선변경 정답 9.24%
+저장: s3_dagger3_part3.npz — 32892 step, 학생 종료 {'completed': 23, 'red_light': 2}, 선생님 차선변경 정답 9.06%
+s3_bc3: 완주(정류장 포함) 80% · 도착 80% · 충돌 10% · 적색 7% · 시간초과 3% · 정류장놓침 0% · 수동개입률 0.6% · 평균속도 3.37 m/s (356s)
+끝
+저장: models/bc_ppo/data/s3_dagger4_part2.npz — 30711 step, 학생 종료 {'completed': 25}, 선생님 차선변경 정답 0.04%
+저장: models/bc_ppo/data/s3_dagger4_part1.npz — 30883 step, 학생 종료 {'completed': 24, 'red_light': 1}, 선생님 차선변경 정답 0.07%
+저장: models/bc_ppo/data/s3_dagger4_part3.npz — 29615 step, 학생 종료 {'completed': 22, 'collision': 1, 'red_light': 2}, 선생님 차선변경 정답 0.05%
+저장: models/bc_ppo/data/s3_dagger4_part0.npz — 28253 step, 학생 종료 {'completed': 23, 'collision': 1, 'red_light': 1}, 선생님 차선변경 정답 0.05%
+s3_d4a   n=90 완주 93.3% 충돌 4.4% 적색 2.2% 시간초과 0.0% 개입 1.4%
+s3_d4b   n=90 완주 93.3% 충돌 4.4% 적색 2.2% 시간초과 0.0% 개입 1.5%
+s3_d4c   n=90 완주 91.1% 충돌 3.3% 적색 5.6% 시간초과 0.0% 개입 0.9%
+s3_d4d   n=90 완주 87.8% 충돌 7.8% 적색 4.4% 시간초과 0.0% 개입 1.7%
