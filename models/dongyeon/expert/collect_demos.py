@@ -16,10 +16,16 @@
 
 출력 (out 폴더):
   demos.npz      obs (N,67) float32, act (N,2) float32 [가감속, 차선 −1/0/+1], exec_act (N,2) 실제 실행,
-                 prev_act (N,2), lane_cls (N,) int8 (0 오른쪽 1 유지 2 왼쪽 = 학생 차선 head 순서),
+                 prev_act (N,2) 직전에 실제 실행한 행동, lane_cls (N,) int8 (0 오른쪽 1 유지 2 왼쪽;
+                 학생 차선 head 순서는 반대 0=왼쪽이므로 학습 때는 act[:,1]에서 직접 만든다),
+                 src (N,) int8 실행한 쪽 (1 선생, 0 학생),
                  reward (N,), ep (N,) 판 번호(0부터), t (N,) 판 안 스텝, reason (N,) int8 (REASONS 순서)
   episodes.csv   판마다 seed, 단계, 길이, 종료 사유, 정차·놓침, 보상 합, 공식 완주·완벽 여부
   meta.json      단계·도로 요약·선생 버전·git 커밋·잡음·판 번호 범위
+
+DAgger (Ross et al. 2011): --student <bc.pt> --beta β 이면 스텝마다 확률 β로 선생, 1−β로 학생 행동을
+실행하고 라벨은 언제나 선생 행동이다. 학생이 실제로 가는 상태에 선생 라벨이 붙는다. 학생 GRU의
+직전 행동 입력은 실제 실행한 행동으로 맞춘다 (학습 데이터 prev_act와 같은 뜻). torch가 필요하다.
 """
 import argparse
 import csv
@@ -85,6 +91,8 @@ def main():
     p.add_argument("--episodes", type=int, default=200)
     p.add_argument("--seed-base", type=int, default=None, help="기본 20000 + 단계×10000")
     p.add_argument("--noise", type=float, default=0.0, help="실행 가감속 잡음 σ (라벨은 깨끗한 행동)")
+    p.add_argument("--student", default=None, help="DAgger: 학생 모델 .pt (gru_ppo_v1)")
+    p.add_argument("--beta", type=float, default=0.0, help="DAgger: 스텝마다 선생 행동을 실행할 확률")
     p.add_argument("--out", required=True)
     args = p.parse_args()
 
@@ -104,17 +112,30 @@ def main():
     env.eval_mode, env.shield_mode = True, "shadow"   # 실패 판 다시 열기 끔, shield는 기록만
     expert = RuleExpert(env)
     rng = np.random.default_rng(base)
+    student = None
+    if args.student:
+        import torch
+        from models.dongyeon.gru_ppo import RecurrentRunner, load_policy
+        torch.set_num_threads(1)
+        student = RecurrentRunner(load_policy(args.student, "cpu"), torch.device("cpu"))
 
-    cols = {k: [] for k in ("obs", "act", "exec_act", "prev_act", "lane_cls", "reward", "ep", "t", "reason")}
+    cols = {k: [] for k in ("obs", "act", "exec_act", "prev_act", "lane_cls", "reward", "ep", "t", "reason", "src")}
     episodes = []
     started = time.time()
     for i, seed in enumerate(seeds):
         obs, _ = env.reset(seed=seed)
         prev = np.zeros(2, dtype=np.float32)
-        t, ret, shield_steps = 0, 0.0, 0
+        t, ret, shield_steps, student_steps = 0, 0.0, 0, 0
+        if student is not None:
+            student.reset()
         while True:
             a = expert.predict(obs)
-            ex = a.copy()
+            ex, src = a.copy(), 1
+            if student is not None:
+                sa = student.predict(obs)
+                if rng.random() >= args.beta:
+                    ex, src = sa.copy(), 0
+                    student_steps += 1
             if args.noise > 0:
                 ex[0] = float(np.clip(ex[0] + rng.normal(0.0, args.noise), -1.0, 1.0))
             cols["obs"].append(np.asarray(obs, dtype=np.float32))
@@ -122,9 +143,12 @@ def main():
             cols["exec_act"].append(ex)
             cols["prev_act"].append(prev)
             cols["lane_cls"].append(int(round(a[1])) + 1)
+            cols["src"].append(src)
             cols["ep"].append(i)
             cols["t"].append(t)
             cols["reason"].append(REASONS.index(expert.last_reason) if expert.last_reason in REASONS else -1)
+            if student is not None:   # 학생 기억의 직전 행동 = 실제 실행한 행동
+                student.prev = torch.as_tensor(ex, dtype=torch.float32).unsqueeze(0)
             obs, r, term, trunc, info = env.step(ex)
             cols["reward"].append(float(r))
             shield_steps += int(bool(info.get("shield_active")))
@@ -137,7 +161,8 @@ def main():
         episodes.append(dict(ep=i, seed=seed, stage=stage, steps=t, end_reason=er,
                              stops_done=info.get("stops_done"), missed_stops=info.get("missed_stops"),
                              ret=round(ret, 2), official=int(er in ("completed", "missed_stop")),
-                             perfect=int(er == "completed"), shield_steps=shield_steps))
+                             perfect=int(er == "completed"), shield_steps=shield_steps,
+                             student_steps=student_steps))
         print(f"[{i + 1}/{len(seeds)}] seed {seed} {er} {t} step 정차 {info.get('stops_done')} "
               f"놓침 {info.get('missed_stops')} ({(time.time() - started) / 60:.1f}분)", flush=True)
     env.close()
@@ -147,13 +172,15 @@ def main():
         obs=np.stack(cols["obs"]), act=np.stack(cols["act"]), exec_act=np.stack(cols["exec_act"]),
         prev_act=np.stack(cols["prev_act"]), lane_cls=np.array(cols["lane_cls"], dtype=np.int8),
         reward=np.array(cols["reward"], dtype=np.float32), ep=np.array(cols["ep"], dtype=np.int32),
-        t=np.array(cols["t"], dtype=np.int32), reason=np.array(cols["reason"], dtype=np.int8))
+        t=np.array(cols["t"], dtype=np.int32), reason=np.array(cols["reason"], dtype=np.int8),
+        src=np.array(cols["src"], dtype=np.int8))
     with open(os.path.join(args.out, "episodes.csv"), "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=list(episodes[0]))
         w.writeheader()
         w.writerows(episodes)
     n = len(episodes)
     meta = dict(teacher=RuleExpert.version, stage=stage, road=road_summary(ROAD), noise=args.noise,
+                student=args.student, beta=args.beta if args.student else 1.0,
                 seeds=[seeds[0], seeds[-1]], episodes=n, steps=len(cols["t"]),
                 obs_dim=int(np.asarray(cols["obs"][0]).shape[0]), reasons=list(REASONS),
                 official_rate=sum(e["official"] for e in episodes) / n,
