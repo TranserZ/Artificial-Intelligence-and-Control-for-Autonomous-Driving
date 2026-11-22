@@ -128,8 +128,14 @@ STOP_RULE_TARGET = 2.0     # m. 앞범퍼를 정류장 끝보다 이만큼 앞�
 # 선생님 신호 접근 규칙 (2단계~)
 SIGNAL_RULE_DECEL = 1.5         # m/s². 적색 앞 감속 곡선
 SIGNAL_RULE_YELLOW_DECEL = 2.0  # m/s². 황색에서 이 감속으로 설 수 있을 때만 선다
+# 4단계: 학생이 "설까 갈까" 경계에서 어정쩡하게(−0.5) 감속하다 적색에 걸림 (90판 적색 5.6%).
+# 경계를 버스 감속 한계(2.5) 가까이 올리면 통과는 정지선 바로 앞에서만 → 망설여도 황색 안에 지나감
+SIGNAL_RULE_YELLOW_DECEL = float(os.environ.get("BCPPO_YELLOW_DECEL", SIGNAL_RULE_YELLOW_DECEL))
 SIGNAL_RULE_MARGIN = 2.5        # m. 정지선 앞 여유 (1.0일 때 학생이 1 m 앞에서 0.5 m/s로 밀려 넘어감)
-SIGNAL_RULE_HOLD = 1.0          # m. 목표 지점(정지선 − 여유)에서 이만큼 안이면 최대 감속 유지
+SIGNAL_RULE_OBS_ONLY = os.environ.get("BCPPO_SIGNAL_OBS_ONLY", "0") == "1"  # 학생이 신호를 볼 때만 신호 규칙
+ZONE_RULE_MARGIN = 0.6  # m/s. 보호구역 목표 = 제한속도 − 이 값 (20 km/h → 약 17.8 km/h)
+ZONE_RULE_DECEL = 1.0    # m/s². 보호구역 입구 앞 감속 곡선
+SIGNAL_RULE_HOLD = 1.0         # m. 목표 지점(정지선 − 여유)에서 이만큼 안이면 최대 감속 유지
 
 
 class TeacherEnv(ExpertGateEnv):
@@ -191,6 +197,10 @@ class TeacherEnv(ExpertGateEnv):
         _, dist, state, _ = sig
         if dist > self.signal_visibility:
             return accel_raw, False
+        # 4단계: 학생 관측은 앞차가 정지선 사이에 있으면 신호를 가린다. 선생님이 가려진 신호를 보고 미리 서면
+        # 학생은 이유를 못 보고 흉내 내지 못해 정지선 10 m 앞 7 m/s로 늦게 섰다 (90판 적색 5.6%).
+        if SIGNAL_RULE_OBS_ONLY and not self._first_in_line(dist):
+            return accel_raw, False
         v = traci.vehicle.getSpeed(self.ego_id)
         d = max(dist - SIGNAL_RULE_MARGIN, 0.0)
         if state == "s" and self._stopped_at == sig[0]:
@@ -212,14 +222,37 @@ class TeacherEnv(ExpertGateEnv):
             return rule_a, True
         return accel_raw, False
 
+    def _zone_rule(self, accel_raw):
+        """어린이보호구역(4단계~): 안에서는 제한속도 − ZONE_RULE_MARGIN, 입구 앞에서는 그 속도로 들어가게
+        ZONE_RULE_DECEL로 미리 감속한다. 학생이 조금 빠르게 흉내 내도 과속 판정(제한 + 3 km/h)에 안 걸리도록 여유."""
+        import traci
+        zs = self._zone_state()
+        if zs is None or self.ego_id not in traci.vehicle.getIDList():
+            return accel_raw, False
+        dist, limit = zs
+        if dist > self.zone_visibility:
+            return accel_raw, False
+        v = traci.vehicle.getSpeed(self.ego_id)
+        vt = max(limit - ZONE_RULE_MARGIN, 0.5)
+        target_v = vt if dist <= 0.0 else float(np.sqrt(vt * vt + 2.0 * ZONE_RULE_DECEL * max(dist - 2.0, 0.0)))
+        need = (target_v - v) / self.step_length
+        rule_a = need / self.max_accel if need >= 0 else need / self.max_decel
+        rule_a = float(np.clip(rule_a, -1.0, 1.0))
+        if rule_a < accel_raw - 1e-6:
+            return rule_a, True
+        return accel_raw, False
+
     def teacher_rules(self, accel_raw, lane_raw):
-        """선생님 규칙 전부: 정류장 정차 → 신호 접근 (둘 다 모델 명령보다 느리게만 바꿈)."""
+        """선생님 규칙 전부: 정류장 정차 → 신호 접근 → 보호구역 속도 (모두 모델 명령보다 느리게만 바꿈)."""
         accel_raw, lane_raw, used_stop = self._stop_rule(accel_raw, lane_raw)
         if self.signal_obs:
             accel_raw, used_sig = self._signal_rule(accel_raw)
         else:
             used_sig = False
-        return accel_raw, lane_raw, used_stop or used_sig
+        used_zone = False
+        if self.zone_obs:
+            accel_raw, used_zone = self._zone_rule(accel_raw)
+        return accel_raw, lane_raw, used_stop or used_sig or used_zone
 
     def step(self, action):
         a = np.asarray(action, dtype=np.float32).reshape(-1).copy()

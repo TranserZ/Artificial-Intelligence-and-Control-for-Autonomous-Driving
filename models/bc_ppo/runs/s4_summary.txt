@@ -1,0 +1,21 @@
+저장: s4_part0.npz — 31647 step, 종료 {'completed': 25}, shield 개입 step 45.2%
+저장: s4_part1.npz — 32840 step, 종료 {'completed': 25}, shield 개입 step 48.2%
+저장: s4_part2.npz — 33145 step, 종료 {'completed': 25}, shield 개입 step 49.6%
+저장: s4_part3.npz — 32382 step, 종료 {'completed': 24, 'collision': 1}, shield 개입 step 43.5%
+s4_bc0: 완주(정류장 포함) 87% · 도착 87% · 충돌 10% · 적색 0% · 시간초과 3% · 정류장놓침 0% · 수동개입률 0.5% · 평균속도 3.19 m/s (412s)
+끝
+s4_bc0   n=90 완주 86.7% 충돌 8.9% 적색 0.0% 시간초과 4.4% 개입 0.5% 구역과속 1.1%
+저장: s4_dagger1_part0.npz — 32070 step, 학생 종료 {'completed': 24, 'missed_stop': 1}, 선생님 차선변경 정답 0.10%
+저장: s4_dagger1_part3.npz — 32157 step, 학생 종료 {'completed': 23, 'timeout': 1, 'collision': 1}, 선생님 차선변경 정답 0.11%
+저장: s4_dagger1_part2.npz — 29008 step, 학생 종료 {'completed': 22, 'collision': 2, 'red_light': 1}, 선생님 차선변경 정답 0.12%
+저장: s4_dagger1_part1.npz — 30623 step, 학생 종료 {'completed': 21, 'red_light': 1, 'collision': 2, 'timeout': 1}, 선생님 차선변경 정답 0.06%
+s4_bc1_lw1 n=90 완주 58.9% 충돌 0.0% 적색 2.2% 시간초과 38.9% 개입 0.3% 구역과속 0.0%
+s4_bc1_lw3 n=90 완주 90.0% 충돌 2.2% 적색 5.6% 시간초과 2.2% 개입 0.5% 구역과속 0.0%
+s4_bc1_lw1s n=90 완주 70.0% 충돌 2.2% 적색 3.3% 시간초과 22.2% 개입 0.6% 구역과속 0.0%
+저장: s4_dagger2_part3.npz — 43290 step, 학생 종료 {'completed': 22, 'timeout': 2, 'red_light': 1}, 선생님 차선변경 정답 18.50%
+저장: s4_dagger2_part1.npz — 36605 step, 학생 종료 {'completed': 23, 'red_light': 1, 'missed_stop': 1}, 선생님 차선변경 정답 9.58%
+저장: s4_dagger2_part2.npz — 33270 step, 학생 종료 {'completed': 23, 'collision': 1, 'red_light': 1}, 선생님 차선변경 정답 8.81%
+저장: s4_dagger2_part0.npz — 34003 step, 학생 종료 {'completed': 25}, 선생님 차선변경 정답 5.31%
+s4_bc1_lw5 n=90 완주 93.3% 충돌 3.3% 적색 2.2% 시간초과 0.0% 개입 0.7% 구역과속 0.0%
+s4_bc2_lw3 n=90 완주 72.2% 충돌 24.4% 적색 3.3% 시간초과 0.0% 개입 0.8% 구역과속 0.0%
+s4_bc2_lw5 n=90 완주 67.8% 충돌 10.0% 적색 3.3% 시간초과 18.9% 개입 0.6% 구역과속 0.0%
