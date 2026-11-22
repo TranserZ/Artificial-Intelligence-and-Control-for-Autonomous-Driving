@@ -107,8 +107,34 @@ def teacher_rules(self, accel_raw, lane_raw):
     return accel_raw, lane_raw, used or used_avoid
 
 
+_orig_gate = bcppo.ExpertGateEnv._lane_change_is_safe
+
+
+def _avoid_situation(env):
+    """주정차 차 뒤에 막혀 천천히 가거나 서 있는가."""
+    import traci
+    ego = env.ego_id
+    if ego not in traci.vehicle.getIDList() or traci.vehicle.getSpeed(ego) >= 3.0:
+        return False
+    return _stopped_parked_leader(ego) or _parked_ahead(env, ego)
+
+
+def lane_gate(self, direction):
+    """선생님 차선변경 게이트: 주정차 차 뒤에 막혔을 때만 규칙 선생 v4 기준(앞 8 m, 뒤 8 m + 3 s × 다가오는 속도)으로 본다.
+
+    1차 보강(회피 차선 명령만)은 6단계 완주 1% → 15%. 남은 85%는 hs_samil_east·hs_jugyo 뒤에서 서 있었다:
+    시범용 넉넉한 게이트(뒤차 3 s·접근 4 s)는 서 있는 버스 기준 옆 차로에 약 32 m 빈틈이 필요하고,
+    교차로 앞뒤 20 m 금지 때문에 교차로 바로 뒤 주정차(주교, 엣지 7 m)에서는 아예 못 바꾼다.
+    """
+    if isinstance(self, bcppo.TeacherEnv) and _avoid_situation(self):
+        return _side_clear(self, self.ego_id, direction)
+    return _orig_gate(self, direction)
+
+
 if os.environ.get("TEACHER_AVOID", "1") == "1":
     bcppo.TeacherEnv.teacher_rules = teacher_rules
+if os.environ.get("TEACHER_AVOID_GATE", "1") == "1":
+    bcppo.ExpertGateEnv._lane_change_is_safe = lane_gate
 
 
 def diag(argv):
