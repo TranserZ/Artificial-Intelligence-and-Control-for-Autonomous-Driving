@@ -24,6 +24,11 @@ sys.path.insert(0, os.path.join(ROOT, "models", "bc_ppo"))
 import numpy as np  # noqa: E402
 import bcppo  # noqa: E402
 
+if os.environ.get("OBS_SCAN", "0") == "1":     # 옆 차로 관측 보강 (obsfix.py)
+    sys.path.insert(0, HERE)
+    import obsfix  # noqa: E402
+    obsfix.apply()
+
 PARKED_PREFIX = ("hs_", "park", "moto_park", "truck")
 AVOID_LOOKAHEAD = 80.0
 LANE_GAP = 8.0
