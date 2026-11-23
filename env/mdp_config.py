@@ -1,4 +1,4 @@
-"""MDP(Markov Decision Process) 정의 파일.
+﻿"""MDP(Markov Decision Process) 정의 파일.
 
 강화학습 문제는 (S, A, R, P, γ) 로 정의되는데, 이 파일이 그중
   S: 관측(상태)을 어떻게 구성할지  → OBSERVATION
@@ -189,13 +189,13 @@ if _CGC["enabled"]:
 #   아래 숫자들을 바꿔가며 정책이 어떻게 달라지는지 관찰해보길 권장.
 # ──────────────────────────────────────────────────────────────
 REWARD = {
-    "speed_weight": 0.1,         # 속도 보상 가중치. 한 스텝 최대 +0.1
+    "speed_weight": 0.0,         # 속도 보상 가중치. 한 스텝 최대 +0.1
     "close_gap_threshold": 6.0, # 앞차와 이 거리(m) 미만으로 붙으면 (좁게 따라붙기 허용:
                                  #  10→6m 완화. 추월 직전 대기 위치를 잡기 쉬워짐)
     "close_gap_penalty": 0.1,    #   → 스텝당 이만큼 감점
     "collision_penalty": 5.0,    # 충돌 시 -5 를 받고 에피소드 즉시 종료
     "arrival_bonus": 2.0,        # 도로 끝까지 완주하면 +2 받고 종료
-    "progress_weight": 0.0,      # 진행 보상: 이동거리/도로길이 × 이 값 (완주 시 누적 = 이 값)
+    "progress_weight": 10.0,      # 진행 보상: 이동거리/도로길이 × 이 값 (완주 시 누적 = 이 값)
 
     # ---- 막힘(blocked) 페널티: 추월 학습의 핵심 신호 ----
     # "느린 앞차에 막혀 있는 상태"에 매 스텝 감점을 준다.
@@ -270,10 +270,10 @@ REWARD = {
     # 멈춰야 할 이유(green_stop_gap 안의 정지선·앞차, 보행자)가 없는데 green_stop_speed
     # 보다 느리면 스텝마다 감점: penalty + extra × min((빈 거리 - gap) / ramp, 1).
     # 평가 기준의 "비정상적 정지 / 무한정 대기" 방지.
-    "green_stop_penalty": 0.0,
+    "green_stop_penalty": 0.08,
     "green_stop_gap": 15.0,
     "green_stop_speed": 1.5,
-    "green_stop_extra": 0.0,
+    "green_stop_extra": 0.15,
     "green_stop_ramp": 30.0,
     # ---- 신호 접근 감속 ----
     # 정지 신호(또는 곧 끝나는 녹색)에 다가갈 때 편한 감속(approach_decel)으로 멈출 수
@@ -319,3 +319,4 @@ REWARD = {
 #   그래서 속도 보상을 1/10로 줄여 리턴을 ~10 규모로 낮췄다.
 #   → 보상의 절대값이 아니라 "항 사이의 상대 비율"이 정책을 결정한다는
 #     점을 확인해보는 실험을 해보길 권장.
+

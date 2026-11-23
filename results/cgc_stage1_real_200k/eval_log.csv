@@ -1,0 +1,4 @@
+steps,collision_rate,success_rate,timeout_rate,red_violation_rate,mean_speed,mean_gap,min_gap,ep_return,ep_length,lane_changes,ped_collision_rate,yield_violation_rate,wrong_lane_rate,filter_rate,straight_success_rate,right_success_rate,zone_overspeed_rate,zone_mean_speed,zone_p85_speed,completion_rate,intervention_rate,missed_stop_rate
+51200,0.0,0.0,1.0,0.0,0.00123962110063682,31.95808466997828,13.254075171307182,-549.4643058431895,3600.0,0.0,0.0,0.0,0.0,0.0,0.0,nan,0.0,nan,nan,0.0,0.0,0.0
+102400,0.0,0.0,1.0,0.0,0.026165916888819387,33.38342706670181,12.996978232518291,-544.6015241676229,3600.0,0.0,0.0,0.0,0.0,0.0,0.0,nan,0.0,nan,nan,0.0,0.0,0.0
+153600,0.0,0.6,0.4,0.0,1.8621716561244175,33.62376370553658,0.7303743298585132,-208.4073667856168,1800.4,0.6,0.0,0.0,0.0,0.0,0.6,nan,0.0,nan,nan,0.0,0.0,1.0
