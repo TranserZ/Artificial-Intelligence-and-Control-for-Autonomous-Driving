@@ -13,7 +13,8 @@ s4_student (민기, 4단계 93.3%) ─BC₀→ s5_student (5단계) ─BC₀→ 
 |---|---|---|---|---|---|---|
 | `s5_student.pt` | 5 (오토바이) | **87.8%** | 6.7% | 3.3% | 2.2% | 0.3% |
 | `s6_student.pt` | 6 (불법주정차) | 34.4% | 62.2% | 0% | 3.3% | 1.6% |
-| `s6_student_obsfix.pt` (`OBS_SCAN=1` 필요, DAgger 2회) | 6 (불법주정차) | **67.8%** | 22.2% | 2.2% | 7.8% | 0.9% |
+| `s6_student_obsfix.pt` (`OBS_SCAN=1` 필요, DAgger 2회) | 6 (불법주정차) | 67.8% | 22.2% | 2.2% | 7.8% | 0.9% |
+| `s6_student_ppo.pt` (`OBS_SCAN=1` 필요, 위 + PPO 미세조정) | 6 (불법주정차) | **70.0%** | **7.8%** | 17.8% | 4.4% | 0.8% |
 
 평가 판: 개발 900100~900129 (30판) + 학습 범위 60판 (5단계 570000~, 6단계 670000~), 15판씩. 판별 json은 `results/`.
 
@@ -37,7 +38,8 @@ s4_student (민기, 4단계 93.3%) ─BC₀→ s5_student (5단계) ─BC₀→ 
 옆 차로(±1) 관측은 getNeighbors만 쓰고 나란히 겹친 차(gap < 0)를 버린다. 버스가 서 있을 때 차선 직접 스캔과 비교하면
 앞차 약 79%, 뒷차 약 41%를 관측이 놓쳤다. 선생님 게이트는 스캔으로 보므로, 학생은 못 보는 차 때문에 선생님이 기다리는 장면을 흉내 낼 수 없다.
 보강 실험: `obsfix.py` (`OBS_SCAN=1`)로 옆 차로 관측을 스캔으로 보완하고 시범 200판부터 다시 → s5_student에서 BC₀ 46.7%·충돌 45.6%, DAgger 1회 BC1 58.9%·충돌 24.4% (`kaggle/s6o.py`) → DAgger 2회 BC2 **67.8%·충돌 22.2%** (`s6_student_obsfix.pt`), 3회 64.4% (`kaggle/s6o2.py`).
-이 모델은 보강된 관측으로만 제대로 달린다 (`OBS_SCAN=1 python models/dongyeon_bc/teacher56.py eval ...`). 공식 평가에 쓰려면 env의 `_neighbor` 수정이 필요하고, 그건 팀 결정.
+그 위에 PPO 미세조정(`teacher56.py finetune`, `REWARD_RED=60`, 200k step, `kaggle/s6ft2.py`) → **70.0%·충돌 7.8%**, 적색 17.8% (`s6_student_ppo.pt`). 전체 데이터 재BC(`kaggle/s6agg.py`)는 61.1%.
+두 모델은 보강된 관측으로만 제대로 달린다 (`OBS_SCAN=1 python models/dongyeon_bc/teacher56.py eval ...`). 공식 평가에 쓰려면 env의 `_neighbor` 수정이 필요하고, 그건 팀 결정.
 
 ## 재현
 
