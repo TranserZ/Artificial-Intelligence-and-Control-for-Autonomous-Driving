@@ -58,11 +58,13 @@ def _side_clear(env, ego, direction):
     return True
 
 
-def _parked_ahead(env, ego):
+def _parked_dist(env, ego, offset=0):
+    """경로 앞 AVOID_LOOKAHEAD m 안, (내 차로 + offset) 차로에 있는 불법주정차(hs_)까지 가장 가까운 거리 (없으면 None)."""
     import traci
     route = traci.vehicle.getRoute(ego)
     ahead = set(route[traci.vehicle.getRouteIndex(ego):])
-    mine = env._car_lane_index(ego)
+    want = env._car_lane_index(ego) + offset
+    best = None
     for vid in traci.vehicle.getIDList():
         if not vid.startswith("hs_"):
             continue
@@ -73,9 +75,13 @@ def _parked_ahead(env, ego):
             d = traci.vehicle.getDrivingDistance(ego, road, traci.vehicle.getLanePosition(vid))
         except traci.TraCIException:
             continue
-        if 0.0 < d < AVOID_LOOKAHEAD and env._car_lane_index(vid) == mine:
-            return True
-    return False
+        if 0.0 < d < AVOID_LOOKAHEAD and env._car_lane_index(vid) == want and (best is None or d < best):
+            best = d
+    return best
+
+
+def _parked_ahead(env, ego):
+    return _parked_dist(env, ego) is not None
 
 
 def _stopped_parked_leader(ego):
@@ -85,22 +91,40 @@ def _stopped_parked_leader(ego):
             and lead[0].startswith(PARKED_PREFIX) and traci.vehicle.getSpeed(lead[0]) < 0.1)
 
 
+STOP_MARGIN = 30.0   # m. 정류장이 주정차 차보다 이만큼 이상 뒤에 있으면 먼저 비킨다 (TEACHER_AVOID_STOP=1)
+AVOID_STOP = os.environ.get("TEACHER_AVOID_STOP", "0") == "1"
+
+
 def avoid_rule(env, accel_raw, lane_raw):
     import traci
     ego = env.ego_id
     if ego not in traci.vehicle.getIDList():
         return accel_raw, lane_raw, False
-    if traci.vehicle.getRoadID(ego).startswith(":") or env._quantize_lane_change(lane_raw) != 0:
+    if traci.vehicle.getRoadID(ego).startswith(":"):
         return accel_raw, lane_raw, False
+    d_park = _parked_dist(env, ego)
+    if _stopped_parked_leader(ego):
+        lead = traci.vehicle.getLeader(ego, 80.0)
+        d_park = lead[1] if d_park is None else min(d_park, lead[1])
     ns = env._next_stop()
-    if ns is not None and 0 <= ns[0] <= bcppo.STOP_RULE_RANGE and abs(env._stop_obs()[1]) > 1e-6:
+    stop_lane = ns is not None and 0 <= ns[0] <= bcppo.STOP_RULE_RANGE and abs(env._stop_obs()[1]) > 1e-6
+    lc = env._quantize_lane_change(lane_raw)
+    held = False
+    if AVOID_STOP:
+        # 정류장 규칙이 주정차 차가 있는 차로로 옮기라고 하면, 그 차를 지날 때까지 미룬다
+        # (주교: 교차로 바로 뒤 4~33 m 주정차 + 그 뒤 정류장 → 정류장 차로로 들어갔다가 엣지 2 m에서 갇힘, 선생님 시간초과의 절반)
+        if lc != 0 and _parked_dist(env, ego, lc) is not None:
+            lane_raw, lc, held = 0.0, 0, True
+        if stop_lane and d_park is not None and ns[0] < d_park + STOP_MARGIN:
+            return accel_raw, lane_raw, held       # 정류장이 주정차 차 앞·근처: 정류장 규칙 우선
+    elif stop_lane:
         return accel_raw, lane_raw, False          # 정류장 규칙이 차로를 정하는 중
-    if not (_parked_ahead(env, ego) or _stopped_parked_leader(ego)):
-        return accel_raw, lane_raw, False
+    if lc != 0 or d_park is None:
+        return accel_raw, lane_raw, held
     for dr in (1, -1):
         if _side_clear(env, ego, dr):
             return accel_raw, float(dr), True
-    return accel_raw, lane_raw, False
+    return accel_raw, lane_raw, held
 
 
 _orig_rules = bcppo.TeacherEnv.teacher_rules
