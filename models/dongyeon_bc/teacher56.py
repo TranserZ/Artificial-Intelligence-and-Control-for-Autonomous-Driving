@@ -30,7 +30,7 @@ if os.environ.get("OBS_SCAN", "0") == "1":     # 옆 차로 관측 보강 (obsfi
     obsfix.apply()
 
 PARKED_PREFIX = ("hs_", "park", "moto_park", "truck")
-AVOID_LOOKAHEAD = 80.0
+AVOID_LOOKAHEAD = float(os.environ.get("TEACHER_AVOID_LOOKAHEAD", "80"))
 LANE_GAP = 8.0
 OVERTAKE_RANGE = 30.0
 
@@ -113,7 +113,9 @@ def avoid_rule(env, accel_raw, lane_raw):
     if AVOID_STOP:
         # 정류장 규칙이 주정차 차가 있는 차로로 옮기라고 하면, 그 차를 지날 때까지 미룬다
         # (주교: 교차로 바로 뒤 4~33 m 주정차 + 그 뒤 정류장 → 정류장 차로로 들어갔다가 엣지 2 m에서 갇힘, 선생님 시간초과의 절반)
-        if lc != 0 and _parked_dist(env, ego, lc) is not None:
+        d_t = _parked_dist(env, ego, lc) if lc != 0 else None
+        if d_t is not None and (ns is None or ns[0] > d_t + STOP_MARGIN):
+            # 정류장이 그 주정차 차 너머일 때만 미룬다. 정류장이 주정차 앞·근처면(삼일 동쪽) 미루면 정류장에 못 들어가 갇힌다
             lane_raw, lc, held = 0.0, 0, True
         if stop_lane and d_park is not None and ns[0] < d_park + STOP_MARGIN:
             return accel_raw, lane_raw, held       # 정류장이 주정차 차 앞·근처: 정류장 규칙 우선
