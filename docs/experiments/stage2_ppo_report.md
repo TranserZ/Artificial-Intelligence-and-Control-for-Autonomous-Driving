@@ -33,15 +33,9 @@ Stage 1 가중치 전이 직후에는 ① 전방 신호·차량 감속 가중치
 1. **훈련(Rollout) vs 결정론적 평가(Eval) 간 행동 분포 괴리:**
    - 50만 스텝 학습 결과 탐험 노이즈(`std=0.40`)가 포함된 롤아웃에서는 완주율 **41%**, 정류장 놓침률 **15%**, 평균속도 **3.95 m/s**까지 도달함.
    - 반면 노이즈를 제거한 평가(`deterministic=True`)에서는 차선 변경 빈도가 `0.76~3.62회`에서 `0.1회`로 급감하고, 가속 출력 평균이 한쪽으로 치우쳐 정체 차선 뒤 추돌(70%) 또는 안전 쉴드 개입 시 교착(시간초과 90%) 현상이 고착됨.
-2. **시각화(SUMO GUI) 검증 결과:**
-   - `test.py` 직접 주행 확인 결과, 정류장 정차 및 차선 유지는 정상 작동하나 적색 신호 및 정지 차량 전방에서의 풀브레이크(`accel < 0`) 전환 타이밍이 반 박자 늦거나 결정론적 모드에서 차선 회피가 작동하지 않는 것이 주원인으로 확인됨.
+2. **네트워크 아키텍처 한계 확인:**
+   - 단일 스텝 67차원 수치 벡터 기반 MLP 정책 구조로는 시간적 맥락(전방 차량 감속 추이, 신호 변화 경과) 및 주변 객체 상호작용 파악에 한계가 있어, 다음 단계에서 네트워크 구조 개선(GRU/LSTM 또는 Attention 기반) 병행 검토 필요.
 
-## 4. 향후 개선 방향 (Next Steps)
-1. **결정론적 평가(Eval) 교착 및 추돌 해소:** `env/` 내 전방 차량 TTC(Time-to-Collision) 기반 제동 보상 강화 및 정체 차선 회피(차선 변경) 유도 관측·보상 점검.
-2. **Stage 2 목표 지표(충돌률 <= 5%, 공식 완주율 확보) 달성 후 Stage 3 전환:** 순수 모델 및 안전 쉴드 결합 기준 교착 없이 완주율 확보 후 다음 커리큘럼 단계로 확장.
-
-## 5. 재현 명령어
-- Stage 2 밤샘 학습(500k):
+## 4. 재현 명령어
+- Stage 2 학습(500k):
   `$env:CGC_STAGE=2; python train.py --init results\cgc_stage1_real_200k\best_model.pt --timesteps 500000 --seed 0 --lr 0.00015 --replay-prob 0.15 --save-steps 150000,300000,450000 --run-name cgc_stage2_overnight_500k`
-- 학습 모델 GUI / Shield 평가:
-  `$env:CGC_STAGE=2; python test.py results\cgc_stage2_overnight_500k\best_model.pt --nogui --episodes 20 --shield on`
