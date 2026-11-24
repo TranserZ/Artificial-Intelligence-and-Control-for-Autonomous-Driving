@@ -156,7 +156,7 @@ HPARAMS = dict(
                                #   → 양자화 dead zone 제거. deterministic 평가에서도
                                #     argmax로 차선변경이 실제로 나온다. (권장)
                                # "gaussian": 예전 방식(전축 연속) — 비교 실험용
-    lane_keep_bias=0.5,        # hybrid 차선 head의 "유지" 초기 편향.
+    lane_keep_bias=1.2,        # hybrid 차선 head의 "유지" 초기 편향.
                                #   0.5 → 초기 (좌27%/유지45%/우27%) ≈ 55% 변경 시도 (공격적)
                                #   1.0 → ≈32% 시도 (보수적)
                                #   낮추면 탐험↑, 높이면 보수적
@@ -409,15 +409,11 @@ if __name__ == "__main__":
     )
     if args.init:
         sd = torch.load(args.init, map_location=agent.device)
-        w = sd["trunk.0.weight"]
-        own = agent.policy.state_dict()["trunk.0.weight"]
-        if w.shape[1] != own.shape[1]:
-            # env-v1에서 관측 블록 순서와 의미가 바뀌어(44 → 67차원) 예전 모델은 이어 학습할 수 없다.
-            # 뒤에 0을 붙이는 방식은 "뒤에 블록만 추가된" 경우에만 맞다.
-            raise SystemExit(f"--init 모델 입력 {w.shape[1]}차원 ≠ 현재 관측 {own.shape[1]}차원. "
-                             "env-v1 이전 모델은 이어 학습할 수 없습니다 (관측 구성이 바뀜).")
+        own_sd = agent.policy.state_dict()
+        if set(sd.keys()) != set(own_sd.keys()):
+            raise SystemExit(f"--init 모델 아키텍처가 현재 네트워크와 다릅니다 ({args.init}).")
         agent.policy.load_state_dict(sd)
-        print(f"초기 가중치: {args.init} (입력 {w.shape[1]} → {own.shape[1]})")
+        print(f"초기 가중치 로드 완료: {args.init} (obs_dim={env.observation_space.shape[0]})")
     elif args.resume:
         agent.load_training_state(args.resume)
         if agent.num_timesteps >= TOTAL_TIMESTEPS:
@@ -521,3 +517,4 @@ if __name__ == "__main__":
               f"{os.path.relpath(model_path, BASE)}")
         print(f"학습 곡선 보기: tensorboard --logdir {RESULTS_DIR}"
               f"  → http://localhost:6006")
+

@@ -1,4 +1,4 @@
-﻿"""MDP(Markov Decision Process) 정의 파일.
+"""MDP(Markov Decision Process) 정의 파일.
 
 강화학습 문제는 (S, A, R, P, γ) 로 정의되는데, 이 파일이 그중
   S: 관측(상태)을 어떻게 구성할지  → OBSERVATION
@@ -189,11 +189,11 @@ if _CGC["enabled"]:
 #   아래 숫자들을 바꿔가며 정책이 어떻게 달라지는지 관찰해보길 권장.
 # ──────────────────────────────────────────────────────────────
 REWARD = {
-    "speed_weight": 0.06,         # 속도 보상 가중치. 한 스텝 최대 +0.1
-    "close_gap_threshold": 12.0, # 앞차와 이 거리(m) 미만으로 붙으면 (좁게 따라붙기 허용:
+    "speed_weight": 0.10,         # 속도 보상 가중치. 한 스텝 최대 +0.1
+    "close_gap_threshold": 8.0, # 앞차와 이 거리(m) 미만으로 붙으면 (좁게 따라붙기 허용:
                                  #  10→6m 완화. 추월 직전 대기 위치를 잡기 쉬워짐)
-    "close_gap_penalty": 0.15,    #   → 스텝당 이만큼 감점
-    "collision_penalty": 12.0,    # 충돌 시 -5 를 받고 에피소드 즉시 종료
+    "close_gap_penalty": 0.08,    #   → 스텝당 이만큼 감점
+    "collision_penalty": 5.0,    # 충돌 시 -5 를 받고 에피소드 즉시 종료
     "arrival_bonus": 2.0,        # 도로 끝까지 완주하면 +2 받고 종료
     "progress_weight": 10.0,      # 진행 보상: 이동거리/도로길이 × 이 값 (완주 시 누적 = 이 값)
 
@@ -220,7 +220,7 @@ REWARD = {
     #   실행돼도 즉시 -0.05인 반면 추월 이득은 지연·분산되어 오므로
     #   "변경 = 손해"만 학습됨. 페널티 없이 추월을 먼저 배우게 하고,
     #   학습 후 지그재그가 과하면 0.02~0.05로 재도입할 것.
-    "lane_change_penalty": 0.02,   # 차선변경이 "실행될 때마다" 감점.
+    "lane_change_penalty": 0.05,   # 차선변경이 "실행될 때마다" 감점.
                                    #   목적: 이득 없는 지그재그(웨빙) 억제.
                                    #   속도 보상(스텝당 최대 0.1)의 절반 수준이라,
                                    #   "변경해서 더 빨라질 때만 변경"하도록 유도.
@@ -270,7 +270,7 @@ REWARD = {
     # 멈춰야 할 이유(green_stop_gap 안의 정지선·앞차, 보행자)가 없는데 green_stop_speed
     # 보다 느리면 스텝마다 감점: penalty + extra × min((빈 거리 - gap) / ramp, 1).
     # 평가 기준의 "비정상적 정지 / 무한정 대기" 방지.
-    "green_stop_penalty": 0.12,
+    "green_stop_penalty": 0.20,
     "green_stop_gap": 15.0,
     "green_stop_speed": 1.5,
     "green_stop_extra": 0.15,
