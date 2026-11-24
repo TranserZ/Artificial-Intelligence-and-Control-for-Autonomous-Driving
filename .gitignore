@@ -15,3 +15,8 @@ data/road_data/MOCT_*
 data/road_data/MULTILINK.dbf
 data/road_data/TURNINFO.dbf
 data/road_data/내역서.csv
+results/**/tb/
+results/**/*.resume.pt
+results/**/model_*.pt
+results/**/final.pt
+train_file_backup/

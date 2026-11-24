@@ -189,11 +189,11 @@ if _CGC["enabled"]:
 #   아래 숫자들을 바꿔가며 정책이 어떻게 달라지는지 관찰해보길 권장.
 # ──────────────────────────────────────────────────────────────
 REWARD = {
-    "speed_weight": 0.0,         # 속도 보상 가중치. 한 스텝 최대 +0.1
-    "close_gap_threshold": 6.0, # 앞차와 이 거리(m) 미만으로 붙으면 (좁게 따라붙기 허용:
+    "speed_weight": 0.06,         # 속도 보상 가중치. 한 스텝 최대 +0.1
+    "close_gap_threshold": 12.0, # 앞차와 이 거리(m) 미만으로 붙으면 (좁게 따라붙기 허용:
                                  #  10→6m 완화. 추월 직전 대기 위치를 잡기 쉬워짐)
-    "close_gap_penalty": 0.1,    #   → 스텝당 이만큼 감점
-    "collision_penalty": 5.0,    # 충돌 시 -5 를 받고 에피소드 즉시 종료
+    "close_gap_penalty": 0.15,    #   → 스텝당 이만큼 감점
+    "collision_penalty": 12.0,    # 충돌 시 -5 를 받고 에피소드 즉시 종료
     "arrival_bonus": 2.0,        # 도로 끝까지 완주하면 +2 받고 종료
     "progress_weight": 10.0,      # 진행 보상: 이동거리/도로길이 × 이 값 (완주 시 누적 = 이 값)
 
@@ -220,7 +220,7 @@ REWARD = {
     #   실행돼도 즉시 -0.05인 반면 추월 이득은 지연·분산되어 오므로
     #   "변경 = 손해"만 학습됨. 페널티 없이 추월을 먼저 배우게 하고,
     #   학습 후 지그재그가 과하면 0.02~0.05로 재도입할 것.
-    "lane_change_penalty": 0.0,   # 차선변경이 "실행될 때마다" 감점.
+    "lane_change_penalty": 0.02,   # 차선변경이 "실행될 때마다" 감점.
                                    #   목적: 이득 없는 지그재그(웨빙) 억제.
                                    #   속도 보상(스텝당 최대 0.1)의 절반 수준이라,
                                    #   "변경해서 더 빨라질 때만 변경"하도록 유도.
@@ -236,7 +236,7 @@ REWARD = {
     # 적색 대기(최대 25초 = 50스텝)로 잃는 속도 보상은 최대 50×0.1 = 5이므로,
     # 감점이 이보다 작으면 "그냥 통과"가 이득이 될 수 있다 → 충돌과 같은 5.0.
     # 전방 신호가 적/황색인 동안은 blocked_penalty를 주지 않는다 (sumo_env.py).
-    "red_light_penalty": 5.0,
+    "red_light_penalty": 10.0,
     "red_light_terminate": True,     # True면 위반 즉시 에피소드 종료 (충돌과 같은 실패)
 
     # ---- 횡단보도 양보 위반 ----
@@ -270,7 +270,7 @@ REWARD = {
     # 멈춰야 할 이유(green_stop_gap 안의 정지선·앞차, 보행자)가 없는데 green_stop_speed
     # 보다 느리면 스텝마다 감점: penalty + extra × min((빈 거리 - gap) / ramp, 1).
     # 평가 기준의 "비정상적 정지 / 무한정 대기" 방지.
-    "green_stop_penalty": 0.08,
+    "green_stop_penalty": 0.12,
     "green_stop_gap": 15.0,
     "green_stop_speed": 1.5,
     "green_stop_extra": 0.15,
@@ -278,7 +278,7 @@ REWARD = {
     # ---- 신호 접근 감속 ----
     # 정지 신호(또는 곧 끝나는 녹색)에 다가갈 때 편한 감속(approach_decel)으로 멈출 수
     # 있는 속도보다 빠르면 초과 1 m/s당 스텝마다 감점 (approach_penalty_cap까지).
-    "approach_overspeed_penalty": 0.0,
+    "approach_overspeed_penalty": 0.18,
     "approach_decel": 2.0,
     "approach_penalty_cap": 0.2,
 
@@ -319,4 +319,9 @@ REWARD = {
 #   그래서 속도 보상을 1/10로 줄여 리턴을 ~10 규모로 낮췄다.
 #   → 보상의 절대값이 아니라 "항 사이의 상대 비율"이 정책을 결정한다는
 #     점을 확인해보는 실험을 해보길 권장.
+
+
+
+
+
 
