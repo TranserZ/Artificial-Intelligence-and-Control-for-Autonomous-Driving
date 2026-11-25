@@ -26,6 +26,13 @@ import bcppo  # noqa: E402
 
 if os.environ.get("REWARD_RED"):                   # PPO 미세조정 때 적색 통과 벌점만 키운다 (기본 그대로)
     bcppo.T.REWARD["red_light_penalty"] = float(os.environ["REWARD_RED"])
+if os.environ.get("REWARD_COLL"):                  # PPO 미세조정 때 충돌 벌점 (기본 20)
+    bcppo.T.REWARD["collision_penalty"] = float(os.environ["REWARD_COLL"])
+if os.environ.get("BEST_COLL_W"):
+    # best 고르기: 완주율 - w × 충돌률 (기본 bcppo는 완주율 우선, 충돌은 동점일 때만 본다)
+    _w = float(os.environ["BEST_COLL_W"])
+    bcppo.score_of = lambda m: (round(m.completion_rate - _w * m.collision_rate, 4), -m.red_violation_rate,
+                                m.success_rate, m.mean_speed * m.ep_length)
 
 if os.environ.get("OBS_SCAN", "0") == "1":     # 옆 차로 관측 보강 (obsfix.py)
     sys.path.insert(0, HERE)
