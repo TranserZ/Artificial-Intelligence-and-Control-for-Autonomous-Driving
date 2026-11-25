@@ -57,7 +57,11 @@ def _side_clear(env, ego, direction):
     pos = traci.vehicle.getLanePosition(ego)
     length = traci.vehicle.getLength(ego)
     if pos - length < 0.0:
-        return False
+        # 꼬리가 아직 교차로 안(교차로 바로 뒤 주정차, 주교). 기본은 바꾸지 않는다.
+        # TEACHER_JX=1: 교차로 안에서 이 엣지로 들어오는 차가 없거나 멀 때만 바꾼다
+        # (s6_student_ppo 충돌 7판 중 5판이 여기서 교차로를 빠져나오던 직진차·오토바이와 측면 충돌)
+        if not JX or not _junction_clear(env, ego, edge, li, direction, v):
+            return False
     for vid in traci.lane.getLastStepVehicleIDs(f"{edge}_{li}"):
         p = traci.vehicle.getLanePosition(vid)
         if p >= pos:
@@ -65,6 +69,40 @@ def _side_clear(env, ego, direction):
                 return False
         elif (pos - length) - p < LANE_GAP + 3.0 * max(0.0, traci.vehicle.getSpeed(vid) - v):
             return False
+    return True
+
+
+JX = os.environ.get("TEACHER_JX", "0") == "1"
+JX_RANGE = 60.0
+
+
+def _junction_clear(env, ego, edge, li, direction, v):
+    """교차로 안·직전에서 edge로 들어오는 차(서 있지 않은 차)가 내 꼬리 앞까지 LANE_GAP + 3 s × 속도 안에 오면 False."""
+    import traci
+    mode = 1 if direction > 0 else 0          # bit0 1 = 왼쪽, bit1 0 = 뒤차 (위쪽 차로까지 찾는다)
+    try:
+        for vid, gap in traci.vehicle.getNeighbors(ego, mode):
+            if gap < LANE_GAP + 3.0 * max(0.0, traci.vehicle.getSpeed(vid) - v):
+                return False
+    except traci.TraCIException:
+        return False
+    x, y = traci.vehicle.getPosition(ego)
+    for vid in traci.vehicle.getIDList():
+        if vid == ego:
+            continue
+        road = traci.vehicle.getRoadID(vid)
+        sp = traci.vehicle.getSpeed(vid)
+        if road == edge or sp < 1.0:
+            continue
+        vx, vy = traci.vehicle.getPosition(vid)
+        if (vx - x) ** 2 + (vy - y) ** 2 > JX_RANGE ** 2:
+            continue
+        try:
+            d = traci.vehicle.getDrivingDistance(vid, edge, 0.0)
+        except traci.TraCIException:
+            continue
+        if 0.0 <= d < LANE_GAP + 3.0 * sp + 5.0:
+            return False                      # 곧 이 엣지 시작(내 꼬리 옆)으로 들어온다
     return True
 
 
