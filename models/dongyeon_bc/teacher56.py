@@ -34,6 +34,31 @@ if os.environ.get("BEST_COLL_W"):
     bcppo.score_of = lambda m: (round(m.completion_rate - _w * m.collision_rate, 4), -m.red_violation_rate,
                                 m.success_rate, m.mean_speed * m.ep_length)
 
+SIG_PEN = float(os.environ.get("SIGNAL_SHAPING", "0"))
+if SIG_PEN > 0:
+    # PPO 미세조정용 신호 보상 보강: 신호 shield가 끼어들 상황(적색, 또는 편하게 설 수 있는 황색인데 너무 빠름)이면
+    # 매 step 벌점 = SIG_PEN × (모델 가속 - shield 가속). 적색 통과 벌점은 정지선을 넘는 순간에만 받아 너무 늦다
+    # (s6_student_ppo 적색 통과 16판: 55 m 앞 황색에서 가속 → 30 m 앞 적색에서도 거의 안 멈춤)
+    from env.sumo_env import SumoHighwayEnv as _SHE
+    _orig_step = _SHE.step
+
+    def _shaped_step(self, action):
+        import traci
+        pen = 0.0
+        try:
+            if self.ego_id in traci.vehicle.getIDList():
+                a = float(np.clip(np.asarray(action, dtype=np.float32).reshape(-1)[self.accel_index], -1.0, 1.0))
+                s_cmd, hit = self._signal_shield_accel(a, traci.vehicle.getSpeed(self.ego_id), self._next_signal())
+                if hit:
+                    pen = SIG_PEN * max(0.0, a - s_cmd)
+        except traci.TraCIException:
+            pen = 0.0
+        obs, r, te, tr, info = _orig_step(self, action)
+        info["signal_shaping"] = pen
+        return obs, r - pen, te, tr, info
+
+    _SHE.step = _shaped_step
+
 if os.environ.get("OBS_SCAN", "0") == "1":     # 옆 차로 관측 보강 (obsfix.py)
     sys.path.insert(0, HERE)
     import obsfix  # noqa: E402
