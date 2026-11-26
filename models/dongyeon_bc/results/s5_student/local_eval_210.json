@@ -1,0 +1,1689 @@
+{
+"model": "models/dongyeon_bc/s5_student.pt",
+"stage": 5,
+"shield": "shadow",
+"sumo": "1.27.1",
+"note": "seeds 1000-1089 were run earlier with the same script: completed 80, timeout 7, red_light 2, collision 1 (per-seed logs not kept)",
+"episodes": [
+{
+"seed": 1090,
+"result": "completed",
+"sim_seconds": 812,
+"end_odometer_m": 2133.6,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 1091,
+"result": "completed",
+"sim_seconds": 605,
+"end_odometer_m": 2135.7,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 1092,
+"result": "timeout",
+"sim_seconds": 1800,
+"end_odometer_m": 480.9,
+"end_edge": ":cluster_n13732389919_n13732389920_n14324399149_n14324399156_12",
+"stops_done": 1
+},
+{
+"seed": 1093,
+"result": "completed",
+"sim_seconds": 710,
+"end_odometer_m": 2135.8,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 1094,
+"result": "completed",
+"sim_seconds": 596,
+"end_odometer_m": 2134.6,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 1095,
+"result": "completed",
+"sim_seconds": 656,
+"end_odometer_m": 2133.7,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 1096,
+"result": "collision",
+"sim_seconds": 242,
+"end_odometer_m": 529.0,
+"end_edge": "e73541403_8",
+"stops_done": 1
+},
+{
+"seed": 1097,
+"result": "completed",
+"sim_seconds": 810,
+"end_odometer_m": 2135.2,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 1098,
+"result": "completed",
+"sim_seconds": 592,
+"end_odometer_m": 2135.2,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 1099,
+"result": "completed",
+"sim_seconds": 657,
+"end_odometer_m": 2135.9,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2000,
+"result": "completed",
+"sim_seconds": 842,
+"end_odometer_m": 2136.8,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2001,
+"result": "completed",
+"sim_seconds": 646,
+"end_odometer_m": 2135.3,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2002,
+"result": "completed",
+"sim_seconds": 588,
+"end_odometer_m": 2134.1,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2003,
+"result": "completed",
+"sim_seconds": 601,
+"end_odometer_m": 2134.4,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2004,
+"result": "timeout",
+"sim_seconds": 1800,
+"end_odometer_m": 481.3,
+"end_edge": ":cluster_n13732389919_n13732389920_n14324399149_n14324399156_12",
+"stops_done": 1
+},
+{
+"seed": 2005,
+"result": "completed",
+"sim_seconds": 963,
+"end_odometer_m": 2137.2,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2006,
+"result": "completed",
+"sim_seconds": 429,
+"end_odometer_m": 2134.1,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2007,
+"result": "completed",
+"sim_seconds": 743,
+"end_odometer_m": 2137.5,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2008,
+"result": "completed",
+"sim_seconds": 1069,
+"end_odometer_m": 2137.3,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2009,
+"result": "completed",
+"sim_seconds": 591,
+"end_odometer_m": 2134.3,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2010,
+"result": "completed",
+"sim_seconds": 516,
+"end_odometer_m": 2134.5,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2011,
+"result": "completed",
+"sim_seconds": 626,
+"end_odometer_m": 2135.2,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2012,
+"result": "completed",
+"sim_seconds": 684,
+"end_odometer_m": 2134.2,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2013,
+"result": "timeout",
+"sim_seconds": 1800,
+"end_odometer_m": 482.5,
+"end_edge": ":cluster_n13732389919_n13732389920_n14324399149_n14324399156_12",
+"stops_done": 1
+},
+{
+"seed": 2014,
+"result": "completed",
+"sim_seconds": 675,
+"end_odometer_m": 2135.4,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2015,
+"result": "completed",
+"sim_seconds": 658,
+"end_odometer_m": 2137.1,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2016,
+"result": "completed",
+"sim_seconds": 534,
+"end_odometer_m": 2136.6,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2017,
+"result": "completed",
+"sim_seconds": 726,
+"end_odometer_m": 2135.5,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2018,
+"result": "completed",
+"sim_seconds": 547,
+"end_odometer_m": 2134.0,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2019,
+"result": "completed",
+"sim_seconds": 527,
+"end_odometer_m": 2136.8,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2020,
+"result": "completed",
+"sim_seconds": 691,
+"end_odometer_m": 2135.6,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2021,
+"result": "completed",
+"sim_seconds": 565,
+"end_odometer_m": 2133.7,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2022,
+"result": "collision",
+"sim_seconds": 47,
+"end_odometer_m": 164.7,
+"end_edge": ":cluster_n3806620354_n5863541495_3",
+"stops_done": 1
+},
+{
+"seed": 2023,
+"result": "completed",
+"sim_seconds": 942,
+"end_odometer_m": 2135.8,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2024,
+"result": "completed",
+"sim_seconds": 739,
+"end_odometer_m": 2134.2,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2025,
+"result": "timeout",
+"sim_seconds": 1800,
+"end_odometer_m": 1330.2,
+"end_edge": ":n4203161539_2",
+"stops_done": 3
+},
+{
+"seed": 2026,
+"result": "completed",
+"sim_seconds": 596,
+"end_odometer_m": 2137.0,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2027,
+"result": "completed",
+"sim_seconds": 688,
+"end_odometer_m": 2134.9,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2028,
+"result": "completed",
+"sim_seconds": 818,
+"end_odometer_m": 2134.4,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2029,
+"result": "completed",
+"sim_seconds": 714,
+"end_odometer_m": 2135.0,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2030,
+"result": "completed",
+"sim_seconds": 598,
+"end_odometer_m": 2134.7,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2031,
+"result": "completed",
+"sim_seconds": 528,
+"end_odometer_m": 2135.5,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2032,
+"result": "red_light",
+"sim_seconds": 259,
+"end_odometer_m": 923.5,
+"end_edge": ":n11173361247_1",
+"stops_done": 2
+},
+{
+"seed": 2033,
+"result": "completed",
+"sim_seconds": 1141,
+"end_odometer_m": 2137.4,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2034,
+"result": "completed",
+"sim_seconds": 583,
+"end_odometer_m": 2134.2,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2035,
+"result": "timeout",
+"sim_seconds": 1800,
+"end_odometer_m": 1330.8,
+"end_edge": ":n4203161539_2",
+"stops_done": 3
+},
+{
+"seed": 2036,
+"result": "red_light",
+"sim_seconds": 369,
+"end_odometer_m": 923.5,
+"end_edge": ":n11173361247_1",
+"stops_done": 2
+},
+{
+"seed": 2037,
+"result": "completed",
+"sim_seconds": 785,
+"end_odometer_m": 2136.3,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2038,
+"result": "completed",
+"sim_seconds": 584,
+"end_odometer_m": 2133.5,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2039,
+"result": "completed",
+"sim_seconds": 551,
+"end_odometer_m": 2135.6,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2040,
+"result": "completed",
+"sim_seconds": 1747,
+"end_odometer_m": 2133.4,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2041,
+"result": "completed",
+"sim_seconds": 680,
+"end_odometer_m": 2137.0,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2042,
+"result": "completed",
+"sim_seconds": 735,
+"end_odometer_m": 2136.0,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2043,
+"result": "completed",
+"sim_seconds": 493,
+"end_odometer_m": 2136.6,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2044,
+"result": "completed",
+"sim_seconds": 636,
+"end_odometer_m": 2134.0,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2045,
+"result": "completed",
+"sim_seconds": 651,
+"end_odometer_m": 2134.2,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2046,
+"result": "completed",
+"sim_seconds": 614,
+"end_odometer_m": 2134.3,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2047,
+"result": "completed",
+"sim_seconds": 534,
+"end_odometer_m": 2134.7,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2048,
+"result": "completed",
+"sim_seconds": 620,
+"end_odometer_m": 2136.7,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2049,
+"result": "completed",
+"sim_seconds": 558,
+"end_odometer_m": 2134.0,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2050,
+"result": "completed",
+"sim_seconds": 744,
+"end_odometer_m": 2134.7,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2051,
+"result": "completed",
+"sim_seconds": 493,
+"end_odometer_m": 2134.3,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2052,
+"result": "completed",
+"sim_seconds": 612,
+"end_odometer_m": 2135.2,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2053,
+"result": "completed",
+"sim_seconds": 511,
+"end_odometer_m": 2134.1,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2054,
+"result": "timeout",
+"sim_seconds": 1800,
+"end_odometer_m": 482.9,
+"end_edge": ":cluster_n13732389919_n13732389920_n14324399149_n14324399156_12",
+"stops_done": 1
+},
+{
+"seed": 2055,
+"result": "completed",
+"sim_seconds": 702,
+"end_odometer_m": 2136.2,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2056,
+"result": "completed",
+"sim_seconds": 930,
+"end_odometer_m": 2135.0,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2057,
+"result": "completed",
+"sim_seconds": 564,
+"end_odometer_m": 2134.6,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2058,
+"result": "completed",
+"sim_seconds": 571,
+"end_odometer_m": 2134.3,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2059,
+"result": "completed",
+"sim_seconds": 828,
+"end_odometer_m": 2136.8,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2060,
+"result": "completed",
+"sim_seconds": 663,
+"end_odometer_m": 2134.7,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2061,
+"result": "completed",
+"sim_seconds": 774,
+"end_odometer_m": 2134.8,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2062,
+"result": "completed",
+"sim_seconds": 606,
+"end_odometer_m": 2134.0,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2063,
+"result": "completed",
+"sim_seconds": 763,
+"end_odometer_m": 2136.2,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2064,
+"result": "completed",
+"sim_seconds": 678,
+"end_odometer_m": 2134.3,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2065,
+"result": "collision",
+"sim_seconds": 175,
+"end_odometer_m": 528.6,
+"end_edge": "e73541403_8",
+"stops_done": 1
+},
+{
+"seed": 2066,
+"result": "completed",
+"sim_seconds": 674,
+"end_odometer_m": 2136.1,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2067,
+"result": "completed",
+"sim_seconds": 704,
+"end_odometer_m": 2134.6,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2068,
+"result": "completed",
+"sim_seconds": 962,
+"end_odometer_m": 2133.9,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2069,
+"result": "timeout",
+"sim_seconds": 1800,
+"end_odometer_m": 482.8,
+"end_edge": ":cluster_n13732389919_n13732389920_n14324399149_n14324399156_12",
+"stops_done": 1
+},
+{
+"seed": 2070,
+"result": "timeout",
+"sim_seconds": 1800,
+"end_odometer_m": 481.7,
+"end_edge": ":cluster_n13732389919_n13732389920_n14324399149_n14324399156_12",
+"stops_done": 1
+},
+{
+"seed": 2071,
+"result": "completed",
+"sim_seconds": 712,
+"end_odometer_m": 2134.9,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2072,
+"result": "completed",
+"sim_seconds": 896,
+"end_odometer_m": 2136.4,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2073,
+"result": "completed",
+"sim_seconds": 752,
+"end_odometer_m": 2134.6,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2074,
+"result": "collision",
+"sim_seconds": 241,
+"end_odometer_m": 528.3,
+"end_edge": "e73541403_8",
+"stops_done": 1
+},
+{
+"seed": 2075,
+"result": "completed",
+"sim_seconds": 636,
+"end_odometer_m": 2133.6,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2076,
+"result": "timeout",
+"sim_seconds": 1800,
+"end_odometer_m": 482.9,
+"end_edge": ":cluster_n13732389919_n13732389920_n14324399149_n14324399156_12",
+"stops_done": 1
+},
+{
+"seed": 2077,
+"result": "completed",
+"sim_seconds": 610,
+"end_odometer_m": 2134.4,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2078,
+"result": "completed",
+"sim_seconds": 578,
+"end_odometer_m": 2136.5,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2079,
+"result": "arrived_missed_stop",
+"sim_seconds": 645,
+"end_odometer_m": 2134.7,
+"end_edge": "e1212424783_4",
+"stops_done": 4
+},
+{
+"seed": 2080,
+"result": "collision",
+"sim_seconds": 294,
+"end_odometer_m": 482.2,
+"end_edge": ":cluster_n13732389919_n13732389920_n14324399149_n14324399156_12",
+"stops_done": 1
+},
+{
+"seed": 2081,
+"result": "completed",
+"sim_seconds": 621,
+"end_odometer_m": 2137.1,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2082,
+"result": "completed",
+"sim_seconds": 656,
+"end_odometer_m": 2135.2,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2083,
+"result": "completed",
+"sim_seconds": 815,
+"end_odometer_m": 2136.6,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2084,
+"result": "timeout",
+"sim_seconds": 1800,
+"end_odometer_m": 482.5,
+"end_edge": ":cluster_n13732389919_n13732389920_n14324399149_n14324399156_12",
+"stops_done": 1
+},
+{
+"seed": 2085,
+"result": "timeout",
+"sim_seconds": 1800,
+"end_odometer_m": 481.2,
+"end_edge": ":cluster_n13732389919_n13732389920_n14324399149_n14324399156_12",
+"stops_done": 1
+},
+{
+"seed": 2086,
+"result": "completed",
+"sim_seconds": 708,
+"end_odometer_m": 2136.4,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2087,
+"result": "completed",
+"sim_seconds": 758,
+"end_odometer_m": 2135.6,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2088,
+"result": "completed",
+"sim_seconds": 776,
+"end_odometer_m": 2136.6,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2089,
+"result": "completed",
+"sim_seconds": 694,
+"end_odometer_m": 2136.5,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2090,
+"result": "completed",
+"sim_seconds": 656,
+"end_odometer_m": 2135.9,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2091,
+"result": "completed",
+"sim_seconds": 598,
+"end_odometer_m": 2136.8,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2092,
+"result": "completed",
+"sim_seconds": 569,
+"end_odometer_m": 2135.4,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2093,
+"result": "completed",
+"sim_seconds": 527,
+"end_odometer_m": 2135.0,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2094,
+"result": "completed",
+"sim_seconds": 804,
+"end_odometer_m": 2134.4,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2095,
+"result": "timeout",
+"sim_seconds": 1800,
+"end_odometer_m": 480.0,
+"end_edge": ":cluster_n13732389919_n13732389920_n14324399149_n14324399156_12",
+"stops_done": 1
+},
+{
+"seed": 2096,
+"result": "completed",
+"sim_seconds": 894,
+"end_odometer_m": 2136.7,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2097,
+"result": "completed",
+"sim_seconds": 578,
+"end_odometer_m": 2136.5,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2098,
+"result": "completed",
+"sim_seconds": 510,
+"end_odometer_m": 2137.3,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2099,
+"result": "completed",
+"sim_seconds": 750,
+"end_odometer_m": 2134.2,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2100,
+"result": "collision",
+"sim_seconds": 174,
+"end_odometer_m": 480.5,
+"end_edge": ":cluster_n13732389919_n13732389920_n14324399149_n14324399156_12",
+"stops_done": 1
+},
+{
+"seed": 2101,
+"result": "collision",
+"sim_seconds": 289,
+"end_odometer_m": 528.5,
+"end_edge": "e73541403_8",
+"stops_done": 1
+},
+{
+"seed": 2102,
+"result": "completed",
+"sim_seconds": 938,
+"end_odometer_m": 2135.6,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2103,
+"result": "completed",
+"sim_seconds": 752,
+"end_odometer_m": 2135.0,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2104,
+"result": "completed",
+"sim_seconds": 690,
+"end_odometer_m": 2134.1,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2105,
+"result": "completed",
+"sim_seconds": 540,
+"end_odometer_m": 2134.4,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2106,
+"result": "completed",
+"sim_seconds": 788,
+"end_odometer_m": 2136.7,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2107,
+"result": "completed",
+"sim_seconds": 731,
+"end_odometer_m": 2133.5,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2108,
+"result": "completed",
+"sim_seconds": 759,
+"end_odometer_m": 2137.2,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 2109,
+"result": "completed",
+"sim_seconds": 657,
+"end_odometer_m": 2135.5,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570000,
+"result": "completed",
+"sim_seconds": 643,
+"end_odometer_m": 2136.8,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570001,
+"result": "completed",
+"sim_seconds": 862,
+"end_odometer_m": 2135.7,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570002,
+"result": "completed",
+"sim_seconds": 529,
+"end_odometer_m": 2133.9,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570003,
+"result": "completed",
+"sim_seconds": 627,
+"end_odometer_m": 2135.1,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570004,
+"result": "completed",
+"sim_seconds": 701,
+"end_odometer_m": 2133.8,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570005,
+"result": "completed",
+"sim_seconds": 686,
+"end_odometer_m": 2133.7,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570006,
+"result": "completed",
+"sim_seconds": 715,
+"end_odometer_m": 2137.4,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570007,
+"result": "collision",
+"sim_seconds": 408,
+"end_odometer_m": 1296.9,
+"end_edge": "e908646367_6",
+"stops_done": 3
+},
+{
+"seed": 570008,
+"result": "completed",
+"sim_seconds": 625,
+"end_odometer_m": 2134.5,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570009,
+"result": "completed",
+"sim_seconds": 724,
+"end_odometer_m": 2133.6,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570010,
+"result": "completed",
+"sim_seconds": 547,
+"end_odometer_m": 2134.2,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570011,
+"result": "completed",
+"sim_seconds": 719,
+"end_odometer_m": 2135.2,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570012,
+"result": "red_light",
+"sim_seconds": 378,
+"end_odometer_m": 859.5,
+"end_edge": ":cluster_n11170069517_n11173361256_n11232930754_n13998649081_#1more_7",
+"stops_done": 2
+},
+{
+"seed": 570013,
+"result": "completed",
+"sim_seconds": 823,
+"end_odometer_m": 2134.2,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570014,
+"result": "completed",
+"sim_seconds": 893,
+"end_odometer_m": 2135.3,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570015,
+"result": "completed",
+"sim_seconds": 695,
+"end_odometer_m": 2135.5,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570016,
+"result": "completed",
+"sim_seconds": 589,
+"end_odometer_m": 2134.5,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570017,
+"result": "completed",
+"sim_seconds": 640,
+"end_odometer_m": 2136.8,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570018,
+"result": "completed",
+"sim_seconds": 674,
+"end_odometer_m": 2136.3,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570019,
+"result": "completed",
+"sim_seconds": 476,
+"end_odometer_m": 2135.4,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570020,
+"result": "completed",
+"sim_seconds": 829,
+"end_odometer_m": 2137.5,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570021,
+"result": "completed",
+"sim_seconds": 855,
+"end_odometer_m": 2133.7,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570022,
+"result": "completed",
+"sim_seconds": 739,
+"end_odometer_m": 2136.3,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570023,
+"result": "completed",
+"sim_seconds": 602,
+"end_odometer_m": 2135.6,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570024,
+"result": "completed",
+"sim_seconds": 485,
+"end_odometer_m": 2137.3,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570025,
+"result": "completed",
+"sim_seconds": 688,
+"end_odometer_m": 2134.3,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570026,
+"result": "completed",
+"sim_seconds": 681,
+"end_odometer_m": 2133.7,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570027,
+"result": "completed",
+"sim_seconds": 702,
+"end_odometer_m": 2136.9,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570028,
+"result": "completed",
+"sim_seconds": 796,
+"end_odometer_m": 2133.6,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570029,
+"result": "completed",
+"sim_seconds": 563,
+"end_odometer_m": 2137.4,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570030,
+"result": "completed",
+"sim_seconds": 549,
+"end_odometer_m": 2136.8,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570031,
+"result": "completed",
+"sim_seconds": 770,
+"end_odometer_m": 2134.6,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570032,
+"result": "completed",
+"sim_seconds": 524,
+"end_odometer_m": 2136.1,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570033,
+"result": "completed",
+"sim_seconds": 525,
+"end_odometer_m": 2137.0,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570034,
+"result": "completed",
+"sim_seconds": 633,
+"end_odometer_m": 2134.4,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570035,
+"result": "completed",
+"sim_seconds": 751,
+"end_odometer_m": 2133.6,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570036,
+"result": "completed",
+"sim_seconds": 695,
+"end_odometer_m": 2136.2,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570037,
+"result": "completed",
+"sim_seconds": 512,
+"end_odometer_m": 2134.0,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570038,
+"result": "completed",
+"sim_seconds": 946,
+"end_odometer_m": 2136.8,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570039,
+"result": "completed",
+"sim_seconds": 900,
+"end_odometer_m": 2134.3,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570040,
+"result": "completed",
+"sim_seconds": 471,
+"end_odometer_m": 2135.6,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570041,
+"result": "completed",
+"sim_seconds": 649,
+"end_odometer_m": 2134.9,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570042,
+"result": "completed",
+"sim_seconds": 619,
+"end_odometer_m": 2136.7,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570043,
+"result": "completed",
+"sim_seconds": 613,
+"end_odometer_m": 2134.3,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570044,
+"result": "completed",
+"sim_seconds": 785,
+"end_odometer_m": 2135.8,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570045,
+"result": "completed",
+"sim_seconds": 549,
+"end_odometer_m": 2134.2,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570046,
+"result": "completed",
+"sim_seconds": 710,
+"end_odometer_m": 2133.8,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570047,
+"result": "completed",
+"sim_seconds": 599,
+"end_odometer_m": 2134.9,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570048,
+"result": "timeout",
+"sim_seconds": 1800,
+"end_odometer_m": 482.3,
+"end_edge": ":cluster_n13732389919_n13732389920_n14324399149_n14324399156_12",
+"stops_done": 1
+},
+{
+"seed": 570049,
+"result": "completed",
+"sim_seconds": 693,
+"end_odometer_m": 2135.5,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570050,
+"result": "timeout",
+"sim_seconds": 1800,
+"end_odometer_m": 482.7,
+"end_edge": ":cluster_n13732389919_n13732389920_n14324399149_n14324399156_12",
+"stops_done": 1
+},
+{
+"seed": 570051,
+"result": "completed",
+"sim_seconds": 748,
+"end_odometer_m": 2136.8,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570052,
+"result": "completed",
+"sim_seconds": 608,
+"end_odometer_m": 2137.0,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570053,
+"result": "completed",
+"sim_seconds": 675,
+"end_odometer_m": 2135.8,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570054,
+"result": "collision",
+"sim_seconds": 978,
+"end_odometer_m": 486.9,
+"end_edge": "e73541403_8",
+"stops_done": 1
+},
+{
+"seed": 570055,
+"result": "collision",
+"sim_seconds": 138,
+"end_odometer_m": 528.9,
+"end_edge": "e73541403_8",
+"stops_done": 1
+},
+{
+"seed": 570056,
+"result": "completed",
+"sim_seconds": 758,
+"end_odometer_m": 2135.5,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570057,
+"result": "timeout",
+"sim_seconds": 1800,
+"end_odometer_m": 480.9,
+"end_edge": ":cluster_n13732389919_n13732389920_n14324399149_n14324399156_12",
+"stops_done": 1
+},
+{
+"seed": 570058,
+"result": "completed",
+"sim_seconds": 559,
+"end_odometer_m": 2134.5,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 570059,
+"result": "completed",
+"sim_seconds": 538,
+"end_odometer_m": 2136.9,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 900100,
+"result": "completed",
+"sim_seconds": 641,
+"end_odometer_m": 2134.9,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 900101,
+"result": "completed",
+"sim_seconds": 570,
+"end_odometer_m": 2136.9,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 900102,
+"result": "completed",
+"sim_seconds": 675,
+"end_odometer_m": 2134.0,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 900103,
+"result": "completed",
+"sim_seconds": 674,
+"end_odometer_m": 2133.5,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 900104,
+"result": "red_light",
+"sim_seconds": 317,
+"end_odometer_m": 923.7,
+"end_edge": ":n11173361247_1",
+"stops_done": 2
+},
+{
+"seed": 900105,
+"result": "completed",
+"sim_seconds": 897,
+"end_odometer_m": 2136.1,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 900106,
+"result": "completed",
+"sim_seconds": 632,
+"end_odometer_m": 2133.4,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 900107,
+"result": "completed",
+"sim_seconds": 575,
+"end_odometer_m": 2134.7,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 900108,
+"result": "completed",
+"sim_seconds": 684,
+"end_odometer_m": 2136.0,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 900109,
+"result": "completed",
+"sim_seconds": 710,
+"end_odometer_m": 2136.9,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 900110,
+"result": "completed",
+"sim_seconds": 700,
+"end_odometer_m": 2136.1,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 900111,
+"result": "completed",
+"sim_seconds": 666,
+"end_odometer_m": 2136.3,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 900112,
+"result": "completed",
+"sim_seconds": 655,
+"end_odometer_m": 2135.5,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 900113,
+"result": "collision",
+"sim_seconds": 372,
+"end_odometer_m": 1031.7,
+"end_edge": "e908646367_4",
+"stops_done": 3
+},
+{
+"seed": 900114,
+"result": "completed",
+"sim_seconds": 734,
+"end_odometer_m": 2137.3,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 900115,
+"result": "collision",
+"sim_seconds": 271,
+"end_odometer_m": 1030.6,
+"end_edge": ":n2420018317_2",
+"stops_done": 3
+},
+{
+"seed": 900116,
+"result": "completed",
+"sim_seconds": 762,
+"end_odometer_m": 2134.8,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 900117,
+"result": "completed",
+"sim_seconds": 680,
+"end_odometer_m": 2134.7,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 900118,
+"result": "completed",
+"sim_seconds": 671,
+"end_odometer_m": 2133.8,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 900119,
+"result": "completed",
+"sim_seconds": 487,
+"end_odometer_m": 2136.1,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 900120,
+"result": "completed",
+"sim_seconds": 1027,
+"end_odometer_m": 2134.8,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 900121,
+"result": "completed",
+"sim_seconds": 695,
+"end_odometer_m": 2136.2,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 900122,
+"result": "completed",
+"sim_seconds": 606,
+"end_odometer_m": 2137.4,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 900123,
+"result": "completed",
+"sim_seconds": 622,
+"end_odometer_m": 2134.8,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 900124,
+"result": "completed",
+"sim_seconds": 484,
+"end_odometer_m": 2133.9,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 900125,
+"result": "completed",
+"sim_seconds": 520,
+"end_odometer_m": 2136.2,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 900126,
+"result": "completed",
+"sim_seconds": 738,
+"end_odometer_m": 2134.2,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 900127,
+"result": "completed",
+"sim_seconds": 732,
+"end_odometer_m": 2135.0,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+},
+{
+"seed": 900128,
+"result": "red_light",
+"sim_seconds": 267,
+"end_odometer_m": 923.7,
+"end_edge": ":n11173361247_1",
+"stops_done": 2
+},
+{
+"seed": 900129,
+"result": "completed",
+"sim_seconds": 444,
+"end_odometer_m": 2134.7,
+"end_edge": "e1212424783_4",
+"stops_done": 5
+}
+]
+}
