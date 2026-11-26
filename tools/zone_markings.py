@@ -8,6 +8,7 @@
   어린이보호구역 (zone_name 첫 단어로 묶음: "세운상가", "배오개" …)
     - 적색 미끄럼방지포장: 구역 첫 엣지 앞 10 m, 전 차로    type="school_zone" + param speed_limit
     - 노란 이중 가장자리선: 구역 엣지마다 오른쪽 끝        type="school_zone_line" + param zone_id
+    - 구역 전체 적색 노면 (시작~끝, 차선 점선·정지선 다시 그림) type="school_zone_mark" (보기용)
     - 노면 (30)·"어린이 보호구역" 글자, 시작·해제 표지판   type="school_zone_mark" (보기용)
   정차금지지대
     - 노란 테두리 + 45° 빗금, 전 차로                      type="no_stop_zone"
@@ -47,6 +48,7 @@ WHITE = "255,255,255"     # 노상주차 칸 흰 실선 (roadside_parking.csv)
 ROADSIDE_T = (-3.2, -0.1) # 노상주차 칸 가로 범위 t (m): 주차 차량 중심이 t≈-1.6에 그려진다
 ROADSIDE_SLOT = 7.0       # make_cgc_scenario.ROADSIDE_SLOT과 같은 값 (칸 길이 m)
 PAVE_LEN = 10.0           # 시점부 적색 포장 길이 (m)
+FULL_PAVE_LAYER = 19.9    # 구역 전체 적색 노면 (보기용): 시점부 포장·노면 글자보다 아래
 HATCH_STEP = 2.0          # 정차금지 빗금 간격 (m)
 HATCH_W = 0.35            # 빗금 굵기 (m)
 BORDER_W = 0.15           # 테두리 굵기 (m)
@@ -160,6 +162,18 @@ class _Writer:
                           f'layer="{layer}" imgFile="{ASSET_REL}/{f}"/>')
 
 
+def _has_stop_line(edge):
+    """SUMO가 엣지 끝에 정지선을 그리는가: 신호 교차로이거나, 우선(major) 아닌 연결이 있을 때."""
+    if "traffic_light" in (edge.getToNode().getType() or ""):
+        return True
+    for conns in edge.getOutgoing().values():
+        for c in conns:
+            state = getattr(c, "getState", lambda: "M")()
+            if state not in ("M", "O", None, ""):
+                return True
+    return False
+
+
 def _seg_quad(a, b, width):
     """선분 a-b를 폭 width의 사각형으로."""
     dx, dy = b[0] - a[0], b[1] - a[1]
@@ -236,6 +250,27 @@ def marking_lines(net, log=print, school_on=True, parking_on=True):
             for t0 in (0.10, 0.40):
                 w.poly("school_zone_line", YELLOW, LINE_LAYER, e.band(0.0, e.length, t0, t0 + 0.12),
                        {"zone_id": zid})
+        # 3b) 구역 전체 적색 노면 (보기용, type="school_zone_mark"라 sumo_env 인식에는 안 쓰임)
+        #     시점부 포장(20.0)보다 한 층 아래에 깔고, 가려지는 흰 차선 점선·정지선은 다시 그린다.
+        frames = [EdgeFrame(edge) for edge, _ in items]
+        for k, e in enumerate(frames):
+            w.poly("school_zone_mark", PAVE, FULL_PAVE_LAYER, e.band(0.0, e.length, 0.0, e.width))
+            if k + 1 < len(frames):              # 다음 구역 엣지까지 교차로 안도 잇는다
+                nx = frames[k + 1]
+                w.poly("school_zone_mark", PAVE, FULL_PAVE_LAYER,
+                       [e.xy(e.length, 0.0), nx.xy(0.0, 0.0), nx.xy(0.0, nx.width), e.xy(e.length, e.width)])
+            lanes = _car_lanes(e.edge)
+            t = 0.0
+            for ln in lanes[:-1]:                # 차로 사이 흰 점선 (3 m 선 / 6 m 틈)
+                t += ln.getWidth()
+                s = 0.0
+                while s < e.length - 0.5:
+                    w.poly("school_zone_mark", WHITE, FULL_PAVE_LAYER + 0.05,
+                           e.band(s, min(s + 3.0, e.length), t - 0.06, t + 0.06))
+                    s += 9.0
+            if _has_stop_line(e.edge):           # 교차로 앞 정지선
+                w.poly("school_zone_mark", WHITE, FULL_PAVE_LAYER + 0.05,
+                       e.band(max(e.length - 0.5, 0.0), e.length - 0.05, 0.0, e.width))
         # 4) 표지판 (오른쪽 보도 위, 위에서 본 아이콘이라 글자는 북쪽이 위)
         x, y = fr.xy(1.0, -2.0)
         w.image("sign_start", x, y, 0.0, 6.0, limit_kmh=int(round(limit * 3.6)))
