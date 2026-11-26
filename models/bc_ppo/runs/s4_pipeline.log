@@ -1,0 +1,7 @@
+저장: s4_part0.npz — 31647 step, 종료 {'completed': 25}, shield 개입 step 45.2%
+저장: s4_part1.npz — 32840 step, 종료 {'completed': 25}, shield 개입 step 48.2%
+저장: s4_part2.npz — 33145 step, 종료 {'completed': 25}, shield 개입 step 49.6%
+저장: s4_part3.npz — 32382 step, 종료 {'completed': 24, 'collision': 1}, shield 개입 step 43.5%
+s4_bc0: 완주(정류장 포함) 87% · 도착 87% · 충돌 10% · 적색 0% · 시간초과 3% · 정류장놓침 0% · 수동개입률 0.5% · 평균속도 3.19 m/s (412s)
+끝
+s4_bc0   n=90 완주 86.7% 충돌 8.9% 적색 0.0% 시간초과 4.4% 개입 0.5% 구역과속 1.1%

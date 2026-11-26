@@ -1,0 +1,15 @@
+저장: s3g_part0.npz — 30488 step, 종료 {'completed': 25}, shield 개입 step 48.1%
+저장: s3g_part1.npz — 31575 step, 종료 {'completed': 25}, shield 개입 step 48.9%
+저장: s3g_part2.npz — 32336 step, 종료 {'completed': 25}, shield 개입 step 50.8%
+저장: s3g_part3.npz — 29947 step, 종료 {'completed': 25}, shield 개입 step 48.3%
+s3g_bc0: 완주(정류장 포함) 100% · 도착 100% · 충돌 0% · 적색 0% · 시간초과 0% · 정류장놓침 0% · 수동개입률 0.4% · 평균속도 3.43 m/s (389s)
+저장: s3g_dagger1_part0.npz — 33607 step, 학생 종료 {'completed': 25}, 선생님 차선변경 정답 1.62%
+저장: s3g_dagger1_part1.npz — 30026 step, 학생 종료 {'completed': 23, 'collision': 2}, 선생님 차선변경 정답 3.79%
+저장: s3g_dagger1_part2.npz — 33235 step, 학생 종료 {'completed': 25}, 선생님 차선변경 정답 2.86%
+저장: s3g_dagger1_part3.npz — 32412 step, 학생 종료 {'completed': 24, 'collision': 1}, 선생님 차선변경 정답 3.72%
+s3g_bc1: 완주(정류장 포함) 90% · 도착 90% · 충돌 10% · 적색 0% · 시간초과 0% · 정류장놓침 0% · 수동개입률 2.5% · 평균속도 3.44 m/s (359s)
+저장: s3g_dagger2_part0.npz — 28433 step, 학생 종료 {'completed': 21, 'collision': 3, 'red_light': 1}, 선생님 차선변경 정답 0.09%
+저장: s3g_dagger2_part1.npz — 29208 step, 학생 종료 {'collision': 3, 'completed': 22}, 선생님 차선변경 정답 0.03%
+저장: s3g_dagger2_part2.npz — 31252 step, 학생 종료 {'completed': 22, 'collision': 2, 'timeout': 1}, 선생님 차선변경 정답 0.09%
+저장: s3g_dagger2_part3.npz — 25922 step, 학생 종료 {'collision': 5, 'completed': 20}, 선생님 차선변경 정답 0.10%
+s3g_bc2: 완주(정류장 포함) 47% · 도착 47% · 충돌 53% · 적색 0% · 시간초과 0% · 정류장놓침 0% · 수동개입률 3.2% · 평균속도 3.54 m/s (238s)
