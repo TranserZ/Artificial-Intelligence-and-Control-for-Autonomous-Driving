@@ -1,3 +1,0 @@
-<configuration><input><net-file value="net.net.xml"/>
-<route-files value="veh.rou.xml,ped.rou.xml"/></input>
-<gui_only><gui-settings-file value="net.gui.xml"/></gui_only></configuration>

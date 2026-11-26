@@ -1,76 +1,122 @@
-# Artificial Intelligence and Control for Autonomous Driving
+# 김희영 · 초반 순수 PPO 실험
 
-> **자율주행 인공지능 및 제어 — Course Project Materials**
+청계천로 자율주행 버스(청계A01) SUMO 환경에서, 시범 없이 강화학습(PPO)만으로 버스 주행을 학습하려고 한 실험 기록입니다.
 
-수업 프로젝트에 필요한 자료를 순서대로 정리합니다.
+## 한눈에 보기
 
-## 🗂 저장소 폴더 지도
+- **무엇을 했나**: 팀 기본 설정의 PPO가 왜 실패하는지 원인을 둘로 나눠(할인율, 보상 형태) 하나씩 바꿔 봤고, 그 결과를 반영해 정류장만 있는 1단계에서 다시 학습했습니다.
+- **결과**: 할인율을 올리면 다시 들이받았고(최근 100판 충돌 49%), 속도 보상을 끄면 첫 정류장에 선 채 움직이지 않았습니다(76판 연속 시간초과, 평균 0.036 m/s). 1단계에서도 마지막 공식 완주율이 1.0%였습니다.
+- **원인**: 할인율 0.99에서 정책은 약 50초 앞까지만 봅니다. 그 시야 안에서는 "움직였다가 충돌할 위험"이 "끝까지 가서 받는 완주 보상"보다 훨씬 크게 보입니다. 계산해 보면 충돌 확률이 6%만 넘어도 서 있는 쪽이 이득입니다.
+- **결론**: 보상이나 할인율만 바꿔서는 "서 있으면 덜 잃는다"는 해를 벗어나기 어려웠습니다. 그래서 규칙 기반 선생님의 시범으로 먼저 학습한 모델(BC)을 출발점으로 쓰는 방향으로 바꿨습니다. 이어지는 실험은 브랜치 `huiyoung/bc-ppo-kl`에 있습니다.
 
-| 폴더 | 무엇을 두나 |
+## 1. 출발점: 베이스라인 PPO는 왜 실패했나
+
+팀 기본 보상과 할인율 γ 0.99로 학습한 베이스라인 PPO는 학습 시드마다 실패 모양이 달랐습니다.
+
+| 학습 시드 | 스텝 | 완주 | 시간초과 | 충돌 | 평균 속도 |
+|---|---:|---:|---:|---:|---:|
+| 0 | 51,200 | 0% | 55% | 40% | 0.54 m/s |
+| 1 | 102,400 | 0% | 75% | 20% | 0.66 m/s |
+| 2 | 102,400 | 0% | 5% | 95% | 2.21 m/s |
+
+시드 0·1은 거의 멈춘 채 시간을 넘겼고, 시드 2는 빨리 달리다 들이받았습니다. 두 가지 원인을 의심했습니다.
+
+| 가설 | 의심한 이유 | 바꾼 것 | 고정한 것 |
+|---|---|---|---|
+| A. 할인율이 너무 근시안적이다 | γ 0.99의 유효 시야는 1/(1−γ) = 100스텝(50초)인데, 한 판은 최대 2,400스텝이다. 정류장·도착 보상이 시야 밖에 있다 | γ 0.99 → 0.995 (시야 100초) | 기본 보상 |
+| B. 속도 보상이 추돌을 부른다 | 속도 항이 6 m 밖에서도 빠를수록 점수를 줘서, 앞차에 20~50 m 접근하는 중에도 빨리 가는 게 이득이다 | 스텝마다 주는 형태 보상(특히 속도 +0.1)을 0 | γ 0.99 |
+
+한 번에 둘을 같이 바꾸면 무엇이 효과였는지 알 수 없어서, 따로 시험하고 둘 다 효과가 있을 때만 합치기로 했습니다.
+
+## 2. 실험 A: 할인율 올리기
+
+- **근거**: Tang 외(ICML 2021)는 γ가 평가 길이에 비해 작으면 정책이 근시안적이 되지만, γ를 1에 가깝게 올리면 분산이 커져 잘 안 된다고 합니다. 우리 판 길이에 맞추면 γ 0.9996이 필요해 그 위험 구간에 들어가므로, 0.995까지만 올렸습니다.
+- **결과**: 22만 5천 스텝에서 최근 100판 충돌률이 49%까지 다시 올라갔습니다. 30만 스텝을 채워도 충돌 40% 이하로 내려갈 흐름이 아니어서 중단했습니다.
+- **판정**: 앞차와 20~50 m 간격은 8~20스텝 거리라, γ 0.99에서도 거의 할인되지 않습니다(0.99⁸ ≈ 0.92). 추돌은 할인율 문제가 아니었습니다.
+
+## 3. 실험 B: 보상 단순화
+
+- **근거**: CaRL(Jaeger 외, CoRL 2025)은 여러 형태 보상을 더하는 대신 과제 진행과 위반 중심의 단순한 보상이 PPO에 잘 맞는다고 보였습니다. Ng 외(ICML 1999)는 잠재함수 차이 꼴이 아닌 형태 보상은 최적 정책 자체를 바꿀 수 있다고 증명했습니다. 우리 속도 항이 그런 형태 보상이었습니다.
+- **결과 (22만 5천 스텝)**:
+
+| 학습 구간 | 충돌 | 시간초과 | 평균 속도 | 판당 보상 |
+|---|---:|---:|---:|---:|
+| 처음 20판 | 2판 | 11판 | 0.21 m/s | −16.2 |
+| 21~96번째 판 (76판) | 0판 | **76판 전부** | 0.036 m/s | −4.80 |
+
+- 로그상 충돌률은 18%에서 2%로 줄고 보상도 올라 좋아 보였지만, 이건 초반 판이 평균에 섞여 희석된 것이었습니다. 21번째 판부터는 한 번도 움직이지 않았습니다.
+- 판당 보상 −4.80을 분해하면: 시간초과 −10, 첫 정류장 정차 +5, 43 m 진행 +0.2. **첫 정류장(출발점에서 약 30~40 m)까지만 가서 10초 정차 보너스를 받고 그대로 서 있는 정책**이었습니다.
+
+## 4. 원인 분석: 왜 서 있는 게 이득이 되나
+
+학습기가 최대화하는 것은 할인된 수익입니다. γ 0.99로 계산하면 다음과 같습니다.
+
+| 궤적 | 할인 수익 |
+|---|---:|
+| 시간초과 −10 (2,400스텝 뒤) | 0.99²⁴⁰⁰ ≈ 0 → 사실상 0 |
+| 800스텝에 걸쳐 완주하며 받는 진행 보상 +10 | 약 +1.3 |
+| 앞 50스텝 안에 충돌 −20 | −12 ~ −20 |
+| 그냥 서 있기 | 약 0 |
+
+움직이는 정책의 충돌 확률을 p라 하면 기대 수익은 (1−p)×1.25 + p×(−20)입니다. 이게 0보다 크려면 **p < 6%**여야 합니다. 학습 초반의 정책은 충돌 확률이 이보다 훨씬 높으니, 서 있는 쪽으로 수렴하는 게 학습기 입장에서는 합리적입니다. 할인 없이 합하면 완주(+55)가 정차(−4.8)보다 훨씬 좋지만, 학습기가 보는 할인 수익에서는 정차가 낫습니다. Knox 외("Reward (Mis)design for Autonomous Driving")가 지적한 "의도한 선호와 학습기가 받는 보상의 어긋남"이 이 로그였습니다.
+
+시간초과로 잘린 판을 실패로 학습하지 않도록 하는 처리(Pardo 외, ICML 2018)는 이미 코드에 들어가 있었으므로, 원인은 그쪽이 아니었습니다.
+
+## 5. 1단계 재학습
+
+위 분석을 반영해, 속도 보상은 0으로 두고 "앞이 비었는데 서 있음"에 스텝마다 작은 감점(0.05, 오래 서 있을수록 최대 0.15)을 되살린 팀 보상(env-v3)으로, 정류장만 있는 1단계(`CGC_STAGE=1`)에서 30만 스텝 학습했습니다. 이 감점이 있으면 할인 수익으로도 "계속 서 있기"(−5 ~ −15)가 "완주"보다 나빠지도록 크기를 맞췄습니다.
+
+| 지표 | 결과 |
 |---|---|
-| `train.py` · `test.py` · `train_bc.py` · `collect_pomdp_data.py` · `view_road.py` | 실행 파일 (학습 · 재생 · 모방학습 · 데이터 수집 · 도로 보기) |
-| `env/` | 학습 환경 (도로 설정, 단계별 맵, SUMO 환경). 청계천로 도로는 학습 때 `env/sumo/`에 새로 만든다 |
-| `algorithms/` · `utils/` | 학습 알고리즘(PPO·BC)과 공용 도구 (버퍼, 평가, 로그) |
-| `config/` | 버스 노선·정류장 (`lines.yaml`) |
-| `tools/` | 도로·시나리오 생성 도구. `tools/crossroad_data_collect/`: T-DATA 신호 수집기 (인증키 파일은 git 제외) |
-| `scripts/` | 평가·검증 스크립트 |
-| `data/` | 자료. `road_data/`: 도로 실측(신호·차로·정류장 좌표 등) · `osm/`: 지도 원본 · `huiyoung/`: 수집 궤적·평가 로그 |
-| `docs/` | 설명과 기록. 환경 정리, 데이터 컬럼, `reports/` 날짜별 보고서 |
-| `rules/` | 지켜야 할 것. `course_instruction/`: 수업 과제 안내 · `team/`: 팀 실험 규칙 · `setup/`: 설치·실행 환경 |
-| `results/` | 학습 결과가 쌓이는 곳 (`train.py` 출력) |
-| `backup/` | 지금은 안 쓰지만 보관하는 것: 옛 학습 결과, 옛 모델(`model_huiyoung`), `train.py` 자동 백업, 옛 도로 파일 |
+| 평균 보상 | −82.4 (15만 스텝) → −178.1 (30만 스텝) |
+| 마지막 공식 완주율 (최근 판 이동 평균) | 1.0% |
+| 가치 예측 정확도 (explained variance) | 0.81 |
 
-새 파일은 위 규칙에 맞는 폴더에 둔다. 개인 이름 폴더는 최상위에 만들지 않는다.
+- **판정**: 가치망은 수익을 잘 맞추게 됐지만, 완주는 오르지 않았습니다. 가장 쉬운 1단계에서도 이 정도면, 신호·끼어들기·보호구역이 더해지는 뒤 단계까지 순수 PPO로 가기는 어렵다고 판단했습니다.
+- 팀원의 다른 순수 PPO 실험(보상 튜닝, 어텐션 정책)도 결정적 주행에서 출발을 포기하는 같은 한계를 보고했습니다.
 
----
+## 6. 다음 단계로
 
-## 📚 Project Materials
+| 배운 것 | 다음 실험에 반영한 것 |
+|---|---|
+| 보상·할인율 조정만으로는 정차 해를 벗어나기 어렵다 | 선생님 시범으로 먼저 학습한 BC 모델을 출발점으로 사용 |
+| 학습 로그의 이동 평균은 초반 판에 희석돼 실제보다 좋아 보인다 | 고정된 개발 판(시드 900100–900129)과 독립 판으로 평가 |
+| 충돌률만 보면 "서 있어서 얻은 낮은 충돌"을 놓친다 | 시간초과·장기대기를 함께 보는 공식 지표(A~H)로 판정 |
 
-### 개인별 진행
+이어지는 실험: 브랜치 `huiyoung/bc-ppo-kl` (BC 모델의 PPO 미세조정, KL 제약)
 
-### 0. Project Introduction
+## 보고서와 원래 실험 브랜치
 
-- [프로젝트 소개 및 전체 진행 방향](./rules/course_instruction/0_Project_Introduction.md)
+- `docs/reports/2026-11-20_김희영_PPO_gamma와_보상.md`: 베이스라인 분석, 실험 A·B 설계, A 결과
+- `docs/reports/2026-11-21_김희영_보상단순화_정차수렴.md`: B 결과, 할인 수익 분석
+- `docs/reports/2026-11-21_김희영_1단계_학습준비.md`: 1단계 학습 준비, 공식 완주와 완벽 완주 구분
+- 원래 브랜치: `model/exp-ppo-gamma`(A), `model/exp-ppo-reward`(B), `model/exp-ppo-stage1`(1단계). 학습은 Kaggle CPU 노트북(`kaggle/`)으로 돌렸습니다.
 
-### 1. SUMO Installation
+## 폴더 구조
 
-- [Windows — SUMO 설치 및 환경 설정](./rules/course_instruction/1_SUMO_Windows_Setup.md)
-- [macOS (Apple Silicon) — SUMO 설치 및 환경 설정](./rules/course_instruction/1_SUMO_macOS_AppleSilicon_Setup.md)
+```
+models/ppo_stage1/   1단계 PPO 모델, config.json, training_log.csv
+kaggle/              PPO 학습 노트북
+results/idm_diag/    IDM 기준선 진단 (1단계 학습 준비 보고서의 근거)
+docs/reports/        위 보고서
+train.py             PPO 학습 (REWARD_OVERRIDES, HPARAMS)
+algorithms/ppo.py    PPO (가속 연속값 + 차선 3개 선택)
+```
 
-### 2. Road Environment Construction
+## 실행 방법 (PowerShell, 저장소 최상위, SUMO 1.27.1)
 
-- [도로 및 모델 POMDP 구조 이해](./rules/course_instruction/2_Road_Environment_Construction.md)
+```powershell
+$env:CGC_STAGE='1'
+py -3.13 train.py --help     # 학습 옵션
+py -3.13 test.py --help      # 학습한 모델로 주행
+```
 
----
+## 참고문헌
 
-### 팀별 진행 (1-2명으로 구성, 자율 building)
-
-### 3. Model Training — Behavior Cloning
-
-- [모방학습 기반 자율주행 의사결정 모델 학습](./rules/course_instruction/3_Model_Training_BC.md)
-
-### 팀별 진행 (자율 building)
-
-### 4. Model Training — Reinforcement Learning
-
-- [강화학습 기반 자율주행 의사결정 모델 학습](./rules/course_instruction/4_Model_Training_RL.md)
-
----
-### 팀별 진행 (3-5명으로 구성, 자율 building)
-
-### 5. Project Preparation
-
-- [프로젝트 진행을 위한 코드 소개](./rules/course_instruction/5_Project_Preparation.md)
-
-### 이후. 팀별 프로젝트 진행
-
-#### 평가 기준
-
-- [프로젝트 평가 기준 소개](./rules/course_instruction/6_Project_Evaluation.md)
-- [동료 평가 표](https://docs.google.com/document/d/1czmE5ofrKckau2rMwK4-wXax-f5QrUia/edit?usp=sharing&ouid=107893289049883287038&rtpof=true&sd=true)
-
-#### 프로젝트 컨설팅
-
-- [팀별 컨설팅 진행 소개](./rules/course_instruction/7_Project_Consulting.md)
----
-> 수업 자료는 `rules/course_instruction/` 폴더에서도 확인 가능합니다.
+1. Schulman et al., Proximal Policy Optimization Algorithms, arXiv:1707.06347, 2017.
+2. Tang, Rowland, Munos, Valko, Taylor Expansion of Discount Factors, ICML 2021.
+3. Jaeger et al., CaRL: Learning Scalable Planning Policies with Simple Rewards, CoRL 2025.
+4. Ng, Harada, Russell, Policy Invariance under Reward Transformations: Theory and Application to Reward Shaping, ICML 1999.
+5. Knox, Allievi, Banzhaf, Schmitt, Stone, Reward (Mis)design for Autonomous Driving, Artificial Intelligence, 2023.
+6. Pardo, Tavakoli, Levdik, Kormushev, Time Limits in Reinforcement Learning, ICML 2018.
+7. Sutton, Barto, Reinforcement Learning: An Introduction, 2nd ed., MIT Press, 2018.
