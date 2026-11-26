@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>청계로드 | 청계천 자율주행버스 노선 SUMO 재현</title>
+<meta name="description" content="청계천 자율주행버스 청계A01 노선 2.1 km를 SUMO로 만들고 5단계 환경에서 모방학습으로 버스 주행 모델을 학습한 팀 프로젝트. 코드, 발표 자료, 데이터셋, 주행 영상.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="청계로드 | 청계천 자율주행버스 노선 SUMO 재현">
+<meta property="og:description" content="청계A01 노선 2.1 km SUMO 재현, 5단계 환경, 모방학습. 코드, 발표 자료, 데이터셋, 주행 영상.">
+<meta property="og:image" content="og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#0b4fb3">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preload" href="fonts/SeoulNamsanM.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<a class="skip" href="#main">본문으로 건너뛰기</a>
+
+<header class="bar">
+  <a class="bar-id" href="#top" aria-label="청계로드, 맨 위로">
+    <span class="badge">청계A01</span>
+    <span class="bar-team">청계로드</span>
+  </a>
+  <nav class="bar-nav" aria-label="목차">
+    <a href="#road">도로</a>
+    <a href="#stages">단계</a>
+    <a href="#method">학습</a>
+    <a href="#results">결과</a>
+    <a href="#limits">한계</a>
+    <a href="#data">데이터</a>
+    <a href="#team">팀</a>
+  </nav>
+</header>
+
+<main id="main">
+
+<section class="plate" id="top">
+  <div class="plate-in">
+    <p class="plate-course">성균관대학교 자율주행인공지능및제어 2026년 2학기 최종 프로젝트</p>
+    <h1>청계천 자율주행버스 노선의 SUMO 재현과 단계별 모방학습</h1>
+    <p class="plate-team">청계로드 <span>조민기 · 강동연 · 박선우 · 김희영</span></p>
+
+    <ul class="res" aria-label="제출 자료">
+      <li><a data-link="code" href="https://github.com/TranserZ/Artificial-Intelligence-and-Control-for-Autonomous-Driving"><b>코드</b><span>GitHub 저장소</span></a></li>
+      <li><a data-link="slides" href="#"><b>발표 자료</b><span>PDF</span></a></li>
+      <li><a data-link="dataset" href="#"><b>데이터셋</b><span>Hugging Face</span></a></li>
+      <li><a data-link="video" href="#run"><b>주행 영상</b><span>바로 아래</span></a></li>
+    </ul>
+  </div>
+</section>
+
+<section class="run" id="run" aria-label="최종 모델 주행 영상">
+  <div class="run-in">
+    <div class="line-panel">
+      <div class="line-head">
+        <p class="next"><span>다음 정류장</span> <b id="nextStop">청계광장</b></p>
+        <p class="line-dir">청계광장 <i aria-hidden="true">→</i> 청계4가·배오개다리 방면</p>
+      </div>
+      <div class="line-scroll" id="lineScroll">
+        <svg id="line" class="line" viewBox="0 0 1120 150" role="img" aria-label="청계A01 동행 노선도. 정류장 5곳, 신호 정지선 7개, 어린이보호구역 1구간. 노선을 누르면 영상이 그 위치로 이동합니다."></svg>
+      </div>
+      <ul class="legend">
+        <li><i class="lg lg-stop"></i>정류장 5곳</li>
+        <li><i class="lg lg-sig"></i>신호 정지선 7개</li>
+        <li><i class="lg lg-zone"></i>어린이보호구역</li>
+      </ul>
+    </div>
+
+    <figure class="screen">
+      <video id="runVideo" src="media/run-full.mp4" poster="media/run-full.jpg" muted loop playsinline preload="metadata"></video>
+      <div class="readout" aria-live="off">
+        <button id="playBtn" type="button" class="play" aria-pressed="false">재생</button>
+        <dl>
+          <div><dt>주행 시간</dt><dd id="rT">0:00</dd></div>
+          <div><dt>속도</dt><dd><span id="rV">0</span> km/h</dd></div>
+          <div><dt>위치</dt><dd><span id="rD">0</span> m</dd></div>
+          <div><dt>정차</dt><dd><span id="rS">0</span> / 5</dd></div>
+        </dl>
+      </div>
+      <figcaption>5단계 최종 모델의 테스트 판(seed 1000) 주행입니다. 규칙이나 안전 필터 없이 모델 출력만으로 주행했고, 정류장 5곳에 모두 정차한 뒤 675초에 도착했습니다. 영상은 12배속입니다. 노선도의 버스 위치는 주행 로그에서 가져왔고, 노선을 누르면 그 지점부터 재생됩니다.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<div class="route">
+
+<section class="sec" id="about">
+  <h2>개요</h2>
+  <div class="prose">
+    <p>청계A01은 청계광장과 광장시장 사이 청계천로를 운행하는 서울시 자율주행버스입니다. 차량은 운전석이 없는 8인승 셔틀 ROii이고 시속 20&nbsp;km 안팎으로 다닙니다. 언론 보도에 따르면 운행 1년 동안의 사고는 차량 결함이 아니라 다른 차량이 끼어드는 과정에서 난 접촉 사고 등이었습니다.</p>
+    <p>이 프로젝트에서는 청계A01의 동행 구간(청계광장 → 청계4가, 2.1&nbsp;km)을 SUMO로 만들었습니다. 도로 형상은 OpenStreetMap, 차로 수는 로드뷰 조사, 신호 주기는 서울시 T-DATA 실측값과 교통영향평가 자료를 썼습니다.</p>
+    <p>같은 도로에 정류장, 신호, 끼어들기, 어린이보호구역, 오토바이를 차례로 추가해 5단계 환경을 만들고, 단계마다 버스 주행 모델을 학습했습니다. 학습에는 규칙 기반 선생님의 주행을 따라 하는 모방학습을 썼습니다.</p>
+    <p>완주율은 1~3단계 97% 이상, 4단계 93.3%, 5단계 87.8%입니다. 팀 기준인 95%는 3단계까지 만족했습니다.</p>
+  </div>
+
+  <dl class="facts">
+    <div><dt>구간</dt><dd>청계광장 → 청계4가<small>2,137 m (로드뷰 실측 2,146 m)</small></dd></div>
+    <div><dt>정류장</dt><dd>5곳<small>정류장 차로에서 10초 이상 정차</small></dd></div>
+    <div><dt>신호</dt><dd>6곳<small>정지선 7개, 주기 130~170초</small></dd></div>
+    <div><dt>제한속도</dt><dd>30 km/h<small>어린이보호구역 20 km/h</small></dd></div>
+    <div><dt>관측</dt><dd>67차원<small>버스 위치에서 볼 수 있는 정보만 사용</small></dd></div>
+    <div><dt>행동</dt><dd>가감속, 차선변경<small>가감속은 연속값, 차선은 왼쪽/유지/오른쪽</small></dd></div>
+  </dl>
+</section>
+
+<section class="sec" id="road">
+  <h2>도로 환경</h2>
+  <div class="prose">
+    <p>청계천로는 청계천 양쪽의 일방통행 도로입니다. 버스의 동행 경로는 엣지 24개, 길이 2,137&nbsp;m이고 로드뷰로 잰 2,146&nbsp;m와 0.4% 차이입니다. 차로 수는 로드뷰 조사표와 비교해 엣지 24개 모두 맞췄습니다.</p>
+  </div>
+
+  <figure class="wide">
+    <div class="line-scroll">
+      <svg id="plan" class="plan" viewBox="0 0 1120 150" role="img" aria-label="시뮬레이션 좌표로 그린 버스 경로. 서쪽 청계광장에서 동쪽 청계4가까지 거의 직선이다."></svg>
+    </div>
+    <figcaption>시뮬레이션 좌표로 그린 버스 경로입니다(위쪽이 북). 페이지 상단 노선도는 이 경로를 주행 거리 기준으로 편 것입니다.</figcaption>
+  </figure>
+
+  <h3>신호 주기</h3>
+  <div class="tbl">
+    <table>
+      <thead><tr><th>교차로</th><th class="n">정지선 위치</th><th class="n">주기</th><th class="n">버스 방향 녹색 / 황색</th><th>출처</th></tr></thead>
+      <tbody>
+        <tr><td>무교로</td><td class="n">153 m</td><td class="n">139 s</td><td class="n">55.5 / 4.3 s</td><td>광교 값 사용</td></tr>
+        <tr><td>광교 (남대문로)</td><td class="n">436 m</td><td class="n">139 s</td><td class="n">55.5 / 4.3 s</td><td><b>T-DATA API 실측</b></td></tr>
+        <tr><td>청계2가 (삼일대로)</td><td class="n">859 m, 923 m</td><td class="n">170 s</td><td class="n">72 / 3 s</td><td>교통영향평가 (2025)</td></tr>
+        <tr><td>수표교 (수표로)</td><td class="n">1,067 m</td><td class="n">139 s</td><td class="n">55.5 / 4.3 s</td><td>광교 값 사용</td></tr>
+        <tr><td>청계3가 (충무로)</td><td class="n">1,320 m</td><td class="n">130.6 s</td><td class="n">32.6 / 4.4 s</td><td><b>T-DATA API 실측</b></td></tr>
+        <tr><td>청계4가 (창경궁로)</td><td class="n">1,803 m</td><td class="n">140 s</td><td class="n">42 / 3 s</td><td>교통영향평가 (2022)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note">청계2가는 신호기 1대에 정지선이 2개입니다. 무교로와 수표교는 실측 자료가 없어 광교 값을 넣었습니다.</p>
+
+  <h3>가정한 값</h3>
+  <ul class="plain">
+    <li>교통량과 보행량은 실측 자료를 구하지 못했습니다. 일반 차량은 방향별 시간당 400대, 보행자는 시간당 400명으로 정했습니다.</li>
+    <li>일반 차량의 주행 모델은 수업 기본 설정과 같이 Krauss 35%, IDM 30%, EIDM 20%, ACC 15%로 섞었습니다.</li>
+    <li>모든 차량의 최고 속도는 시속 30&nbsp;km입니다.</li>
+    <li>버스는 ROii 제원(길이 4.9&nbsp;m, 폭 2.1&nbsp;m, 가속 1.0&nbsp;m/s², 감속 2.5&nbsp;m/s²)으로 설정했습니다.</li>
+  </ul>
+</section>
+
+<section class="sec" id="stages">
+  <h2>단계별 환경</h2>
+  <div class="prose">
+    <p>같은 도로에 요소를 하나씩 추가했고, 뒤 단계는 앞 단계의 요소를 모두 포함합니다.</p>
+    <p>관측 67차원은 다섯 단계에서 같습니다. 꺼진 요소의 칸은 “없음” 값으로 채워서, 앞 단계 모델을 다음 단계의 초기값으로 쓸 수 있습니다.</p>
+  </div>
+
+  <ol class="stops">
+    <li>
+      <span class="num">1</span>
+      <h3>버스정류장</h3>
+      <p class="on">정류장 5곳, 승객 6명</p>
+      <p>정류장 차로에서 10초 이상 서면 정차 성공이고, 서지 않고 지나가면 놓친 것으로 처리합니다. SUMO의 자동 정차 기능은 쓰지 않습니다.</p>
+    </li>
+    <li>
+      <span class="num">2</span>
+      <h3>신호등, 횡단보도</h3>
+      <p class="on">신호 6곳(실측 주기), 보행자 시간당 400명</p>
+      <p>적색에 정지선을 넘으면 그 판은 바로 종료됩니다. 횡단보도를 건너는 보행자에게 양보해야 합니다.</p>
+    </li>
+    <li>
+      <span class="num">3</span>
+      <h3>끼어들기</h3>
+      <p class="on">측면 합류 7곳(각 시간당 40대), 세종대로 합류 1곳(시간당 60대)</p>
+      <p>옆 도로에서 본선으로 합류하는 차량이 추가됩니다. 실제 청계A01의 사고 유형과 같은 상황입니다.</p>
+    </li>
+    <li>
+      <span class="num">4</span>
+      <h3>어린이보호구역</h3>
+      <p class="on">세운상가 앞 약 260 m, 제한 20 km/h</p>
+      <p>구간 안에서 시속 20&nbsp;km 이하로 주행해야 합니다.</p>
+    </li>
+    <li>
+      <span class="num">5</span>
+      <h3>오토바이</h3>
+      <p class="on">시간당 120대, 노상 주차 오토바이 14대</p>
+      <p>오토바이는 일반 차량보다 차선을 1.5배 자주 바꾸도록 설정했습니다(km당 2.11회, 일반 차량 1.40회).</p>
+    </li>
+  </ol>
+
+  <div class="clips">
+    <figure>
+      <video class="loop" src="media/clip-stop.mp4" poster="media/clip-stop.jpg" muted loop playsinline preload="none"></video>
+      <figcaption><b>정류장 정차</b> 청계1가·광교 정류장. 왼쪽 차로에서 정류장 차로로 옮겨 10초 정차 후 출발.</figcaption>
+    </figure>
+    <figure>
+      <video class="loop" src="media/clip-signal.mp4" poster="media/clip-signal.jpg" muted loop playsinline preload="none"></video>
+      <figcaption><b>신호 대기</b> 청계2가 교차로 앞. 앞차 뒤에서 43초 대기.</figcaption>
+    </figure>
+    <figure>
+      <video class="loop" src="media/clip-zone.mp4" poster="media/clip-zone.jpg" muted loop playsinline preload="none"></video>
+      <figcaption><b>어린이보호구역</b> 붉은 노면이 보호구역 시작 지점. 구간 안의 청계3가·관수교 정류장에도 정차.</figcaption>
+    </figure>
+    <figure>
+      <video class="loop" src="media/clip-traffic.mp4" poster="media/clip-traffic.jpg" muted loop playsinline preload="none"></video>
+      <figcaption><b>혼잡 구간</b> 합류 차량과 오토바이가 섞인 구간에서 앞차를 따라 주행.</figcaption>
+    </figure>
+  </div>
+  <p class="note">위 주행 영상(5단계 모델, seed 1000)에서 잘라 낸 장면입니다. 초록색 차량이 버스입니다.</p>
+</section>
+
+<section class="sec" id="method">
+  <h2>학습 방법</h2>
+  <div class="prose">
+    <p>처음에는 PPO만으로 학습했습니다. 베이스라인 PPO는 테스트 100판에서 완주 0%였고, 신호 앞에 정지한 채 움직이지 않는 정책으로 수렴했습니다. 보상 항목을 줄인 실험에서도 첫 정류장에 정차한 뒤 출발하지 않았습니다. 정류장만 있는 1단계에서 순수 PPO의 최고 완주율은 60%였습니다.</p>
+    <p>이후 모방학습으로 바꿨습니다. 규칙으로 주행하는 선생님을 만들고, 선생님의 주행 데이터로 학생 모델을 학습하는 방식입니다.</p>
+  </div>
+
+  <ol class="flow">
+    <li><b>선생님</b><span>PPO 정책에 안전 필터와 규칙을 더한 것입니다. 정류장 150&nbsp;m 전부터 정류장 차로로 옮겨 10초 정차하고, 적색과 황색에서 미리 감속하고, 보호구역에서는 제한속도보다 낮게 주행합니다. 규칙은 정책의 가감속을 낮추는 방향으로만 작동합니다.</span></li>
+    <li><b>시범 수집</b><span>선생님으로 시범 주행을 수집합니다(1단계와 5단계 기준 100판). 충돌이나 위반이 있는 판은 제외하고, 필터와 규칙이 적용된 뒤의 행동을 정답으로 저장합니다.</span></li>
+    <li><b>모방학습 (BC)</b><span>학생은 관측 67차원을 입력받는 MLP(256-256)이고 가감속과 차선변경을 출력합니다. 앞 단계 학생의 가중치에서 시작해 시범 데이터로 학습합니다.</span></li>
+    <li><b>DAgger</b><span>학생이 주행하며 만난 상태에 선생님의 행동을 붙여 데이터에 추가합니다. 1, 2단계에는 적용했고, 3단계부터는 적용하면 성능이 떨어져 쓰지 않았습니다.</span></li>
+  </ol>
+  <p class="note">평가에서 학생은 규칙과 안전 필터 없이 주행합니다. 안전 필터는 개입 여부만 기록하는 감시 모드로 둡니다.</p>
+
+  <h3>1단계 방법 비교</h3>
+  <div class="tbl">
+    <table class="narrow">
+      <thead><tr><th>방법</th><th class="n">완주</th><th class="n">충돌</th></tr></thead>
+      <tbody>
+        <tr><td>PPO (처음부터 학습)</td><td class="n">0%</td><td class="n">40~95%</td></tr>
+        <tr><td>선생님 (안전 필터 사용)</td><td class="n">100%</td><td class="n">0%</td></tr>
+        <tr><td>BC (시범 100판)</td><td class="n">87%</td><td class="n">0%</td></tr>
+        <tr><td>BC 후 PPO 30만 step</td><td class="n">0~35%</td><td class="n">0~5%</td></tr>
+        <tr><td><b>BC + DAgger 1회</b></td><td class="n"><b>100%</b></td><td class="n"><b>0%</b></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note">개발 판 30개 기준입니다. BC 모델을 PPO로 이어서 학습하면 완주율이 떨어졌습니다.</p>
+
+  <h3>KL-PPO 실험 (4단계)</h3>
+  <div class="prose">
+    <p>4단계 학생 모델에서 시작해 KL 제약을 둔 PPO를 30만 step 학습했습니다. 10만 step 체크포인트는 개발 판 30개에서 완주 100%, 충돌 0%였고, KL 제약이 없는 대조군은 완주 80%, 충돌 20%였습니다.</p>
+    <p>시작 모델도 같은 30판에서 완주 100%여서, 개선 여부는 판 수를 늘려 확인해야 합니다.</p>
+  </div>
+</section>
+
+<section class="sec" id="results">
+  <h2>결과</h2>
+  <div class="prose">
+    <p>완주는 종점에 도착하고 정류장을 모두 정차한 판입니다. 팀 기준은 완주율 95% 이상, 수동개입률 16% 이하입니다.</p>
+  </div>
+
+  <div class="tbl">
+    <table class="res-tbl">
+      <thead>
+        <tr><th>단계</th><th>학습</th><th class="n">평가</th><th class="bar-col">완주</th><th class="n">충돌</th><th class="n">적색 통과</th><th class="n">시간초과</th><th class="n">개입률</th></tr>
+      </thead>
+      <tbody>
+        <tr><th>1 버스정류장</th><td>BC + DAgger 1회</td><td class="n">30판</td><td class="bar-col"><span class="bar-v" style="--v:100">100%</span></td><td class="n">0%</td><td class="n">0%</td><td class="n">0%</td><td class="n">2.1%</td></tr>
+        <tr><th>2 신호등, 횡단보도</th><td>BC + DAgger 1회</td><td class="n">30판</td><td class="bar-col"><span class="bar-v" style="--v:97">97%</span></td><td class="n">0%</td><td class="n">0%</td><td class="n">3%</td><td class="n">1.0%</td></tr>
+        <tr><th>3 끼어들기</th><td>BC</td><td class="n">90판</td><td class="bar-col"><span class="bar-v" style="--v:98.9">98.9%</span></td><td class="n">1.1%</td><td class="n">0%</td><td class="n">0%</td><td class="n">0.5%</td></tr>
+        <tr><th>4 어린이보호구역</th><td>BC</td><td class="n">90판</td><td class="bar-col"><span class="bar-v miss" style="--v:93.3">93.3%</span></td><td class="n">2.2%</td><td class="n">0%</td><td class="n">2.2%</td><td class="n">3.3%</td></tr>
+        <tr><th>5 오토바이</th><td>BC</td><td class="n">90판</td><td class="bar-col"><span class="bar-v miss" style="--v:87.8">87.8%</span></td><td class="n">6.7%</td><td class="n">3.3%</td><td class="n">2.2%</td><td class="n">0.3%</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note">막대의 세로선이 기준 95%입니다. 1~4단계는 조민기, 5단계는 강동연이 학습했습니다. 학습 시드는 1개이고, 평가 판은 학습에 쓰지 않은 seed입니다. 개입률은 감시 모드의 안전 필터가 개입 조건에 해당한 스텝의 비율입니다.</p>
+
+  <h3>5단계 학습 시도</h3>
+  <div class="tbl">
+    <table class="narrow">
+      <thead><tr><th>설정</th><th class="n">완주</th><th class="n">충돌</th></tr></thead>
+      <tbody>
+        <tr><td>3단계 학생에서 시작, 3단계 선생님 시범</td><td class="n">72%</td><td class="n">–</td></tr>
+        <tr><td>위 설정 + DAgger 1회</td><td class="n">82%</td><td class="n">–</td></tr>
+        <tr><td><b>4단계 학생에서 시작, 4단계 선생님 시범 100판</b></td><td class="n"><b>87.8%</b></td><td class="n"><b>6.7%</b></td></tr>
+        <tr><td>위 설정 + DAgger 1회</td><td class="n">87.8%</td><td class="n">11.1%</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note">파란색으로 표시한 설정이 최종 모델입니다. 4단계 선생님은 5단계 시범 100판을 모두 완주했습니다.</p>
+
+  <h3>5단계 모델 테스트 판 평가</h3>
+  <div class="tbl">
+    <table>
+      <thead><tr><th>평가 판</th><th class="n">판 수</th><th class="n">완주</th><th class="n">충돌</th><th class="n">적색 통과</th><th class="n">시간초과</th><th class="n">개입률</th></tr></thead>
+      <tbody>
+        <tr><td>개발 30판 + 학습 범위 60판</td><td class="n">90</td><td class="n">87.8%</td><td class="n">6.7%</td><td class="n">3.3%</td><td class="n">2.2%</td><td class="n">0.3%</td></tr>
+        <tr><td>팀 공통 테스트 판 (seed 1000~1089)</td><td class="n">90</td><td class="n">88.9%</td><td class="n">1.1%</td><td class="n">2.2%</td><td class="n">7.8%</td><td class="n">0.4%</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note">테스트 판 결과는 저장소의 최종 모델(<code>s5_student.pt</code>)을 감시 모드로 다시 실행한 값입니다(SUMO 1.27.1). 완주 80판, 시간초과 7판, 적색 통과 2판, 충돌 1판입니다.</p>
+</section>
+
+<section class="sec" id="limits">
+  <h2>한계</h2>
+  <div class="prose">
+    <p>테스트 90판 중 실패한 10판의 종료 위치입니다. 광교 교차로와 청계3가 교차로 두 곳에 8판이 모여 있습니다.</p>
+  </div>
+
+  <figure class="wide">
+    <div class="line-scroll">
+      <svg id="failLine" class="line" viewBox="0 0 1120 190" role="img" aria-label="5단계 모델 테스트 90판의 실패 위치. 광교 교차로에 시간초과 4판, 청계2가 동쪽 정지선에 적색 통과 2판, 청계3가 교차로에 시간초과 3판과 충돌 1판."></svg>
+    </div>
+    <figcaption>점 하나가 한 판입니다. <i class="dot d-to"></i>시간초과 7 <i class="dot d-red"></i>적색 통과 2 <i class="dot d-col"></i>충돌 1</figcaption>
+  </figure>
+
+  <div class="clips">
+    <figure>
+      <video class="loop" src="media/clip-fail-stall.mp4" poster="media/clip-fail-stall.jpg" muted loop playsinline preload="none"></video>
+      <figcaption><b>교차로 안 정지 (seed 1008)</b> 광교 교차로 출구 횡단보도 앞에서 멈춘 뒤 제한 시간 1,800초까지 출발하지 않음.</figcaption>
+    </figure>
+    <figure>
+      <video class="loop" src="media/clip-fail-red.mp4" poster="media/clip-fail-red.jpg" muted loop playsinline preload="none"></video>
+      <figcaption><b>적색 통과 (seed 1010)</b> 청계2가 교차로 동쪽 정지선에서 감속이 늦어 시속 18&nbsp;km로 통과.</figcaption>
+    </figure>
+  </div>
+
+  <ul class="plain limits-list">
+    <li>4단계(93.3%)와 5단계(87.8%)는 완주율 기준 95%에 못 미칩니다.</li>
+    <li>시간초과 7판은 모두 교차로 안에서 정지한 뒤 다시 출발하지 않은 경우입니다. 광교 교차로에서 4판, 청계3가 교차로에서 3판입니다.</li>
+    <li>관측에 신호 잔여 시간이 없습니다. 적색 통과 2판은 청계2가 동쪽 정지선에서 감속이 늦은 경우입니다.</li>
+    <li>학습 시드는 1개입니다. 팀 기준은 시드 3개의 평균입니다.</li>
+    <li>학생 성능은 선생님 시범에 의존합니다. 5단계 시범에서는 전체 스텝의 약 50%에서 안전 필터가 행동을 수정했습니다.</li>
+    <li>교통량과 보행량은 가정한 값입니다. 무단횡단과 자전거는 환경에 없습니다.</li>
+  </ul>
+</section>
+
+<section class="sec" id="data">
+  <h2>데이터셋</h2>
+  <div class="prose">
+    <p>한 행이 한 스텝(0.5초)인 표 형식입니다. 컬럼은 167개이고 다섯 단계에서 같습니다. 학습 입력은 <code>obs.*</code> 67개이고, 나머지는 행동, 보상, 사건 기록, 분석용 시뮬레이터 상태입니다.</p>
+  </div>
+
+  <div class="tbl">
+    <table>
+      <thead><tr><th>컬럼</th><th class="n">개수</th><th>내용</th><th>학습에서</th></tr></thead>
+      <tbody>
+        <tr><td><code>episode, seed, t, route</code></td><td class="n">4</td><td>판 번호, seed, 스텝 번호, 경로</td><td>사용 안 함</td></tr>
+        <tr><td><code>obs.*</code></td><td class="n">67</td><td>내 속도 1, 차로 5개의 앞뒤 차량·밀도·차로 끝 30, 회전 안내와 노면 화살표 18, 신호 6, 횡단보도 보행자 6, 정류장 3, 보호구역 2, 차선변경 금지 구간 1</td><td><b>입력</b></td></tr>
+        <tr><td><code>action_raw.*, action.*</code></td><td class="n">6</td><td>정책 출력(가감속, 차선변경)과 실제 적용된 값</td><td>정답 (BC)</td></tr>
+        <tr><td><code>reward, terminated, truncated</code></td><td class="n">3</td><td>보상, 종료 여부</td><td>RL 학습 신호</td></tr>
+        <tr><td><code>event.*</code></td><td class="n">16</td><td>충돌, 도착, 적색 통과, 양보 위반, 안전 필터 개입 조건, 정차 성공/놓침</td><td>사용 안 함</td></tr>
+        <tr><td><code>state.*</code></td><td class="n">71</td><td>버스 위치와 속도, 신호 7개의 색과 잔여 시간, 정류장 5곳 상태, 주변 차량 수 (관측에 없는 정보 포함)</td><td>사용 안 함</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <p>수집 코드는 <code>collect_pomdp_data.py</code>이고, 선생님 또는 학생이 주행하는 동안 스텝마다 한 행을 기록합니다. 값이 없는 칸은 −1입니다. 신호가 없는 1단계에서는 신호 관련 42칸이 모두 −1입니다.</p>
+  </div>
+
+<pre class="code" tabindex="0"><code>import pandas as pd
+
+df = pd.read_csv("data/&lt;이름&gt;.table.csv.gz")
+X = df.filter(like="obs.").to_numpy()                               # 관측 67개
+y = df[["action_raw.accel", "action_raw.lane_change"]].to_numpy()   # BC 정답</code></pre>
+
+  <p class="links">
+    <a data-link="dataset" href="#">Hugging Face 데이터셋</a>
+    <a href="https://github.com/TranserZ/Artificial-Intelligence-and-Control-for-Autonomous-Driving/blob/BehaviorCloning/docs/data_columns.md">컬럼 정의 전체 (data_columns.md)</a>
+  </p>
+</section>
+
+<section class="sec" id="team">
+  <h2>팀</h2>
+  <ul class="team">
+    <li>
+      <h3>조민기 <small>팀장</small></h3>
+      <p>단계별 도로 환경, 교통 생성, 선생님 규칙과 BC/DAgger 파이프라인, 1~4단계 학습, 발표 자료</p>
+      <a href="https://github.com/TranserZ/Artificial-Intelligence-and-Control-for-Autonomous-Driving/tree/BehaviorCloning/models/bc_ppo">BehaviorCloning 브랜치</a>
+    </li>
+    <li>
+      <h3>강동연</h3>
+      <p>청계천로 도로망과 신호, 학습 환경 정리, 데이터 컬럼 정의, 5단계 학습, 프로젝트 페이지</p>
+      <a href="https://github.com/TranserZ/Artificial-Intelligence-and-Control-for-Autonomous-Driving/tree/model/dongyeon-bc56/models/dongyeon_bc">model/dongyeon-bc56 브랜치</a>
+    </li>
+    <li>
+      <h3>박선우</h3>
+      <p>순수 PPO 단계별 학습, 어텐션 정책 실험, 단일 PPO 한계 분석</p>
+      <a href="https://github.com/TranserZ/Artificial-Intelligence-and-Control-for-Autonomous-Driving/tree/model/sunwoo-ppo-stage/docs/experiments">model/sunwoo-ppo-stage 브랜치</a>
+    </li>
+    <li>
+      <h3>김희영</h3>
+      <p>정류장, 차로 수, 보호구역 등 도로 세부 설정, 실험 프로토콜, 할인율·보상 실험, KL-PPO, 성능 검증</p>
+      <a href="https://github.com/TranserZ/Artificial-Intelligence-and-Control-for-Autonomous-Driving/blob/main/docs/README.md">실험 보고서 목록</a>
+    </li>
+  </ul>
+</section>
+
+</div>
+</main>
+
+<footer class="foot">
+  <div class="foot-in">
+    <ul class="res res-foot" aria-label="제출 자료">
+      <li><a data-link="code" href="https://github.com/TranserZ/Artificial-Intelligence-and-Control-for-Autonomous-Driving"><b>코드</b><span>GitHub 저장소</span></a></li>
+      <li><a data-link="slides" href="#"><b>발표 자료</b><span>PDF</span></a></li>
+      <li><a data-link="dataset" href="#"><b>데이터셋</b><span>Hugging Face</span></a></li>
+      <li><a href="https://github.com/TranserZ/Artificial-Intelligence-and-Control-for-Autonomous-Driving/blob/main/docs/README.md"><b>실험 보고서</b><span>docs/reports</span></a></li>
+    </ul>
+    <div class="src">
+      <p>도로 형상: © OpenStreetMap contributors (ODbL). 노선과 차량 정보: <a href="https://news.seoul.go.kr/traffic/archives/515168">서울시 교통뉴스</a>. 운행 속도와 사고 유형: <a href="https://biz.heraldcorp.com/article/10921017">헤럴드경제</a>, <a href="https://www.newsis.com/view/NISX20221125_0002100997">뉴시스</a>. 신호 주기: 서울시 T-DATA, 교통영향평가. 시뮬레이터: Eclipse SUMO 1.27.1.</p>
+      <p>서체: 서울남산체, 서울한강체 (서울특별시).</p>
+    </div>
+  </div>
+</footer>
+
+<script src="run-data.js"></script>
+<script src="fail-data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
