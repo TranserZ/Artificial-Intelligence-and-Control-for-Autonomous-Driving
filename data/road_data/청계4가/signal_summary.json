@@ -1,0 +1,250 @@
+{
+  "name": "청계4가",
+  "samples": 150,
+  "movements": [
+    {
+      "key": "et_St",
+      "label": "동 직진"
+    },
+    {
+      "key": "nt_Pd",
+      "label": "북 보행"
+    },
+    {
+      "key": "nt_St",
+      "label": "북 직진"
+    },
+    {
+      "key": "st_Pd",
+      "label": "남 보행"
+    }
+  ],
+  "state_legend": {
+    "G": "녹색",
+    "g": "비보호녹색",
+    "y": "황색/점멸",
+    "r": "적색",
+    "s": "적색후진행",
+    "u": "적황",
+    "o": "황색점멸",
+    "O": "소등",
+    "?": "미확인"
+  },
+  "cycle_s": 110.0,
+  "cycles_observed": 2,
+  "cycle_list_s": [
+    110.0,
+    110.0
+  ],
+  "phase_sum_s": 109.7,
+  "phases": [
+    {
+      "index": 0,
+      "duration_s": 13.1,
+      "duration_min_max_s": [
+        13.1,
+        14.0
+      ],
+      "observed": 3,
+      "state": "rgGg",
+      "signals": {
+        "적색": [
+          "동 직진"
+        ],
+        "비보호녹색": [
+          "북 보행",
+          "남 보행"
+        ],
+        "녹색": [
+          "북 직진"
+        ]
+      }
+    },
+    {
+      "index": 1,
+      "duration_s": 4.0,
+      "duration_min_max_s": [
+        0.1,
+        4.0
+      ],
+      "observed": 3,
+      "state": "rryr",
+      "signals": {
+        "적색": [
+          "동 직진",
+          "북 보행",
+          "남 보행"
+        ],
+        "황색/점멸": [
+          "북 직진"
+        ]
+      }
+    },
+    {
+      "index": 2,
+      "duration_s": 15.7,
+      "duration_min_max_s": [
+        14.0,
+        16.9
+      ],
+      "observed": 5,
+      "state": "rGrG",
+      "signals": {
+        "적색": [
+          "동 직진",
+          "북 직진"
+        ],
+        "녹색": [
+          "북 보행",
+          "남 보행"
+        ]
+      }
+    },
+    {
+      "index": 3,
+      "duration_s": 13.1,
+      "duration_min_max_s": [
+        12.1,
+        14.0
+      ],
+      "observed": 5,
+      "state": "rgrg",
+      "signals": {
+        "적색": [
+          "동 직진",
+          "북 직진"
+        ],
+        "비보호녹색": [
+          "북 보행",
+          "남 보행"
+        ]
+      }
+    },
+    {
+      "index": 4,
+      "duration_s": 13.0,
+      "duration_min_max_s": [
+        11.1,
+        13.9
+      ],
+      "observed": 3,
+      "state": "Grrr",
+      "signals": {
+        "녹색": [
+          "동 직진"
+        ],
+        "적색": [
+          "북 보행",
+          "북 직진",
+          "남 보행"
+        ]
+      }
+    },
+    {
+      "index": 5,
+      "duration_s": 4.1,
+      "duration_min_max_s": [
+        3.2,
+        4.1
+      ],
+      "observed": 3,
+      "state": "yrrr",
+      "signals": {
+        "황색/점멸": [
+          "동 직진"
+        ],
+        "적색": [
+          "북 보행",
+          "북 직진",
+          "남 보행"
+        ]
+      }
+    },
+    {
+      "index": 6,
+      "duration_s": 1.6,
+      "duration_min_max_s": [
+        1.1,
+        3.9
+      ],
+      "observed": 6,
+      "state": "rrrr",
+      "signals": {
+        "적색": [
+          "동 직진",
+          "북 보행",
+          "북 직진",
+          "남 보행"
+        ]
+      }
+    },
+    {
+      "index": 7,
+      "duration_s": 15.7,
+      "duration_min_max_s": [
+        14.0,
+        16.9
+      ],
+      "observed": 5,
+      "state": "rGrG",
+      "signals": {
+        "적색": [
+          "동 직진",
+          "북 직진"
+        ],
+        "녹색": [
+          "북 보행",
+          "남 보행"
+        ]
+      }
+    },
+    {
+      "index": 8,
+      "duration_s": 13.1,
+      "duration_min_max_s": [
+        12.1,
+        14.0
+      ],
+      "observed": 5,
+      "state": "rgrg",
+      "signals": {
+        "적색": [
+          "동 직진",
+          "북 직진"
+        ],
+        "비보호녹색": [
+          "북 보행",
+          "남 보행"
+        ]
+      }
+    },
+    {
+      "index": 9,
+      "duration_s": 16.3,
+      "duration_min_max_s": [
+        15.7,
+        16.9
+      ],
+      "observed": 2,
+      "state": "rGGG",
+      "signals": {
+        "적색": [
+          "동 직진"
+        ],
+        "녹색": [
+          "북 보행",
+          "북 직진",
+          "남 보행"
+        ]
+      }
+    }
+  ],
+  "green_time_per_movement_s": {
+    "동 직진": 13.0,
+    "북 보행": 87.0,
+    "북 직진": 29.4,
+    "남 보행": 87.0
+  },
+  "other_states_seen": [],
+  "segments_total": 32
+}

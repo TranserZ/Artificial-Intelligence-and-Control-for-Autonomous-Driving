@@ -1,0 +1,17 @@
+{
+  "name": "무교동사거리(연등)",
+  "itst_id": "23967",
+  "fetched_at": "2026-11-21T10:51:25",
+  "record": {
+    "itstId": "23967",
+    "itstNm": "무교동사거리(연등)",
+    "mapCtptIntLat": 37.5692919,
+    "mapCtptIntLot": 126.9792953,
+    "laneWidth": 312.0,
+    "limitSpedTypeNm": "vehicleMaxSpeed",
+    "limitSped": "416",
+    "itstEngNm": null,
+    "rgtrId": "V2X",
+    "regDt": "2026-07-09T16:31:14.000+00:00"
+  }
+}

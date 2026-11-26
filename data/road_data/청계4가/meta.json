@@ -1,0 +1,15 @@
+{
+  "name": "청계4가",
+  "itst_id": "1864",
+  "started_at": "2026-11-21T00:48:49",
+  "ended_at": "2026-11-21T00:53:50",
+  "weekday": "토",
+  "duration_s": 300.0,
+  "interval_s": 2.0,
+  "requests": 150,
+  "successful": 150,
+  "remaining_time_unit_s": 0.1,
+  "map_api_url": "http://t-data.seoul.go.kr/apig/apiman-gateway/tapi/v2xCrossroadMapInformation/1.0?apikey=***",
+  "signal_api_url": "https://t-data.seoul.go.kr/apig/apiman-gateway/tapi/v2xSignalPhaseTimingFusionCurrentInfo/1.0?apikey=***",
+  "signal_timing_api_url": ""
+}
