@@ -27,6 +27,7 @@
     <span class="bar-team">청계로드</span>
   </a>
   <nav class="bar-nav" aria-label="목차">
+    <a href="#process">과정</a>
     <a href="#road">도로</a>
     <a href="#stages">단계</a>
     <a href="#method">학습</a>
@@ -92,21 +93,92 @@
 <section class="sec" id="about">
   <h2>개요</h2>
   <div class="prose">
-    <p>청계A01은 청계광장과 광장시장 사이 청계천로를 운행하는 서울시 자율주행버스입니다. 차량은 운전석이 없는 8인승 셔틀 ROii이고 시속 20&nbsp;km 안팎으로 다닙니다. 언론 보도에 따르면 운행 1년 동안의 사고는 차량 결함이 아니라 다른 차량이 끼어드는 과정에서 난 접촉 사고 등이었습니다.</p>
+    <p>청계A01은 청계광장과 광장시장 사이 청계천로를 운행하는 서울시 자율주행버스입니다. 차량은 운전석이 없는 8인승 셔틀 ROii이고 시속 20&nbsp;km 안팎으로 다닙니다. 1년간의 운행 중 타 차량의 끼어들기로 인한 접촉 사고가 발생했으며, 여전히 사람의 개입이 필요하다는 한계도 남아 있습니다.</p>
+    <p>이 프로젝트의 목표는 사람의 개입을 줄여, 미국 자동차기술자협회(SAE)가 정한 자율주행 4단계(정해진 구역 안에서 사람이 개입하지 않아도 되는 고도 자동화)에 다가가는 모델을 만드는 것입니다.</p>
     <p>이 프로젝트에서는 청계A01의 동행 구간(청계광장 → 청계4가, 2.1&nbsp;km)을 SUMO로 만들었습니다. 도로 형상은 OpenStreetMap, 차로 수는 로드뷰 조사, 신호 주기는 서울시 T-DATA 실측값과 교통영향평가 자료를 썼습니다.</p>
-    <p>같은 도로에 정류장, 신호, 끼어들기, 어린이보호구역, 오토바이를 차례로 추가해 5단계 환경을 만들고, 단계마다 버스 주행 모델을 학습했습니다. 학습에는 규칙 기반 선생님의 주행을 따라 하는 모방학습을 썼습니다.</p>
+    <p>같은 도로에 ① 정류장 ② 신호 ③ 끼어들기 ④ 어린이보호구역 ⑤ 오토바이를 차례로 추가해 5단계 환경을 만들고, 단계마다 버스 주행 모델을 학습했습니다. 학습에는 규칙 기반 전문가의 주행을 따라 하는 모방학습을 썼습니다.</p>
     <p>완주율은 1~3단계 97% 이상, 4단계 93.3%, 5단계 87.8%입니다. 팀 기준인 95%는 3단계까지 만족했습니다.</p>
   </div>
 
   <dl class="facts">
-    <div><dt>구간</dt><dd>청계광장 → 청계4가<small>2,137 m (로드뷰 실측 2,146 m)</small></dd></div>
-    <div><dt>정류장</dt><dd>5곳<small>정류장 차로에서 10초 이상 정차</small></dd></div>
+    <div><dt>구간</dt><dd>청계광장 → 청계4가<small>2,137 m</small></dd></div>
+    <div><dt>정류장</dt><dd>5곳<small>정류장 차로에서 10초 정지하면 정차 성공</small></dd></div>
     <div><dt>신호</dt><dd>6곳<small>정지선 7개, 주기 130~170초</small></dd></div>
     <div><dt>제한속도</dt><dd>30 km/h<small>어린이보호구역 20 km/h</small></dd></div>
     <div><dt>관측</dt><dd>67차원<small>버스 위치에서 볼 수 있는 정보만 사용</small></dd></div>
     <div><dt>행동</dt><dd>가감속, 차선변경<small>가감속은 연속값, 차선은 왼쪽/유지/오른쪽</small></dd></div>
   </dl>
 </section>
+
+<section class="sec" id="process">
+  <h2>프로젝트 진행 과정</h2>
+  <div class="prose tl-intro">
+    <p>처음에는 모두 강화학습(PPO)부터 시도했고, 실패한 이유를 확인한 뒤 ① PPO 보강 ② 모방학습(BC) ③ 모방학습 후 PPO 미세조정으로 나누어 진행했습니다. 서로 결과를 공유하며 다음 학습에 참고했습니다.</p>
+  </div>
+
+  <figure class="wide tl-wrap">
+    <div class="tl" role="img" aria-label="팀원 네 명의 진행 과정. 환경 구축, PPO 보강, 모방학습과 미세조정 순서로 진행했고 최종 모델은 5단계 BC와 DAgger 모델입니다.">
+      <div class="tl-head">
+        <span></span>
+        <div class="tl-phase"><b>환경 구축</b></div>
+        <span></span>
+        <div class="tl-phase"><b>PPO 보강</b></div>
+        <span></span>
+        <div class="tl-phase"><b>모방학습과 미세조정</b></div>
+      </div>
+
+      <div class="tl-row">
+        <div class="tl-who"><b>조민기</b></div>
+        <div class="tl-stop env"><b>보행자, 신호, 어린이보호구역 구현</b><em>10/31 ~ 11/11</em></div>
+        <div class="tl-arrow"></div>
+        <div class="tl-stop ppo"><b>전문가 구현과 BC+PPO</b><span>PPO에 규칙을 더해 전문가 구현. BC 모델에 PPO를 더하자 1단계 <strong>완주 0~35%</strong></span><em>11/21</em></div>
+        <div class="tl-arrow"><span>PPO가 BC 모델의 주행을 망가뜨려 DAgger로 전환</span></div>
+        <div class="tl-stop bc"><b>BC와 DAgger</b><span>4단계 <strong>완주 93.3%, 충돌 2.2%</strong></span><em>11/21 ~ 11/22</em></div>
+      </div>
+
+      <div class="tl-row">
+        <div class="tl-who"><b>강동연</b></div>
+        <div class="tl-stop env"><b>청계천로 도로망</b><span>OSM 도로, 실측 신호, 실제 셔틀 크기와 가감속 반영</span><em>11/3 ~ 11/16</em></div>
+        <div class="tl-arrow"></div>
+        <div class="tl-stop ppo"><b>기본 PPO</b><span>6단계 테스트 100판 <strong>완주 0%</strong></span><em>11/18</em></div>
+        <div class="tl-arrow"><span>모방학습으로 전환</span></div>
+        <div class="tl-stop bc final"><b>5단계 BC와 DAgger</b><span>민기의 4단계 모델에서 시작. 5단계 테스트 100판 <strong>완주 88%, 충돌 2%</strong></span><em>11/23 ~ 11/26</em></div>
+      </div>
+
+      <div class="tl-row">
+        <div class="tl-who"><b>박선우</b></div>
+        <div class="tl-stop env"><b>중간발표 준비</b><em>~ 11/10</em></div>
+        <div class="tl-arrow"></div>
+        <div class="tl-stop ppo"><b>단계별 PPO와 보상 조정</b><span>1단계 <strong>완주 60%</strong>, 2단계 <strong>완주 0%, 충돌 70%</strong></span><em>11/23 ~ 11/24</em></div>
+        <div class="tl-arrow"><span>학습 중에는 달리지만 시험 주행에서는 출발하지 않아 신경망 구조를 바꿈</span></div>
+        <div class="tl-stop ppo"><b>어텐션 정책과 한계 분석</b><span>1단계에서 신경망 구조를 바꿔도 시험 주행에서 멈추는 문제가 남아 단일 PPO의 한계를 정리</span><em>11/24</em></div>
+      </div>
+
+      <div class="tl-row">
+        <div class="tl-who"><b>김희영</b></div>
+        <div class="tl-stop env"><b>도로 세부 설정</b><span>로드뷰로 정류장 위치, 차로 수, 불법주정차 다발구역 등 조사</span><em>11/7 ~ 11/17</em></div>
+        <div class="tl-arrow"></div>
+        <div class="tl-stop ppo"><b>PPO가 멈추는 원인 실험</b><span>6단계에서 γ를 올리면 <strong>완주 0%, 충돌 49%</strong>, 속도 보상을 빼면 <strong>완주 0%, 충돌 2%</strong>.</span><em>11/19 ~ 11/21</em></div>
+        <div class="tl-arrow"><span>팀원의 BC 모델에 PPO 미세조정(KL 페널티)을 더하는 방식으로 전환</span></div>
+        <div class="tl-stop kl"><b>BC 모델의 PPO 미세조정</b><span>민기와 동연의 BC 모델에서 시작. 5단계 100판 <strong>완주 87%, 충돌 3%</strong></span><em>11/22 ~ 11/26</em></div>
+      </div>
+    </div>
+    <figcaption>
+      <span class="tl-key"><i class="ppo"></i>PPO</span>
+      <span class="tl-key"><i class="bc"></i>모방학습</span>
+      <span class="tl-key"><i class="kl"></i>모방학습 후 PPO 미세조정</span>
+      <span class="tl-key"><mark class="tl-hl">팀 최종 모델</mark></span>
+    </figcaption>
+  </figure>
+
+  <dl class="tl-terms">
+    <div><dt>DAgger</dt><dd>BC 모델이 운전하다 만난 상황에 전문가의 정답을 붙여 다시 배우는 방법. 모델이 실수하는 장면을 보강.</dd></div>
+    <div><dt>미세조정(KL 페널티)</dt><dd>이미 학습한 BC 모델을 PPO로 조금 더 학습하되, 원래 행동에서 너무 멀어지지 않게 벌점을 주는 방법. KL 발산은 두 행동 분포가 얼마나 다른지 재는 값. 기존 연구(VPT, InstructGPT)에서 쓰인 방식을 버스 주행에 적용.</dd></div>
+    <div><dt>할인율(γ)</dt><dd>나중에 받을 보상을 지금 얼마나 반영할지 정하는 값. 작을수록 가까운 미래만 봄.</dd></div>
+    <div><dt>어텐션 정책</dt><dd>주변 차, 신호, 정류장 중 지금 중요한 것에 더 집중하도록 만든 신경망 구조.</dd></div>
+  </dl>
+</section>
+
 
 <section class="sec" id="road">
   <h2>도로 환경</h2>
@@ -150,7 +222,7 @@
   <h2>단계별 환경</h2>
   <div class="prose">
     <p>같은 도로에 요소를 하나씩 추가했고, 뒤 단계는 앞 단계의 요소를 모두 포함합니다.</p>
-    <p>관측 67차원은 다섯 단계에서 같습니다. 꺼진 요소의 칸은 “없음” 값으로 채워서, 앞 단계 모델을 다음 단계의 초기값으로 쓸 수 있습니다.</p>
+    <p>관측 67차원은 다섯 단계에서 같습니다. 그 단계에 아직 없는 요소의 칸도 비워 두지 않고 “해당 없음” 값으로 채웁니다. 예를 들어 1단계에는 신호가 없지만 신호 칸 6개는 “보이는 신호 없음” 값으로 들어갑니다. 입력 크기가 늘 같아서, 앞 단계에서 학습한 모델을 다음 단계 학습의 출발점으로 그대로 쓸 수 있습니다.</p>
   </div>
 
   <ol class="stops">
@@ -158,7 +230,7 @@
       <span class="num">1</span>
       <h3>버스정류장</h3>
       <p class="on">정류장 5곳, 승객 6명</p>
-      <p>정류장 차로에서 10초 이상 서면 정차 성공이고, 서지 않고 지나가면 놓친 것으로 처리합니다. SUMO의 자동 정차 기능은 쓰지 않습니다.</p>
+      <p>정류장 차로에서 10초 연속 서 있으면 정차 성공이고, 정류장 끝을 지나치면 놓친 것으로 처리합니다. SUMO의 자동 정차 기능이나 대신 세워 주는 규칙은 쓰지 않고, 모델이 직접 차로를 옮기고 섭니다.</p>
     </li>
     <li>
       <span class="num">2</span>
@@ -186,6 +258,7 @@
     </li>
   </ol>
 
+
   <div class="clips">
     <figure>
       <video class="loop" src="media/clip-stop.mp4" poster="media/clip-stop.jpg" muted loop playsinline preload="none"></video>
@@ -210,15 +283,15 @@
 <section class="sec" id="method">
   <h2>학습 방법</h2>
   <div class="prose">
-    <p>처음에는 PPO만으로 학습했습니다. 베이스라인 PPO는 테스트 100판에서 완주 0%였고, 신호 앞에 정지한 채 움직이지 않는 정책으로 수렴했습니다. 보상 항목을 줄인 실험에서도 첫 정류장에 정차한 뒤 출발하지 않았습니다. 정류장만 있는 1단계에서 순수 PPO의 최고 완주율은 60%였습니다.</p>
-    <p>이후 모방학습으로 바꿨습니다. 규칙으로 주행하는 선생님을 만들고, 선생님의 주행 데이터로 학생 모델을 학습하는 방식입니다.</p>
+    <p>처음에는 PPO만으로 학습했습니다. 베이스라인 PPO는 테스트 100판에서 한 판도 완주하지 못했습니다. 학습이 진행될수록 신호 앞에서 멈춘 뒤 다시 출발하지 않게 됐습니다. 움직이다 충돌하면 크게 감점되고 서 있으면 감점이 작아서, 서 있는 것을 가장 손해가 적은 행동으로 배운 것입니다. 보상 항목을 줄인 실험에서도 첫 정류장에 정차한 뒤 출발하지 않았습니다. 정류장만 있는 1단계에서 순수 PPO의 최고 완주율은 60%였습니다.</p>
+    <p>이후 모방학습으로 바꿨습니다. 규칙으로 주행하는 전문가를 만들고, 전문가의 주행 데이터로 학생 모델을 학습하는 방식입니다.</p>
   </div>
 
   <ol class="flow">
-    <li><b>선생님</b><span>PPO 정책에 안전 필터와 규칙을 더한 것입니다. 정류장 150&nbsp;m 전부터 정류장 차로로 옮겨 10초 정차하고, 적색과 황색에서 미리 감속하고, 보호구역에서는 제한속도보다 낮게 주행합니다. 규칙은 정책의 가감속을 낮추는 방향으로만 작동합니다.</span></li>
-    <li><b>시범 수집</b><span>선생님으로 시범 주행을 수집합니다(1단계와 5단계 기준 100판). 충돌이나 위반이 있는 판은 제외하고, 필터와 규칙이 적용된 뒤의 행동을 정답으로 저장합니다.</span></li>
+    <li><b>전문가</b><span>PPO 정책에 안전 필터와 규칙을 더한 것입니다. 정류장 150&nbsp;m 전부터 정류장 차로로 옮겨 10초 정차하고, 적색과 황색에서 미리 감속하고, 보호구역에서는 제한속도보다 낮게 주행합니다. 규칙은 정책의 가감속을 낮추는 방향으로만 작동합니다.</span></li>
+    <li><b>시범 수집</b><span>전문가로 시범 주행을 수집합니다(1단계와 5단계 기준 100판). 충돌이나 위반이 있는 판은 제외하고, 필터와 규칙이 적용된 뒤의 행동을 정답으로 저장합니다.</span></li>
     <li><b>모방학습 (BC)</b><span>학생은 관측 67차원을 입력받는 MLP(256-256)이고 가감속과 차선변경을 출력합니다. 앞 단계 학생의 가중치에서 시작해 시범 데이터로 학습합니다.</span></li>
-    <li><b>DAgger</b><span>학생이 주행하며 만난 상태에 선생님의 행동을 붙여 데이터에 추가합니다. 1, 2단계에는 적용했고, 3단계부터는 적용하면 성능이 떨어져 쓰지 않았습니다.</span></li>
+    <li><b>DAgger</b><span>학생이 주행하며 만난 상태에 전문가의 행동을 붙여 데이터에 추가합니다. 1, 2단계에는 적용했고, 3단계부터는 적용하면 성능이 떨어져 쓰지 않았습니다.</span></li>
   </ol>
   <p class="note">평가에서 학생은 규칙과 안전 필터 없이 주행합니다. 안전 필터는 개입 여부만 기록하는 감시 모드로 둡니다.</p>
 
@@ -228,7 +301,7 @@
       <thead><tr><th>방법</th><th class="n">완주</th><th class="n">충돌</th></tr></thead>
       <tbody>
         <tr><td>PPO (처음부터 학습)</td><td class="n">0%</td><td class="n">40~95%</td></tr>
-        <tr><td>선생님 (안전 필터 사용)</td><td class="n">100%</td><td class="n">0%</td></tr>
+        <tr><td>전문가 (안전 필터 사용)</td><td class="n">100%</td><td class="n">0%</td></tr>
         <tr><td>BC (시범 100판)</td><td class="n">87%</td><td class="n">0%</td></tr>
         <tr><td>BC 후 PPO 30만 step</td><td class="n">0~35%</td><td class="n">0~5%</td></tr>
         <tr><td><b>BC + DAgger 1회</b></td><td class="n"><b>100%</b></td><td class="n"><b>0%</b></td></tr>
@@ -237,10 +310,9 @@
   </div>
   <p class="note">개발 판 30개 기준입니다. BC 모델을 PPO로 이어서 학습하면 완주율이 떨어졌습니다.</p>
 
-  <h3>KL-PPO 실험 (4단계)</h3>
+  <h3>BC 모델의 PPO 미세조정 실험 (4단계)</h3>
   <div class="prose">
-    <p>4단계 학생 모델에서 시작해 KL 제약을 둔 PPO를 30만 step 학습했습니다. 10만 step 체크포인트는 개발 판 30개에서 완주 100%, 충돌 0%였고, KL 제약이 없는 대조군은 완주 80%, 충돌 20%였습니다.</p>
-    <p>시작 모델도 같은 30판에서 완주 100%여서, 개선 여부는 판 수를 늘려 확인해야 합니다.</p>
+    <p>4단계 BC 모델에서 시작해, PPO를 더해도 BC가 배운 주행이 무너지지 않는지 확인하기 위해 KL 페널티를 준 PPO 미세조정을 30만 step 학습했습니다. 앞서 BC 모델에 PPO를 그대로 이어 학습했을 때 주행이 무너졌기 때문에, 이미 잘 달리는 4단계에서 안정성부터 확인한 것입니다. 10만 step 체크포인트는 개발 판 30개에서 완주 100%, 충돌 0%를 유지했고, KL 페널티가 없는 대조군은 완주 80%, 충돌 20%로 무너졌습니다.</p>
   </div>
 </section>
 
@@ -253,7 +325,7 @@
   <div class="tbl">
     <table class="res-tbl">
       <thead>
-        <tr><th>단계</th><th>학습</th><th class="n">평가</th><th class="bar-col">완주</th><th class="n">충돌</th><th class="n">적색 통과</th><th class="n">시간초과</th><th class="n">개입률</th></tr>
+        <tr><th>단계</th><th>학습</th><th class="n">평가</th><th class="bar-col">완주</th><th class="n">충돌</th><th class="n">신호위반</th><th class="n">시간초과</th><th class="n">개입률</th></tr>
       </thead>
       <tbody>
         <tr><th>1 버스정류장</th><td>BC + DAgger 1회</td><td class="n">30판</td><td class="bar-col"><span class="bar-v" style="--v:100">100%</span></td><td class="n">0%</td><td class="n">0%</td><td class="n">0%</td><td class="n">2.1%</td></tr>
@@ -271,26 +343,27 @@
     <table class="narrow">
       <thead><tr><th>설정</th><th class="n">완주</th><th class="n">충돌</th></tr></thead>
       <tbody>
-        <tr><td>3단계 학생에서 시작, 3단계 선생님 시범</td><td class="n">72%</td><td class="n">–</td></tr>
-        <tr><td>위 설정 + DAgger 1회</td><td class="n">82%</td><td class="n">–</td></tr>
-        <tr><td><b>4단계 학생에서 시작, 4단계 선생님 시범 100판</b></td><td class="n"><b>87.8%</b></td><td class="n"><b>6.7%</b></td></tr>
-        <tr><td>위 설정 + DAgger 1회</td><td class="n">87.8%</td><td class="n">11.1%</td></tr>
+        <tr><td>① 3단계 학생에서 시작, 3단계 전문가 시범</td><td class="n">72%</td><td class="n">–</td></tr>
+        <tr><td>② ① + DAgger 1회</td><td class="n">82%</td><td class="n">–</td></tr>
+        <tr><td><b>③ 4단계 학생에서 시작, 4단계 전문가 시범 100판</b></td><td class="n"><b>87.8%</b></td><td class="n"><b>6.7%</b></td></tr>
+        <tr><td>④ ③ + DAgger 1회</td><td class="n">87.8%</td><td class="n">11.1%</td></tr>
+        <tr><td>⑤ ③ + PPO 미세조정 (KL 페널티)</td><td class="n">87%</td><td class="n">3%</td></tr>
       </tbody>
     </table>
   </div>
-  <p class="note">파란색으로 표시한 설정이 최종 모델입니다. 4단계 선생님은 5단계 시범 100판을 모두 완주했습니다.</p>
+  <p class="note">파란색으로 표시한 설정이 최종 모델입니다. 4단계 전문가는 5단계 시범 100판을 모두 완주했습니다.</p>
 
-  <h3>5단계 모델 테스트 판 평가</h3>
+  <h3>최종 모델 테스트 판 평가</h3>
   <div class="tbl">
     <table>
-      <thead><tr><th>평가 판</th><th class="n">판 수</th><th class="n">완주</th><th class="n">충돌</th><th class="n">적색 통과</th><th class="n">시간초과</th><th class="n">개입률</th></tr></thead>
+      <thead><tr><th>평가 판</th><th class="n">판 수</th><th class="n">완주</th><th class="n">충돌</th><th class="n">신호위반</th><th class="n">시간초과</th><th class="n">개입률</th></tr></thead>
       <tbody>
         <tr><td>개발 30판 + 학습 범위 60판</td><td class="n">90</td><td class="n">87.8%</td><td class="n">6.7%</td><td class="n">3.3%</td><td class="n">2.2%</td><td class="n">0.3%</td></tr>
         <tr><td>팀 공통 테스트 판 (seed 1000~1089)</td><td class="n">90</td><td class="n">88.9%</td><td class="n">1.1%</td><td class="n">2.2%</td><td class="n">7.8%</td><td class="n">0.4%</td></tr>
       </tbody>
     </table>
   </div>
-  <p class="note">테스트 판 결과는 저장소의 최종 모델(<code>s5_student.pt</code>)을 감시 모드로 다시 실행한 값입니다(SUMO 1.27.1). 완주 80판, 시간초과 7판, 적색 통과 2판, 충돌 1판입니다.</p>
+  <p class="note">테스트 판 결과는 저장소의 최종 모델(<code>s5_student.pt</code>)을 감시 모드로 다시 실행한 값입니다(SUMO 1.27.1). 완주 80판, 시간초과 7판, 신호위반 2판, 충돌 1판입니다.</p>
 </section>
 
 <section class="sec" id="limits">
@@ -301,9 +374,9 @@
 
   <figure class="wide">
     <div class="line-scroll">
-      <svg id="failLine" class="line" viewBox="0 0 1120 190" role="img" aria-label="5단계 모델 테스트 90판의 실패 위치. 광교 교차로에 시간초과 4판, 청계2가 동쪽 정지선에 적색 통과 2판, 청계3가 교차로에 시간초과 3판과 충돌 1판."></svg>
+      <svg id="failLine" class="line" viewBox="0 0 1120 190" role="img" aria-label="5단계 모델 테스트 90판의 실패 위치. 광교 교차로에 시간초과 4판, 청계2가 동쪽 정지선에 신호위반 2판, 청계3가 교차로에 시간초과 3판과 충돌 1판."></svg>
     </div>
-    <figcaption>점 하나가 한 판입니다. <i class="dot d-to"></i>시간초과 7 <i class="dot d-red"></i>적색 통과 2 <i class="dot d-col"></i>충돌 1</figcaption>
+    <figcaption>점 하나가 한 판입니다. <i class="dot d-to"></i>시간초과 7 <i class="dot d-red"></i>신호위반 2 <i class="dot d-col"></i>충돌 1</figcaption>
   </figure>
 
   <div class="clips">
@@ -313,18 +386,47 @@
     </figure>
     <figure>
       <video class="loop" src="media/clip-fail-red.mp4" poster="media/clip-fail-red.jpg" muted loop playsinline preload="none"></video>
-      <figcaption><b>적색 통과 (seed 1010)</b> 청계2가 교차로 동쪽 정지선에서 감속이 늦어 시속 18&nbsp;km로 통과.</figcaption>
+      <figcaption><b>신호위반 (seed 1010)</b> 청계2가 교차로 동쪽 정지선에서 감속이 늦어 시속 18&nbsp;km로 통과.</figcaption>
     </figure>
   </div>
 
   <ul class="plain limits-list">
-    <li>4단계(93.3%)와 5단계(87.8%)는 완주율 기준 95%에 못 미칩니다.</li>
+    <li>4단계(93.3%)와 5단계(87.8%)는 팀 기준 완주율 95%에 못 미칩니다.</li>
     <li>시간초과 7판은 모두 교차로 안에서 정지한 뒤 다시 출발하지 않은 경우입니다. 광교 교차로에서 4판, 청계3가 교차로에서 3판입니다.</li>
-    <li>관측에 신호 잔여 시간이 없습니다. 적색 통과 2판은 청계2가 동쪽 정지선에서 감속이 늦은 경우입니다.</li>
+    <li>모델은 매 순간의 관측만 보기 때문에 황색이 언제 켜졌는지 모릅니다. 신호위반 2판은 이러한 이유로 감속이 늦은 경우입니다.</li>
     <li>학습 시드는 1개입니다. 팀 기준은 시드 3개의 평균입니다.</li>
-    <li>학생 성능은 선생님 시범에 의존합니다. 5단계 시범에서는 전체 스텝의 약 50%에서 안전 필터가 행동을 수정했습니다.</li>
+    <li>학생 성능은 전문가 시범에 의존합니다. 5단계 시범에서는 전체 스텝의 약 50%에서 안전 필터가 행동을 수정했습니다.</li>
     <li>교통량과 보행량은 가정한 값입니다. 무단횡단과 자전거는 환경에 없습니다.</li>
   </ul>
+
+  <h3>6단계 시도</h3>
+  <div class="prose">
+    <p>6단계(5단계 + 불법주정차)도 학습했지만 팀 기준을 넘지 못해, 팀 최종 환경은 5단계로 정했습니다.</p>
+  </div>
+
+  <h4>6단계 최종 모델</h4>
+  <div class="tbl">
+    <table class="narrow">
+      <thead><tr><th>평가 판</th><th class="n">판 수</th><th class="n">완주</th><th class="n">충돌</th></tr></thead>
+      <tbody>
+        <tr><td>개발 판</td><td class="n">90</td><td class="n">72.2%</td><td class="n">7.8%</td></tr>
+        <tr><td>테스트 판 (seed 1000~1089)</td><td class="n">90</td><td class="n">74.4%</td><td class="n">7.8%</td></tr>
+        <tr><td><b>합계</b></td><td class="n"><b>180</b></td><td class="n"><b>73.3%</b></td><td class="n"><b>7.8%</b></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note">충돌은 대부분 정체 속 차선변경에서 났습니다. 실패 48판 중 약 25판이 정류장 앞에서 차선변경을 못하거나 주차된 오토바이를 피하지 못해 생겼습니다. 신호위반도 12.8%로 남았습니다.</p>
+
+  <h4>PPO 미세조정 모델 (KL 페널티)</h4>
+  <div class="tbl">
+    <table class="narrow">
+      <thead><tr><th>평가 판</th><th class="n">판 수</th><th class="n">완주</th><th class="n">충돌</th></tr></thead>
+      <tbody>
+        <tr><td>개발 판</td><td class="n">30</td><td class="n"><b>73.3%</b></td><td class="n"><b>6.7%</b></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note">30판 중 19판에서 장시간 멈춤이 있어 테스트 판 평가로 넘어가지 못했습니다. 정류장 바로 뒤에 주차된 오토바이가 있으면 정차와 회피가 부딪혔고, 옆 차로가 비어 있어도 버스가 차로를 바꾸지 않았습니다.</p>
 </section>
 
 <section class="sec" id="data">
@@ -341,14 +443,14 @@
         <tr><td><code>obs.*</code></td><td class="n">67</td><td>내 속도 1, 차로 5개의 앞뒤 차량·밀도·차로 끝 30, 회전 안내와 노면 화살표 18, 신호 6, 횡단보도 보행자 6, 정류장 3, 보호구역 2, 차선변경 금지 구간 1</td><td><b>입력</b></td></tr>
         <tr><td><code>action_raw.*, action.*</code></td><td class="n">6</td><td>정책 출력(가감속, 차선변경)과 실제 적용된 값</td><td>정답 (BC)</td></tr>
         <tr><td><code>reward, terminated, truncated</code></td><td class="n">3</td><td>보상, 종료 여부</td><td>RL 학습 신호</td></tr>
-        <tr><td><code>event.*</code></td><td class="n">16</td><td>충돌, 도착, 적색 통과, 양보 위반, 안전 필터 개입 조건, 정차 성공/놓침</td><td>사용 안 함</td></tr>
+        <tr><td><code>event.*</code></td><td class="n">16</td><td>충돌, 도착, 신호위반, 양보 위반, 안전 필터 개입 조건, 정차 성공/놓침</td><td>사용 안 함</td></tr>
         <tr><td><code>state.*</code></td><td class="n">71</td><td>버스 위치와 속도, 신호 7개의 색과 잔여 시간, 정류장 5곳 상태, 주변 차량 수 (관측에 없는 정보 포함)</td><td>사용 안 함</td></tr>
       </tbody>
     </table>
   </div>
 
   <div class="prose">
-    <p>수집 코드는 <code>collect_pomdp_data.py</code>이고, 선생님 또는 학생이 주행하는 동안 스텝마다 한 행을 기록합니다. 값이 없는 칸은 −1입니다. 신호가 없는 1단계에서는 신호 관련 42칸이 모두 −1입니다.</p>
+    <p>수집 코드는 <code>collect_pomdp_data.py</code>이고, 전문가 또는 학생이 주행하는 동안 스텝마다 한 행을 기록합니다. 값이 없는 칸은 −1입니다. 신호가 없는 1단계에서는 신호 관련 42칸이 모두 −1입니다.</p>
   </div>
 
 <pre class="code" tabindex="0"><code>import pandas as pd
@@ -368,7 +470,7 @@ y = df[["action_raw.accel", "action_raw.lane_change"]].to_numpy()   # BC 정답<
   <ul class="team">
     <li>
       <h3>조민기 <small>팀장</small></h3>
-      <p>단계별 도로 환경, 교통 생성, 선생님 규칙과 BC/DAgger 파이프라인, 1~4단계 학습, 발표 자료</p>
+      <p>단계별 도로 환경, 교통 생성, 전문가 규칙과 BC/DAgger 파이프라인, 1~4단계 학습, 발표 자료</p>
       <a href="https://github.com/TranserZ/Artificial-Intelligence-and-Control-for-Autonomous-Driving/tree/BehaviorCloning/models/bc_ppo">BehaviorCloning 브랜치</a>
     </li>
     <li>
@@ -383,8 +485,9 @@ y = df[["action_raw.accel", "action_raw.lane_change"]].to_numpy()   # BC 정답<
     </li>
     <li>
       <h3>김희영</h3>
-      <p>정류장, 차로 수, 보호구역 등 도로 세부 설정, 실험 프로토콜, 할인율·보상 실험, KL-PPO, 성능 검증</p>
-      <a href="https://github.com/TranserZ/Artificial-Intelligence-and-Control-for-Autonomous-Driving/blob/main/docs/README.md">실험 보고서 목록</a>
+      <p>정류장 위치, 차로 수, 어린이보호구역, 불법주정차 다발구역의 위치 로드뷰 조사, 테스트 스크립트 제작, 모방학습 모델의 PPO 미세조정</p>
+      <a href="https://github.com/TranserZ/Artificial-Intelligence-and-Control-for-Autonomous-Driving/tree/huiyoung/ppo">순수 PPO 실험 브랜치</a>
+      <a href="https://github.com/TranserZ/Artificial-Intelligence-and-Control-for-Autonomous-Driving/tree/huiyoung/bc-ppo-kl">모방학습 + PPO 미세조정 브랜치</a>
     </li>
   </ul>
 </section>

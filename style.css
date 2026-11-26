@@ -200,6 +200,7 @@ figcaption, .note { font-size: 0.97rem; line-height: 1.7; color: var(--ink-2); }
   background: var(--paper); border: 5px solid var(--blue);
 }
 .sec h3 { font-size: 1.32rem; margin: 2.8rem 0 0.9rem; }
+.sec h4 { font-size: 1.08rem; font-weight: 500; margin: 1.8rem 0 0.6rem; }
 .prose { max-width: var(--col); }
 .prose p + p { margin-top: 1.15em; }
 .plain { max-width: var(--col); margin: 0; padding: 0; list-style: none; }
@@ -310,6 +311,54 @@ figcaption b { font-weight: 500; color: var(--ink); }
 .src a { color: #fff; }
 
 /* ── 좁은 화면 ─────────────────────────────── */
+/* ── 프로젝트 진행 과정 (팀원별 노선) ───────── */
+.tl-wrap { overflow-x: auto; scrollbar-width: thin; scrollbar-color: var(--blue-soft) transparent; }
+.tl { min-width: 60rem; max-width: var(--wide); background: var(--panel); border-radius: 0.5rem; padding: 1.2rem 1.4rem 1.4rem;
+  box-shadow: 0 1px 0 var(--rule); font-family: var(--sign); }
+.tl-head, .tl-row { display: grid; grid-template-columns: 7.5rem minmax(0,1fr) 3rem minmax(0,1fr) 13rem minmax(0,1.15fr); align-items: center; column-gap: 0.4rem; }
+.tl-head { border-bottom: 6px solid var(--blue); padding-bottom: 0.55rem; margin-bottom: 0.4rem; }
+.tl-phase b { display: block; font-weight: 500; font-size: 1.02rem; color: var(--ink); }
+.tl-phase span { font-size: 0.88rem; color: var(--ink-2); }
+.tl-row { padding: 0.95rem 0; border-bottom: 1px dashed var(--rule); }
+.tl-row:last-child { border-bottom: 0; }
+.tl-who b { display: block; font-weight: 500; font-size: 1.12rem; }
+.tl-who span { font-size: 0.85rem; color: var(--ink-2); }
+.tl-stop { position: relative; padding-left: 1.55rem; line-height: 1.45; }
+.tl-stop b { display: block; font-weight: 500; font-size: 0.98rem; color: var(--ink); }
+.tl-stop span { display: block; font-size: 0.86rem; color: var(--ink-2); margin-top: 0.15rem; }
+.tl-stop em { display: block; font-style: normal; font-size: 0.78rem; color: var(--blue); margin-top: 0.2rem; letter-spacing: 0.01em; }
+.tl-stop::before { content: ""; position: absolute; left: 0; top: 0.2em; width: 1rem; height: 1rem; border-radius: 50%;
+  box-sizing: border-box; background: var(--panel); border: 3px solid var(--ink-2); }
+.tl-stop.none::before { display: none; }
+.tl-stop.env { padding-left: 0; }
+.tl-stop.env::before { display: none; }
+.tl-stop.ppo::before { border-color: var(--ink-2); }
+.tl-stop.bc::before { border-color: var(--blue); background: var(--blue); }
+.tl-stop.kl::before { border-color: var(--zone); background: var(--panel); border-width: 4px; }
+.tl-stop.final b, .tl-hl { display: inline; color: var(--ink); background: #cdeaff; padding: 0.05em 0.25em; border-radius: 0.15em; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+.tl-arrow { position: relative; padding-bottom: 0.9rem; text-align: center; }
+.tl-arrow span { display: block; font-size: 0.78rem; line-height: 1.35; color: var(--red); }
+.tl-arrow::after { content: ""; position: absolute; left: 0.3rem; right: 0.6rem; bottom: 0.35rem; height: 2px; background: var(--ink-2); }
+.tl-arrow::before { content: ""; position: absolute; right: 0.3rem; bottom: calc(0.35rem - 4px); border: 5px solid transparent; border-left: 7px solid var(--ink-2); border-right: 0; }
+.tl-arrow.empty::after, .tl-arrow.empty::before { display: none; }
+.tl-wrap figcaption { display: flex; flex-wrap: wrap; gap: 0.4rem 1.4rem; max-width: none; margin-top: 0.8rem; }
+.tl-key { display: inline-flex; align-items: center; gap: 0.45rem; }
+.tl-key i { width: 0.95rem; height: 0.95rem; border-radius: 50%; box-sizing: border-box; border: 3px solid var(--ink-2); background: var(--panel); }
+.tl-key i.env { border-color: var(--rule); background: var(--paper); }
+.tl-key i.bc { border-color: var(--blue); background: var(--blue); }
+.tl-key i.kl { border-color: var(--zone); border-width: 4px; }
+
+
+.tl-intro { max-width: var(--wide); }
+.tl-stop span strong { font-weight: 700; color: var(--ink); -webkit-text-stroke: 0.45px currentColor; }
+.tl-arrow:empty { min-height: 1.2rem; }
+#process > .note { max-width: var(--wide); }
+.tl-terms { margin: 1.4rem 0 0; max-width: var(--wide); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem 2rem; font-family: var(--sign); }
+.tl-terms div { border-top: 1px solid var(--rule); padding-top: 0.55rem; }
+.tl-terms dt { font-weight: 500; font-size: 0.98rem; color: var(--ink); }
+.tl-terms dd { margin: 0.15rem 0 0; font-size: 0.9rem; line-height: 1.6; color: var(--ink-2); }
+@media (max-width: 52rem) { .tl-terms { grid-template-columns: minmax(0, 1fr); } }
+
 @media (max-width: 52rem) {
   .res { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .res li:nth-child(3) { border-left: 0; }
