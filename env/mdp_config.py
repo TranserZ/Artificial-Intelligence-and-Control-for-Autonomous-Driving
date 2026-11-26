@@ -41,13 +41,15 @@ SIMULATION = {
 # 청계천로(2.1 km, 경로 위 신호 6곳, 정류장 5곳)는 600초로는 시간초과가 난다.
 #   주행 ~250초(버스 가속 1.2 m/s², 자전거 뒤 서행) + 신호 6곳 대기 + 정류장 5곳 × 15초
 #   + 정차 감속 + 보행자·끼어들기 여유 → 1200초(2400스텝).
+# 단계별 맵(2026-11-21): 실측 신호 주기(110~170초, 버스 방향 녹색 27~43%)와 최고속도 30 km/h에서
+#   데모 버스(정류장 15초) 주행시간이 690~1010초 (6단계, 본선 400대/시간) → 1800초(3600스텝).
 from env.road_config import CHEONGGYECHEON as _CGC  # noqa: E402
 if _CGC["enabled"]:
-    SIMULATION["max_steps"] = 2400
+    SIMULATION["max_steps"] = 3600
 
 # ──────────────────────────────────────────────────────────────
 # shield (= 수동개입). 차량 shield(앞차 간격), 신호 shield(적색 정지선), 보행자 필터,
-# 차선변경 게이트(옆 차로 간격)를 한 스위치로 묶는다 (experiment_protocol.md A7).
+# 차선변경 게이트(옆 차로 간격)를 한 스위치로 묶는다 (rules/team/experiment_protocol.md A7).
 #   mode "off"    : 학습 기본값. 계산도 하지 않는다 (규칙 없이 모델 혼자 운전)
 #   mode "shadow" : 팀 비교 테스트. 운전은 모델 혼자, "개입했을지"만 info에 기록 → 수동개입률
 #   mode "on"     : 참고용. 위험한 명령을 실제로 덮어쓴다
@@ -63,7 +65,7 @@ SIMULATION["shield"] = {
 # ──────────────────────────────────────────────────────────────
 # 2) 관측 (Observation, 버스가 실제로 받는 부분 관측) — 범위 [-1, 1]
 #
-# env-v1 (experiment_protocol.md A3·A4·A5) 기준 청계천로 67차원. 블록 순서가 곧 벡터 순서이고,
+# env-v1 (rules/team/experiment_protocol.md A3·A4·A5) 기준 청계천로 67차원. 블록 순서가 곧 벡터 순서이고,
 # 인덱스는 고정 숫자 대신 env.obs_index("블록 이름")으로 찾는다 (env.obs_blocks에 범위).
 #
 #   speed        1   내 절대속도 / vmax

@@ -52,6 +52,20 @@ HATCH_W = 0.35            # 빗금 굵기 (m)
 BORDER_W = 0.15           # 테두리 굵기 (m)
 
 
+def _speed_asset(fname, key, limit_kmh):
+    """속도가 그려진 그림(speed, sign_start)은 제한속도별 파일이 있으면 그것을 쓴다.
+
+    school_speed30.png / school_sign_start.png가 30 km/h 기본 그림이고,
+    20 km/h면 school_speed20.png / school_sign_start20.png (env/school_assets.py로 만든 파일).
+    """
+    if limit_kmh is None or limit_kmh == 30 or key not in ("speed", "sign_start"):
+        return fname
+    alt = {"speed": f"school_speed{limit_kmh}.png",
+           "sign_start": f"school_sign_start{limit_kmh}.png"}[key]
+    here = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "env", "assets", alt)
+    return alt if os.path.exists(here) else fname
+
+
 # ──────────────────────────────────────────────────────────────
 # 차로 좌표계: s = 엣지 시작부터 거리, t = 맨 오른쪽 차도 차로의 오른쪽 끝에서 왼쪽으로 거리
 # ──────────────────────────────────────────────────────────────
@@ -137,9 +151,10 @@ class _Writer:
         else:
             self.lines.append(head + "/>")
 
-    def image(self, key, x, y, angle, layer):
+    def image(self, key, x, y, angle, layer, limit_kmh=None):
         self.n += 1
         f, w, h = ASSET[key]
+        f = _speed_asset(f, key, limit_kmh)
         self.lines.append(f'    <poi id="school_zone_mark_{self.n}" type="school_zone_mark" '
                           f'x="{x:.2f}" y="{y:.2f}" width="{w}" height="{h}" angle="{angle:.1f}" '
                           f'layer="{layer}" imgFile="{ASSET_REL}/{f}"/>')
@@ -183,13 +198,18 @@ def _hatch_polygon(w, ptype, poly, color=YELLOW):
         c += HATCH_STEP
 
 
-def marking_lines(net, log=print):
-    """cgc.add.xml에 넣을 줄 목록 (BEGIN/END 표시 포함)."""
+def marking_lines(net, log=print, school_on=True, parking_on=True):
+    """cgc.add.xml에 넣을 줄 목록 (BEGIN/END 표시 포함).
+
+    school_on=False: 어린이보호구역 노면을 그리지 않는다. sumo_env가 이 노면(적색 포장·노란선)을
+        읽어 보호구역을 판정하므로, 보호구역 단계 전에는 그리면 안 된다.
+    parking_on=False: 불법주정차 다발구역 표시를 그리지 않는다 (보기용).
+    """
     w = _Writer()
 
     # ---- 어린이보호구역 ----
     zones = {}                                   # 이름 → [(엣지, 제한속도)] (CSV 순서 유지)
-    for r in _read_csv("school_zones.csv"):
+    for r in (_read_csv("school_zones.csv") if school_on else []):
         eid = r["edge_id"].strip()
         if not net.hasEdge(eid):
             log(f"[zone_markings] 보호구역 엣지가 도로망에 없음 (건너뜀): {eid}")
@@ -208,7 +228,8 @@ def marking_lines(net, log=print):
         for key, s in (("text", min(4.0, fr.length / 2)), ("speed", min(PAVE_LEN + 4.0, fr.length - 1.5))):
             for t in fr.centers:
                 x, y = fr.xy(s, t)
-                w.image(key, x, y, fr.heading(s), ROAD_LAYER + 0.3)
+                w.image(key, x, y, fr.heading(s), ROAD_LAYER + 0.3,
+                        limit_kmh=int(round(limit * 3.6)))
         # 3) 노란 이중 가장자리선: 구역 엣지마다
         for edge, _ in items:
             e = EdgeFrame(edge)
@@ -217,7 +238,7 @@ def marking_lines(net, log=print):
                        {"zone_id": zid})
         # 4) 표지판 (오른쪽 보도 위, 위에서 본 아이콘이라 글자는 북쪽이 위)
         x, y = fr.xy(1.0, -2.0)
-        w.image("sign_start", x, y, 0.0, 6.0)
+        w.image("sign_start", x, y, 0.0, 6.0, limit_kmh=int(round(limit * 3.6)))
         last = EdgeFrame(items[-1][0])
         x, y = last.xy(last.length - 1.0, -2.0)
         w.image("sign_end", x, y, 0.0, 6.0)
@@ -287,7 +308,7 @@ def marking_lines(net, log=print):
 
     # ---- 불법주정차 다발구역: 맨 오른쪽 주행 차로 바닥을 파란색으로 ----
     # (sumo_env는 이 type을 읽지 않는다 — 보기용. 차량은 sumo_env reset이 확률로 세움)
-    for r in _read_csv("illegal_parking_hotspots.csv"):
+    for r in (_read_csv("illegal_parking_hotspots.csv") if parking_on else []):
         eid = r["edge_id"].strip()
         if not net.hasEdge(eid):
             log(f"[zone_markings] 다발구역 엣지가 도로망에 없음 (건너뜀): {eid}")

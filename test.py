@@ -20,6 +20,7 @@ from env.sumo_env import SumoHighwayEnv
 
 from algorithms.ppo import PPO
 from algorithms.bc import BCPolicy
+from algorithms.kl_ppo import load_eval_policy
 from utils.evaluator import evaluate_policy
 
 # train.py와 동일한 네트워크 구조로 만들어야 가중치를 불러올 수 있으므로
@@ -41,9 +42,17 @@ def find_latest_model() -> str:
 
 def load_agent(model_path, obs_dim, act_dim, algorithm="auto"):
     """BC 체크포인트와 기존 PPO state_dict를 구분해 평가 정책을 복원한다."""
-    checkpoint = torch.load(model_path, map_location="cpu", weights_only=True)
+    try:
+        checkpoint = torch.load(model_path, map_location="cpu", weights_only=True)
+    except Exception:
+        checkpoint = torch.load(model_path, map_location="cpu", weights_only=False)
     if not isinstance(checkpoint, dict):
         raise ValueError("지원하지 않는 모델 파일 형식입니다.")
+    policy_sd = checkpoint.get("policy") if isinstance(checkpoint.get("policy"), dict) else {}
+    if checkpoint.get("format") == "kl_ppo" or "accel_trunk.0.weight" in policy_sd:
+        agent = load_eval_policy(model_path, obs_dim, act_dim, HPARAMS)
+        print("평가 알고리즘: KL-PPO")
+        return agent
     if checkpoint.get("algorithm") == "bc":
         detected = "bc"
     elif "trunk.0.weight" in checkpoint and "mu_head.weight" in checkpoint:
@@ -136,6 +145,8 @@ if __name__ == "__main__":
     print(f"  직진 완주율  : {metrics.straight_success_rate:.0%}")
     print(f"  우회전 완주율: {metrics.right_success_rate:.0%}")
     print(f"  보호구역 과속: {metrics.zone_overspeed_rate:.0%}  (+3 km/h를 1초 넘게)")
+    print(f"  보호구역 최고 초과 속도: {metrics.zone_max_overspeed * 3.6:.2f} km/h")
+    print(f"  보호구역 과속 스텝 비율: {metrics.zone_overspeed_step_rate:.1%}")
     print(f"  보호구역 속도: 평균 {metrics.zone_mean_speed * 3.6:.1f} km/h, "
           f"85% {metrics.zone_p85_speed * 3.6:.1f} km/h")
     print(f"  평균 속도    : {metrics.mean_speed:.2f} m/s "

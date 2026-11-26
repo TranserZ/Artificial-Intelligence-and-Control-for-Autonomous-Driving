@@ -284,3 +284,186 @@ class HybridActorCritic(nn.Module):
     @property
     def current_std(self) -> float:
         return float(torch.exp(self.log_std).mean().item())
+
+
+class AccelSplitPolicy(nn.Module):
+    """가속 trunk와 차선 trunk를 나눈 정책.
+
+    학습 롤아웃의 차선 행동은 차선 갈래 argmax다.
+    log_std는 학습하지 않고 explore_std로 고정한다.
+    ref는 기준 학생의 고정 복사본이고, 기준 묶음은 가속 평균만 비교한다.
+    """
+
+    def __init__(self, student: HybridActorCritic, explore_std: float,
+                 unfreeze_lane: bool = False, lane_temp: float = 1.0):
+        super().__init__()
+        if explore_std <= 0:
+            raise ValueError("explore_std는 0보다 커야 합니다.")
+        self.ref = self._clone(student)
+        for p in self.ref.parameters():
+            p.requires_grad_(False)
+        self.ref_lane_trunk = None
+        self.accel_trunk = self._clone(student.trunk)
+        self.mu_head = self._clone(student.mu_head)
+        self.lane_trunk = self._clone(student.trunk)
+        self.lane_head = self._clone(student.lane_head)
+        self.log_std = nn.Parameter(
+            torch.tensor([float(np.log(explore_std))]), requires_grad=False)
+        self.unfreeze_lane = bool(unfreeze_lane)
+        self.lane_temp = max(float(lane_temp), 1e-6)
+        if not self.unfreeze_lane:
+            for p in list(self.lane_trunk.parameters()) + list(self.lane_head.parameters()):
+                p.requires_grad_(False)
+
+    @staticmethod
+    def _clone(module: nn.Module) -> nn.Module:
+        import copy
+        return copy.deepcopy(module)
+
+    def replace_ref(self, student: HybridActorCritic):
+        self.ref = self._clone(student)
+        for p in self.ref.parameters():
+            p.requires_grad_(False)
+        self.ref.eval()
+
+    def snapshot_reference(self):
+        self.ref.trunk.load_state_dict(self.accel_trunk.state_dict())
+        self.ref.mu_head.load_state_dict(self.mu_head.state_dict())
+        self.ref.lane_head.load_state_dict(self.lane_head.state_dict())
+        self.ref_lane_trunk = self._clone(self.lane_trunk).requires_grad_(False)
+
+    def reference_lane_logits(self, obs):
+        trunk = self.ref.trunk if self.ref_lane_trunk is None else self.ref_lane_trunk
+        with torch.no_grad():
+            return self.ref.lane_head(trunk(obs))
+
+    def train(self, mode: bool = True):
+        super().train(mode)
+        self.ref.eval()
+        if self.ref_lane_trunk is not None:
+            self.ref_lane_trunk.eval()
+        return self
+
+    def accel_mu(self, obs):
+        return torch.tanh(self.mu_head(self.accel_trunk(obs)))
+
+    def ref_mu(self, obs):
+        with torch.no_grad():
+            return torch.tanh(self.ref.mu_head(self.ref.trunk(obs)))
+
+    def lane_logits(self, obs):
+        return self.lane_head(self.lane_trunk(obs))
+
+    def _tempered_logits(self, obs):
+        return self.lane_logits(obs) / self.lane_temp
+
+    def lane_command(self, obs):
+        idx = torch.argmax(self.lane_logits(obs), dim=-1)
+        table = obs.new_tensor(HybridActorCritic.LANE_CMDS)
+        return table[idx]
+
+    def student_lane_command(self, obs):
+        with torch.no_grad():
+            logits = self.reference_lane_logits(obs)
+            idx = torch.argmax(logits, dim=-1)
+            table = obs.new_tensor(HybridActorCritic.LANE_CMDS)
+            return table[idx]
+
+    def sample_lane_index(self, obs):
+        if self.unfreeze_lane:
+            dist = Categorical(logits=self._tempered_logits(obs))
+            return dist.sample()
+        return torch.argmax(self.lane_logits(obs), dim=-1)
+
+    def sample_accel(self, obs):
+        """가속 N(μ, σ). 차선은 unfreeze면 τ-Categorical 샘플, 아니면 argmax."""
+        mu = self.accel_mu(obs)
+        std = torch.exp(self.log_std)
+        dist = Normal(mu, std)
+        accel = dist.sample()
+        log_prob = dist.log_prob(accel).sum(-1)
+        lane_dist = Categorical(logits=self._tempered_logits(obs))
+        if self.unfreeze_lane:
+            lane_idx = self.sample_lane_index(obs)
+        else:
+            lane_idx = torch.argmax(self.lane_logits(obs), dim=-1)
+        table = obs.new_tensor(HybridActorCritic.LANE_CMDS, dtype=accel.dtype)
+        lane = table[lane_idx]
+        lane_log_prob = lane_dist.log_prob(lane_idx)
+        action = torch.cat([accel, lane.unsqueeze(-1)], dim=-1)
+        return action, log_prob, lane_log_prob
+
+    def det_action(self, obs):
+        mu = self.accel_mu(obs)
+        lane = self.lane_command(obs)
+        return torch.cat([mu, lane.unsqueeze(-1)], dim=-1)
+
+    def accel_log_prob(self, obs, actions):
+        mu = self.accel_mu(obs)
+        std = torch.exp(self.log_std)
+        dist = Normal(mu, std)
+        return dist.log_prob(actions[:, :1]).sum(-1), dist.entropy().sum(-1)
+
+    def lane_log_prob(self, obs, actions):
+        lane_idx = (1.0 - torch.round(actions[:, 1])).long().clamp(0, 2)
+        dist = Categorical(logits=self._tempered_logits(obs))
+        return dist.log_prob(lane_idx)
+
+    def full_log_prob(self, obs, actions):
+        accel_lp, ent = self.accel_log_prob(obs, actions)
+        lane_lp = self.lane_log_prob(obs, actions)
+        return accel_lp + lane_lp, ent
+
+    def lane_kl_to_ref(self, obs, increases_only=False):
+        """τ로 맞춘 차선 범주 KL(π || π_ref), 스칼라."""
+        import torch.nn.functional as F
+        logits = self._tempered_logits(obs)
+        ref_logits = self.reference_lane_logits(obs) / self.lane_temp
+        if increases_only:
+            moving = logits.softmax(dim=-1)[:, [0, 2]].sum(dim=-1)
+            reference = ref_logits.softmax(dim=-1)[:, [0, 2]].sum(dim=-1)
+            return (moving - reference).clamp_min(0).square().mean()
+        log_p = F.log_softmax(logits, dim=-1)
+        p = log_p.exp()
+        log_ref = F.log_softmax(ref_logits, dim=-1)
+        return (p * (log_p - log_ref)).sum(-1).mean()
+
+    def stochastic_lane_det_accel(self, obs, rng: np.random.Generator | None = None):
+        """가속 평균 + 차선만 τ-Categorical 샘플 (τ 시험·평가용)."""
+        mu = self.accel_mu(obs)
+        logits = self._tempered_logits(obs).detach().cpu().numpy().ravel()
+        probs = np.exp(logits - logits.max())
+        probs /= probs.sum()
+        if rng is None:
+            idx = int(np.argmax(probs))
+        else:
+            idx = int(rng.choice(len(probs), p=probs))
+        table = HybridActorCritic.LANE_CMDS
+        lane = float(table[idx])
+        return torch.cat([mu, mu.new_tensor([[lane]])], dim=-1)
+
+    def anchor_stats(self, obs, anchor_std: float):
+        """평균 차이 RMS와, 같은 σ로 계산한 가속 KL."""
+        mu = self.accel_mu(obs)
+        ref = self.ref_mu(obs)
+        sq = (mu - ref).pow(2).mean()
+        rms = torch.sqrt(sq)
+        kl = sq / (2.0 * float(anchor_std) ** 2)
+        return rms, kl
+
+    @property
+    def current_std(self) -> float:
+        return float(torch.exp(self.log_std).detach().mean().item())
+
+
+class SplitCritic(nn.Module):
+    """정책과 가중치를 공유하지 않는 가치망. 초기값은 학생 trunk + v_head."""
+
+    def __init__(self, student: HybridActorCritic):
+        super().__init__()
+        import copy
+        self.trunk = copy.deepcopy(student.trunk)
+        self.v_head = copy.deepcopy(student.v_head)
+
+    def forward(self, obs):
+        return self.v_head(self.trunk(obs)).squeeze(-1)

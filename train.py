@@ -14,8 +14,11 @@
 실행:  python train.py
 """
 import argparse
+import json
 import os
 import shutil
+import tempfile
+import numpy as np
 import torch
 from datetime import datetime
 
@@ -62,13 +65,13 @@ SAVE_STEPS = (300_000, 500_000, 1_000_000)
 #  이 파일이 run 폴더에 스냅샷되므로 "그 결과가 어떤 계수였는지"도 남는다.
 # ══════════════════════════════════════════════════════════════════
 REWARD_OVERRIDES = dict(
-    speed_weight=0.1,          # 속도 보상 (스텝당 최대 이 값)
+    speed_weight=0.0,          # B: 형태 항. 1단계는 0 유지 (Ng: 잠재함수 아님)
     collision_penalty=20.0,    # 충돌 시 -이 값, 즉시 종료 (5→20: 완주 보너스와 같은
                                #   크기. 5일 땐 무리한 끼어들기로 충돌 16%)
     arrival_bonus=20.0,        # 완주 보너스 (2→20: 500k run이 완주 0%로 수렴)
     progress_weight=10.0,      # 진행 보상 (완주까지 누적 +10)
     close_gap_threshold=6.0,   # 이 거리(m) 미만 접근 시
-    close_gap_penalty=0.1,     #   → 스텝당 감점
+    close_gap_penalty=0.0,     # B에서 끔. 1단계는 되돌리지 않음
     blocked_penalty=0.0,       # "느린 앞차에 막힘" 스텝당 감점 (고속도로 추월 학습용 0.05→0:
                                #   교차로에선 배경차 대부분이 기준 속도보다 느려 앞차를
                                #   따라가도 감점 → 감속 없이 들이받는 직진 충돌 2.5%)
@@ -76,8 +79,7 @@ REWARD_OVERRIDES = dict(
                                #   14.5 m/s 추종하는 "캠핑" 정책으로 수렴했음)
     blocked_speed_frac=0.85,   #   그리고 내 속도 < vmax × 이 값 (0.7→0.85 ≈ 28 m/s:
                                #   배경차 최고속 19 m/s로 따라가도 막힘으로 판정)
-    lane_change_penalty=0.02,  # 변경 실행당 감점 (0→0.02: 추월은 배웠으나
-                               #   에피소드당 275회 지그재그 → 재도입)
+    lane_change_penalty=0.0,   # B. 판당 변경이 수십 회가 되기 전에는 되돌리지 않음
     invalid_action_penalty=0.0,
     red_light_penalty=20.0,    # 적색 신호 위반 시 감점 (5→20: 일시정지(s)가 100~130초라
                                #   기다리면 할인된 완주 가치가 ~30→2~3으로 줄어 -5 받고
@@ -88,30 +90,26 @@ REWARD_OVERRIDES = dict(
     timeout_penalty=10.0,          # 시간초과 감점 (0일 땐 "끝까지 서 있기"로 수렴)
     wrong_lane_penalty=20.0,       # 차로 오류(경로 밖 차로 끝에서 갇힘) 종료 감점 (충돌과 같은
                                    #   크기. 없을 땐 우회전인데 직진 차로 끝에 서서 시간초과)
-    turn_overspeed_penalty=0.5,    # 교차로 안 회전 제한속도 초과 스텝당 감점
-                                   #   (best 모델이 9~14 m/s로 우회전하며 양보위반 32%)
+    turn_overspeed_penalty=0.0,    # B. 1단계 교차로 회전이 학습 목표가 아님
     green_stop_penalty=0.05,       # 멈출 이유 없이 서 있으면 스텝당 감점 (막힘 감점 0으로 바꾼 뒤
                                    #   초록불에 2~3분씩 서 있는 판이 5% 생김)
     green_stop_extra=0.10,         #   빈 거리가 15 m를 넘을수록 추가 감점 (45 m 이상이면 총 0.15).
                                    #   0.05 한 가지일 땐 정지선 30~50 m 앞에서 미리 섰음
-    approach_overspeed_penalty=0.02,  # 정지 신호 접근 시 편한 감속 곡선 초과 1 m/s당 스텝 감점
-                                      #   (없을 땐 가까이 서는 모델일수록 신호위반 5~6%)
-    zone_overspeed_penalty=0.25,   # 어린이 보호구역 안 30 km/h(+0.3 m/s) 초과 1 m/s당 스텝 감점
-                                   #   0.1: 구역 과속 7~45%, 85% 속도 30~31 km/h
-                                   #   0.4(상한 1.0): 학습 초반부터 거의 서서 다니게 배워 정지선 앞에서
-                                   #   출발을 못 함 (완주 23~60%, 시간초과 38~73%) → 중간값
-    zone_overspeed_cap=0.5,        #   스텝당 상한
-    zone_approach_penalty=0.05,    # 보호구역 입구에서 30 km/h가 되도록 감속 곡선 초과 1 m/s당 감점
-    no_stop_zone_penalty=0.1,         # 정차금지지대에서 서 있으면 스텝당 감점
-    school_zone_speeding_penalty=0.1, # 어린이보호구역 초과 1 m/s당 감점 (상한 0.5)
-    shield_penalty=0.0,               # shield 개입 감점 — env-v1은 학습 중 shield off라 쓰지 않음
+    approach_overspeed_penalty=0.0,   # B. 2단계(신호) 이후 한 항씩
+    zone_overspeed_penalty=0.0,    # 보호구역 과속은 공식 판정 외. 감점 없음
+    zone_overspeed_cap=0.5,
+    zone_approach_penalty=0.0,
+    no_stop_zone_penalty=0.0,
+    school_zone_speeding_penalty=0.0,  # 위와 같음. 4단계에서 되돌리지 않음
+    shield_penalty=0.0,               # shield 개입 감점 — env-v2는 학습 중 shield off라 쓰지 않음
     shield_penalty_scale=0.0,
     stop_success_bonus=5.0,           # 정류장 정차 성공 (정류장 구간에서 10초 정지) +
-    missed_stop_penalty=5.0,          # 정류장 놓침 −
+    missed_stop_penalty=20.0,         # 정류장 놓침 − (5→20, env-v3 준비: ±5일 땐 GRU-PPO가 정류장 차로를 피하는 게
+                                      #   이득이 돼 5곳 중 첫 정류장만 섰다. 충돌·적색 위반과 같은 크기로 맞춤)
     lc_forbidden_penalty=1.0,         # 차선변경 금지 구간(정지선 앞 30 m·교차로 직후 20 m·지그재그)에서 변경 −
 )
 REWARD = {**REWARD_DEFAULTS, **REWARD_OVERRIDES}
-# 학습 중 shield는 끈다 (env-v1: 규칙 없이 모델 혼자). 평가 때만 evaluator가 감시 모드로 바꾼다.
+# 학습 중 shield는 끈다 (env-v2: 규칙 없이 모델 혼자). 평가 때만 evaluator가 감시 모드로 바꾼다.
 SIMULATION["shield"] = {**SIMULATION["shield"], "mode": "off"}
 # 학습 중에만: 완주 못 한 판을 30% 확률로 다시 연다 (env/sumo_env.py _update_replay)
 SIMULATION["replay"] = {"prob": 0.3, "size": 200}
@@ -180,6 +178,72 @@ RUN_NAME = None         # None이면 run_날짜_시각 자동 생성.
 # ══════════════════════════════════════════════════════════════════
 
 
+def _reward_same(left, right) -> bool:
+    if isinstance(left, bool) or isinstance(right, bool):
+        return left is right
+    if left is None or right is None:
+        return left is None and right is None
+    if isinstance(left, (int, float)) and isinstance(right, (int, float)):
+        return abs(float(left) - float(right)) < 1e-9
+    return left == right
+
+
+def stage1_reward_path() -> str:
+    """exp-ppo-stage1이 학습에 남긴 config.json. 이 워크트리에 없으면 옆 트리를 본다."""
+    candidates = [
+        os.path.join(BASE, "results", "exp-ppo-stage1", "config.json"),
+        os.path.normpath(os.path.join(
+            BASE, "..", "청계로드", "results", "exp-ppo-stage1", "config.json")),
+    ]
+    for path in candidates:
+        if os.path.isfile(path):
+            return path
+    raise SystemExit(
+        "results/exp-ppo-stage1/config.json 을 찾지 못했습니다. SUMO를 띄우지 않습니다.")
+
+
+def check_reward_against_stage1(reward: dict) -> None:
+    """최종 REWARD를 exp-ppo-stage1 config의 reward와 키마다 비교한다. 다르면 멈춘다."""
+    path = stage1_reward_path()
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    expected = data.get("reward")
+    if expected is None and isinstance(data.get("environment"), dict):
+        expected = data["environment"].get("reward")
+    if not isinstance(expected, dict):
+        raise SystemExit(f"{path} 에 reward가 없습니다. SUMO를 띄우지 않습니다.")
+    keys = sorted(set(reward) | set(expected), key=str)
+    print(f"보상 비교: {path}")
+    print("| 키 | train.py | exp-ppo-stage1 | |")
+    print("|---|---:|---:|---|")
+    bad = []
+    for key in keys:
+        got = reward.get(key, "<없음>")
+        want = expected.get(key, "<없음>")
+        ok = key in reward and key in expected and _reward_same(got, want)
+        print(f"| {key} | {got} | {want} | {'일치' if ok else '다름'} |")
+        if not ok:
+            bad.append(key)
+    if bad:
+        raise SystemExit("보상이 exp-ppo-stage1과 다릅니다: " + ", ".join(bad)
+                         + ". SUMO를 띄우지 않습니다.")
+    print(f"보상 {len(keys)}키 모두 일치.")
+
+
+def check_road_stage() -> None:
+    """CGC_STAGE와 도로 단계가 같아야 한다. 없으면 SUMO 전에 멈춘다."""
+    stage_env = os.environ.get("CGC_STAGE")
+    stage = ROAD.get("stage")
+    elements = list(ROAD.get("elements") or [])
+    vmax = EGO.get("max_speed")
+    print(f"CGC_STAGE={stage_env!r}")
+    print(f"ROAD[\"stage\"]={stage}  차량 최고속도={vmax} m/s  요소={elements}")
+    if stage is None or str(stage_env) != str(stage):
+        raise SystemExit(
+            f"도로 단계가 환경변수와 다릅니다 (CGC_STAGE={stage_env!r}, "
+            f"ROAD stage={stage}). SUMO를 띄우지 않습니다.")
+
+
 def make_run_dir() -> str:
     """results/<run이름>/ 폴더를 만들고 경로를 반환."""
     name = RUN_NAME or datetime.now().strftime("run_%Y%m%d_%H%M%S")
@@ -222,7 +286,46 @@ if __name__ == "__main__":
                         help="실패한 판 다시 열 확률 (기본 0.3, 0이면 끔)")
     parser.add_argument("--save-steps", default=None,
                         help="그 시점 모델을 따로 저장할 스텝 (쉼표, 기본 300000,500000,1000000)")
+    parser.add_argument("--ref", default=None,
+                        help="KL-PPO 기준 학생. 주면 가속만 학습하고 차선은 argmax로 고정")
+    parser.add_argument("--explore-std", type=float, default=None,
+                        help="롤아웃 가속 σ. --ref일 때 필수. 학습하지 않음")
+    parser.add_argument("--anchor-std", type=float, default=0.079,
+                        help="기준 묶음의 σ. 가속 평균 차이 벌점에만 씀")
+    parser.add_argument("--anchor-target-rms", type=float, default=0.1,
+                        help="가속 평균 차이 RMS 목표 (행동 단위)")
+    parser.add_argument("--kl-beta", type=float, default=0.1, help="기준 묶음 계수 초기값")
+    parser.add_argument("--beta-min", type=float, default=0.01,
+                        help="β를 절반으로 줄일 때 이 값 아래로는 내리지 않음")
+    parser.add_argument("--no-anchor", action="store_true",
+                        help="기준 묶음 끔 (β=0). 대조군용")
+    parser.add_argument("--unfreeze-lane", action="store_true",
+                        help="2차: 차선 갈래 학습·τ-Categorical 롤아웃")
+    parser.add_argument("--stage6-lane-rewards", action="store_true",
+                        help="Enable asymmetric lane anchor and two shadow-only lane penalties")
+    parser.add_argument("--hotspot-recovery", action="store_true",
+                        help="Shape safe escape from parked-car queues and unsafe acceleration")
+    parser.add_argument("--unsafe-lane-penalty", type=float, default=1.0)
+    parser.add_argument("--lane-temp", type=float, default=1.0,
+                        help="차선 softmax(logits/τ). 시험 주행은 argmax")
+    parser.add_argument("--lane-kl-target", type=float, default=0.01)
+    parser.add_argument("--lane-beta", type=float, default=1.0,
+                        help="차선 KL 벌점 초기값(2차, unfreeze 시)")
+    parser.add_argument("--lane-beta-min", type=float, default=0.1)
+    parser.add_argument("--critic-lr", type=float, default=1e-4)
+    parser.add_argument("--warmup-updates", type=int, default=40)
+    parser.add_argument("--critic-warmup-max", type=int, default=None,
+                        help="--warmup-updates 와 같다. 주면 그 값으로 덮어쓴다")
+    parser.add_argument("--warmup-ev", type=float, default=0.8)
     args = parser.parse_args()
+    if args.hotspot_recovery and not args.stage6_lane_rewards:
+        parser.error("--hotspot-recovery requires --stage6-lane-rewards")
+    if args.stage6_lane_rewards and not (args.ref and args.unfreeze_lane):
+        parser.error("--stage6-lane-rewards requires --ref and --unfreeze-lane")
+    if not np.isfinite(args.unsafe_lane_penalty) or args.unsafe_lane_penalty < 0:
+        parser.error("--unsafe-lane-penalty must be finite and nonnegative")
+    if args.beta_min < 0:
+        parser.error("--beta-min 은 0 이상이어야 합니다.")
     if args.save_steps:
         SAVE_STEPS = tuple(int(s) for s in args.save_steps.split(",") if s.strip())
     if args.replay_prob is not None:
@@ -230,15 +333,36 @@ if __name__ == "__main__":
     HPARAMS["seed"] = args.seed
     if args.lr:
         HPARAMS["lr"] = args.lr
+    if args.ref and args.timesteps is None:
+        TOTAL_TIMESTEPS = 300_000
     if args.timesteps:
         TOTAL_TIMESTEPS = args.timesteps
         MIDPOINT_TIMESTEPS = int(TOTAL_TIMESTEPS * 0.7)
+    if args.unfreeze_lane and args.timesteps is None:
+        TOTAL_TIMESTEPS = 200_000
+        MIDPOINT_TIMESTEPS = 140_000
+    if args.ref and not args.save_steps:
+        SAVE_STEPS = tuple(range(25_000, int(TOTAL_TIMESTEPS) + 1, 25_000))
+    if args.ref:
+        if args.explore_std is None or args.explore_std <= 0:
+            parser.error("--ref 에는 0보다 큰 --explore-std 가 필요합니다.")
+        if not args.stage6_lane_rewards:
+            SIMULATION["replay"]["prob"] = 0.0
+        EVAL_INTERVAL = 0
+        check_reward_against_stage1(REWARD)
+        check_road_stage()
+        if args.stage6_lane_rewards:
+            REWARD.update(lane_reversal_penalty=1.0, unsafe_lane_change_penalty=args.unsafe_lane_penalty)
+            SIMULATION["shield"]["mode"] = "shadow"
+        if args.hotspot_recovery:
+            REWARD.update(hotspot_stall_penalty=0.25, unsafe_accel_penalty=0.35)
+        # 저장은 2만 5천 간격. 곡선 평가는 5만 간격 6개(5만·10만·15만·20만·25만·30만)만.
     if args.run_name:
         RUN_NAME = args.run_name
 
-    # 1) 도로 생성 (env/road_config.py 기준으로 매번 재생성)
-    sumocfg = road_builder.build(ROAD, EGO, TRAFFIC,
-                                 os.path.join(BASE, "env", "sumo"))
+    # 1) 도로 생성. 동시 학습이 같은 폴더를 덮지 않도록 프로세스마다 따로 만든다.
+    sumo_dir = tempfile.mkdtemp(prefix="cgc_train_")
+    sumocfg = road_builder.build(ROAD, EGO, TRAFFIC, sumo_dir)
     print(f"도로 생성 완료: {sumocfg}")
     print(f"  길이 {ROAD['length']}m, {ROAD['num_lanes']}차선, "
           f"교통량 {TRAFFIC['vehs_per_hour']}대/시간")
@@ -249,8 +373,22 @@ if __name__ == "__main__":
     print(f"결과 폴더: {run_dir}")
 
     # 학습 방식(train.py)이 지난 백업과 달라졌으면 train_file_backup/에 머리말과 함께 저장
+    purpose = TRAIN_PURPOSE
+    if args.ref:
+        purpose = (
+            "KL-PPO. 팀원 실패와 다른 점: 속도 보상 0, "
+            + ("기준 묶음 끔" if args.no_anchor else "기준 묶음 유지")
+            + ", "
+            + ("차선 갈래 학습" if args.unfreeze_lane else "차선 고정")
+            + ", critic 분리. 롤아웃 차선은 argmax, 벌점·확률비·KL early stop은 가속만."
+        )
+    if args.stage6_lane_rewards:
+        purpose = TRAIN_PURPOSE + (
+            f"\nStage 6: asymmetric lane anchor, reversal penalty -1, unsafe actual lane change penalty {-args.unsafe_lane_penalty:g}. "
+            "Shield shadow only. Replay 0.3, critic warmup, lane sampling at temperature 1."
+        )
     saved = train_backup.backup(os.path.join(BASE, "train.py"), BACKUP_DIR,
-                                TRAIN_PURPOSE, os.path.basename(run_dir))
+                                purpose, os.path.basename(run_dir))
     if saved:
         print(f"train.py 백업: {os.path.relpath(saved, BASE)}")
 
@@ -269,13 +407,133 @@ if __name__ == "__main__":
     #    PPO는 on-policy라 RolloutBuffer를 쓰고, 나중에 SAC/DQN 같은
     #    off-policy 알고리즘을 붙일 땐 여기서 ReplayBuffer로 갈아끼우면 된다.
     buffer = RolloutBuffer()
-    agent = PPO(
-        obs_dim=env.observation_space.shape[0],
-        act_dim=env.action_space.shape[0],
-        buffer=buffer,
-        **HPARAMS,
-    )
-    if args.init:
+    if args.ref:
+        from algorithms.kl_ppo import KLPPO, student_from_state_dict
+        lane_b0 = args.lane_beta if args.unfreeze_lane else 0.0
+        if args.init:
+            ckpt = torch.load(args.init, map_location="cpu", weights_only=False)
+            if not isinstance(ckpt, dict) or ckpt.get("format") != "kl_ppo":
+                raise SystemExit("--init 은 KL-PPO 체크포인트여야 합니다.")
+            agent = KLPPO.from_checkpoint(args.init, device=HPARAMS["device"])
+            agent.buffer = buffer
+            agent.policy.lane_temp = float(args.lane_temp)
+            agent.lane_beta = lane_b0
+            agent.lane_kl_target = float(args.lane_kl_target)
+            agent.lane_beta_min = float(args.lane_beta_min)
+            if args.unfreeze_lane and not agent.unfreeze_lane:
+                agent.unfreeze_lane = True
+                agent.policy.unfreeze_lane = True
+                for p in list(agent.policy.lane_trunk.parameters()) + list(
+                        agent.policy.lane_head.parameters()):
+                    p.requires_grad_(True)
+                agent.policy_optim = torch.optim.Adam(
+                    [p for p in agent.policy.parameters() if p.requires_grad],
+                    lr=HPARAMS["lr"] if args.lr else 1e-5)
+            ref_path = args.ref
+            if os.path.isfile(ref_path):
+                raw = torch.load(ref_path, map_location="cpu", weights_only=False)
+                if isinstance(raw, dict) and raw.get("format") == "kl_ppo":
+                    ref_sd = {k[len("ref."):]: v for k, v in raw["policy"].items()
+                              if k.startswith("ref.")}
+                    student = student_from_state_dict(ref_sd, HPARAMS["activation"])
+                else:
+                    student = student_from_state_dict(raw, HPARAMS["activation"])
+                agent.policy.replace_ref(student)
+        else:
+            raw = torch.load(args.ref, map_location="cpu", weights_only=False)
+            if not isinstance(raw, dict) or "trunk.0.weight" not in raw:
+                raise SystemExit("--ref 는 HybridActorCritic state_dict 여야 합니다.")
+            student = student_from_state_dict(raw, HPARAMS["activation"])
+            if student.trunk[0].in_features != env.observation_space.shape[0]:
+                raise SystemExit(
+                    f"--ref 입력 {student.trunk[0].in_features}차원 ≠ "
+                    f"현재 관측 {env.observation_space.shape[0]}차원.")
+            agent = KLPPO(
+                student,
+                explore_std=args.explore_std,
+                anchor_std=args.anchor_std,
+                anchor_target_rms=args.anchor_target_rms,
+                beta=args.kl_beta,
+                beta_min=args.beta_min,
+                no_anchor=args.no_anchor,
+                unfreeze_lane=args.unfreeze_lane,
+                lane_temp=args.lane_temp,
+                lane_kl_target=args.lane_kl_target,
+                lane_beta=lane_b0,
+                lane_beta_min=args.lane_beta_min,
+                policy_lr=HPARAMS["lr"] if args.lr else 1e-5,
+                critic_lr=args.critic_lr,
+                n_steps=HPARAMS["n_steps"],
+                n_epochs=HPARAMS["n_epochs"],
+                minibatch_size=HPARAMS["minibatch_size"],
+                gamma=HPARAMS["gamma"],
+                gae_lambda=HPARAMS["gae_lambda"],
+                clip_eps=HPARAMS["clip_eps"],
+                value_coef=HPARAMS["value_coef"],
+                entropy_coef=0.0,
+                max_grad_norm=HPARAMS["max_grad_norm"],
+                normalize_advantage=HPARAMS["normalize_advantage"],
+                warmup_max_updates=(args.critic_warmup_max
+                                    if args.critic_warmup_max is not None else args.warmup_updates),
+                warmup_ev=args.warmup_ev,
+                seed=HPARAMS["seed"],
+                device=HPARAMS["device"],
+                buffer=buffer,
+            )
+        if args.stage6_lane_rewards:
+            if args.init and os.path.abspath(args.init) != os.path.abspath(args.ref):
+                parser.error("Stage 6 requires matching --init and --ref, or a BC --ref alone")
+            if args.init:
+                agent.policy.snapshot_reference()
+                agent.warmup_max_updates = args.critic_warmup_max if args.critic_warmup_max is not None else args.warmup_updates
+                agent.warmup_ev = args.warmup_ev
+                torch.manual_seed(args.seed)
+                np.random.seed(args.seed)
+            agent.lane_increases_only = True
+        cfg = {
+            "format": "kl_ppo",
+            "lane_increases_only": agent.lane_increases_only,
+            "hotspot_labels": os.environ.get("HOTSPOT_LABELS") == "1",
+            "place_fix": os.environ.get("PLACE_FIX", "0"),
+            "ref": args.ref,
+            "init": args.init or "",
+            "lane_temp": args.lane_temp,
+            "lane_kl_target": args.lane_kl_target,
+            "lane_beta0": lane_b0,
+            "lane_beta_min": args.lane_beta_min,
+            "explore_std": args.explore_std,
+            "anchor_std": args.anchor_std,
+            "anchor_target_rms": args.anchor_target_rms,
+            "beta0": 0.0 if args.no_anchor else args.kl_beta,
+            "beta_min": args.beta_min,
+            "no_anchor": bool(args.no_anchor),
+            "unfreeze_lane": bool(args.unfreeze_lane),
+            "reward": REWARD,
+            "replay_prob": SIMULATION["replay"]["prob"],
+            "gamma": HPARAMS["gamma"],
+            "policy_lr": HPARAMS["lr"] if args.lr else 1e-5,
+            "critic_lr": args.critic_lr,
+            "obs_scan": os.environ.get("OBS_SCAN", "0"),
+            "ref_commit": os.environ.get("KLPPO_REF_COMMIT", ""),
+            "cgc_stage": os.environ.get("CGC_STAGE", ""),
+            "differences": ["속도 보상 0",
+                            f"기준 묶음은 {args.beta_min:g} 아래로 내리지 않음",
+                            "차선 고정" if not args.unfreeze_lane else "차선 갈래 학습",
+                            "critic 분리"],
+        }
+        with open(os.path.join(run_dir, "config.json"), "w", encoding="utf-8") as f:
+            json.dump(cfg, f, ensure_ascii=False, indent=2)
+        print(f"KL-PPO ref={args.ref} explore_std={args.explore_std} "
+              f"anchor={'off' if args.no_anchor else args.anchor_std} "
+              f"lane={'train' if args.unfreeze_lane else 'frozen'}")
+    else:
+        agent = PPO(
+            obs_dim=env.observation_space.shape[0],
+            act_dim=env.action_space.shape[0],
+            buffer=buffer,
+            **HPARAMS,
+        )
+    if args.init and not args.ref:
         sd = torch.load(args.init, map_location=agent.device)
         w = sd["trunk.0.weight"]
         own = agent.policy.state_dict()["trunk.0.weight"]
@@ -324,7 +582,9 @@ if __name__ == "__main__":
         name = (f"step{step // 1_000_000}m.pt" if step % 1_000_000 == 0
                 else f"step{step // 1000}k.pt")
         path = os.path.join(run_dir, name)
-        agent.save(path)
+        temporary = path + ".tmp"
+        agent.save(temporary)
+        os.replace(temporary, path)
         print(f"    [step {step} 체크포인트 @{agent.num_timesteps}] {path}", flush=True)
 
     try:
@@ -343,6 +603,7 @@ if __name__ == "__main__":
     finally:
         env.close()
         logger.close()
+        shutil.rmtree(sumo_dir, ignore_errors=True)
         agent.save(model_path)
         snapshot_configs(run_dir)
         print(f"\n저장 완료: {model_path}")

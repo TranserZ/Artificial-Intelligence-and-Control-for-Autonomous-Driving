@@ -90,14 +90,22 @@ def _load_zone_rows(filename, columns):
 # 아래는 메타 파일이 없는 구버전 시나리오용 fallback (청계A01 동행 5곳).
 BUS_STOPS_ORDER = ["bs_01", "bs_02", "bs_03", "bs_04", "bs_05"]
 
-# 학습 판에서 빼는 판 시드 구간 (테스트·검증용, experiment_protocol.md 3-2)
-#   1000~1999: 팀 비교·최종 테스트, 900000~999999: 학습 중 best 고르기·튜닝
-HELD_OUT_SEEDS = ((1000, 1999), (900_000, 999_999))
+# 학습 판에서 빼는 판 시드 구간 (테스트·검증용, rules/team/experiment_protocol.md 3-2)
+#   1000~1099: 팀 비교, 2000~2999: 최종 후보 평가,
+#   900000~999999: 학습 중 best 고르기·튜닝.
+# 1100~1999도 이전 프로토콜에서 테스트로 예약했으므로 계속 제외한다.
+HELD_OUT_SEEDS = ((1000, 2999), (900_000, 999_999))
+
+# 팀원 BC 수집·평가 판. HELD_OUT_SEEDS와 별도이고, 학습 판 샘플링에서만 거른다.
+BC_RESERVED_SEEDS = ((400_000, 400_099), (470_000, 470_059))
 
 # 신호색 one-hot 순서 (관측·데이터 공통): 적색 / 황색 / 녹색 / 일시정지 후 진행(s)
 SIGNAL_COLORS = ("red", "yellow", "green", "stop")
 _COLOR_OF_STATE = {"r": "red", "u": "red", "y": "yellow",
                    "G": "green", "g": "green", "o": "green", "O": "green", "s": "stop"}
+# 데이터셋 state.sig{k}.* 칸 수 (경로 r0의 신호 정지선 수, 청계2가는 정지선 2개).
+# 신호가 없는 단계(1단계)에서도 칸을 만들고 -1로 채워, 모든 단계의 기록 파일 칸 구성을 같게 한다.
+STATE_SIGNAL_SLOTS = 7
 
 # SUMO 링크 방향 → (좌, 직, 우) 인덱스. 유턴(t)은 좌로 본다
 _DIR_INDEX = {"l": 0, "L": 0, "t": 0, "s": 1, "r": 2, "R": 2}
@@ -150,6 +158,11 @@ class SumoHighwayEnv(gym.Env):
 
         # ----- 도로/차량 설정에서 필요한 값들 -----
         self.vmax = float(road["speed_limit"])   # 속도 정규화 기준
+        # 단계별 맵 (env/curriculum.py): 이번 맵에서 켜진 요소. 없으면(예전 설정) 전부 켜짐
+        from env.curriculum import has as _has
+        self.stage = road.get("stage")
+        self.has_parking = _has(road, "illegal_parking")
+        self.has_school = _has(road, "school_zone")
         self.num_lanes = int(road["num_lanes"])
         # 시작 차선: "center"면 중앙 차선(차선수//2)으로 자동 결정.
         #   3차선 → 1번(가운데), 5차선 → 2번. 차선 수를 바꿔도 항상 가운데라
@@ -200,6 +213,9 @@ class SumoHighwayEnv(gym.Env):
         #   a = +1 → +max_accel (풀 액셀),  a = -1 → -max_decel (풀 브레이크)
         self.max_accel = float(ego["accel"])   # m/s^2
         self.max_decel = float(ego["decel"])   # m/s^2 (양수로 저장, 부호는 계산 시)
+        # ego가 낼 수 있는 최고속도 (m/s). speedMode=0이면 SUMO가 vType maxSpeed를 지켜 주지 않으므로
+        # setSpeed 상한을 여기서 건다. 관측 정규화 기준(vmax)과는 별개다.
+        self.ego_vmax = min(self.vmax, float(ego.get("max_speed", self.vmax)))
 
         # ----- MDP 설정 -----
         self.step_length = float(mdp_sim["step_length"])
@@ -229,7 +245,7 @@ class SumoHighwayEnv(gym.Env):
         self.zone_visibility = float(szo.get("visibility", 100.0))
         # 버스정류장 (mdp_config.OBSERVATION["bus_stop"]): 관측 3개. 정차는 모델이 직접 한다.
         #   정차 성공 = 정류장 차로·정류장 구간 안에서 stop_speed 이하로 dwell_time 초 이상 정지
-        #   (SUMO 정류장 등록·속도 위임·정류장 규칙은 쓰지 않는다: experiment_protocol.md A1, A5)
+        #   (SUMO 정류장 등록·속도 위임·정류장 규칙은 쓰지 않는다: rules/team/experiment_protocol.md A1, A5)
         bso = (mdp_obs.get("bus_stop") or {})
         self.stop_obs = bool(bso.get("enabled", False))
         self.stop_visibility = float(bso.get("visibility", 150.0))
@@ -281,14 +297,15 @@ class SumoHighwayEnv(gym.Env):
         # 불법주정차 다발지점 (차로 점유). reset마다 지점별 prob 확률로 0초부터 정차 상태로 세운다.
         self._hotspots = _load_zone_rows(
             "illegal_parking_hotspots.csv",
-            ("hotspot_id", "edge_id", "start_pos", "end_pos", "vehicles", "prob"))
+            ("hotspot_id", "edge_id", "start_pos", "end_pos", "vehicles", "prob")
+        ) if self.has_parking else []
         self._hotspot_taken = {}   # (엣지, 차선 번호) → 다발지점 차량 위치 (프리필이 피함)
         self._hotspot_placed = []  # 이번 판에 생성된 다발지점 (id, 엣지, 차량 수)
         # 어린이보호구역 edge → 제한속도 m/s
         self._school_limits = {
             edge: speed for edge, speed in _load_zone_rows(
                 "school_zones.csv", ("edge_id", "speed_limit_ms"))
-        }
+        } if self.has_school else {}
 
         # GUI는 ego를 따라가며 가까이 보이도록 기본값을 둔다.
         self.gui_zoom = float(mdp_sim.get("gui_zoom", 1200.0))
@@ -297,6 +314,7 @@ class SumoHighwayEnv(gym.Env):
 
         self.ego_id = "ego"        # SUMO 안에서 ego 차량을 식별하는 ID
         self.step_count = 0
+        self._previous_policy_lane_change = None
         # 정류장 진행 상태 (reset에서 채움): 이번 판 정류장 목록, 다음 정류장 번호, 연속 정지 스텝
         self._stops = []
         self._stop_i = 0
@@ -801,6 +819,7 @@ class SumoHighwayEnv(gym.Env):
         - 맨 오른쪽 승용차 차로, end_pos에서 뒤쪽으로 촘촘히, 에피소드 끝까지 정차(parking=false)
         """
         self._hotspot_taken = {}
+        self._experimental_prefill_slots = {}
         self._hotspot_placed = []          # (지점 id, 엣지, 차량 수) — 확인·평가용
         rng = self._scn_rng
         for hid, edge, a, b, spec, prob in self._hotspots:
@@ -826,6 +845,11 @@ class SumoHighwayEnv(gym.Env):
                 vtype, vlen = self._HOTSPOT_TYPES.get(kind, self._HOTSPOT_TYPES["moto"])
                 if pos - vlen < float(a) - 0.1:
                     break                      # 지점 범위를 넘으면 그만
+                if hid == "samil_east" and os.environ.get("DISABLE_SAMIL_EAST") == "1":
+                    # Preserve the baseline prefill positions and all scenario RNG draws.
+                    self._experimental_prefill_slots.setdefault((edge, lane), []).append(pos - vlen / 2)
+                    pos -= vlen + self._HOTSPOT_GAP
+                    continue
                 vid = f"hs_{hid}_{k}"
                 try:
                     traci.vehicle.add(vid, rid, typeID=vtype, departLane=str(lane),
@@ -886,6 +910,8 @@ class SumoHighwayEnv(gym.Env):
             start += length
         # (엣지, 차선 번호) → 이미 배치한 엣지 내 위치들. 불법주정차 다발지점 자리도 피한다
         placed = {k: list(v) for k, v in self._hotspot_taken.items()}
+        for key, positions in getattr(self, "_experimental_prefill_slots", {}).items():
+            placed.setdefault(key, []).extend(positions)
         for lane in range(self.num_lanes):
             f = float(factors[lane]) if lane < len(factors) else 1.0
             lane_spacing = self.prefill_spacing * f
@@ -991,12 +1017,17 @@ class SumoHighwayEnv(gym.Env):
         """테스트·검증용 판 시드인가 (학습 판으로 쓰면 안 됨)."""
         return any(lo <= int(seed) <= hi for lo, hi in HELD_OUT_SEEDS)
 
+    @staticmethod
+    def is_bc_reserved_seed(seed: int) -> bool:
+        """팀원 BC가 수집·평가에 쓴 판인가. HELD_OUT과 별도 목록."""
+        return any(lo <= int(seed) <= hi for lo, hi in BC_RESERVED_SEEDS)
+
     @classmethod
     def sample_train_seed(cls) -> int:
-        """학습 판 시드: 전역 np.random에서 뽑되 테스트·검증 구간(HELD_OUT_SEEDS)은 뺀다."""
+        """학습 판 시드. HELD_OUT_SEEDS와 BC_RESERVED_SEEDS를 모두 뺀다."""
         while True:
             seed = int(np.random.randint(0, 2**31 - 1))
-            if not cls.is_held_out_seed(seed):
+            if not cls.is_held_out_seed(seed) and not cls.is_bc_reserved_seed(seed):
                 return seed
 
     def reset(self, seed=None, options=None):
@@ -1009,7 +1040,10 @@ class SumoHighwayEnv(gym.Env):
             if (not self.eval_mode and self._replay_seeds
                     and np.random.random() < self.replay_prob):
                 seed = int(self._replay_seeds[np.random.randint(len(self._replay_seeds))])
-                self._ep_replayed = True
+                if self.is_held_out_seed(seed) or self.is_bc_reserved_seed(seed):
+                    seed = self.sample_train_seed()
+                else:
+                    self._ep_replayed = True
             else:
                 seed = self.sample_train_seed()
         self._ep_seed = seed
@@ -1157,6 +1191,26 @@ class SumoHighwayEnv(gym.Env):
         return index - self._car_lanes(edge)[0]
 
     def _neighbor(self, offset: int, leader: bool):
+        """오프셋 차선의 가장 가까운 선행/후행. OBS_SCAN=1일 때만 ±1을 보강한다.
+
+        보강 본문은 강동연 obsfix.py (model/dongyeon-bc56, d54a761)와 같다.
+        ±1은 getNeighbors와 차선 스캔 중 가까운 쪽, 겹친 차(gap < 0)는 gap 0.
+        OBS_SCAN이 1이 아니면 _neighbor_base만 반환한다 (기본 0).
+        """
+        if os.environ.get("OBS_SCAN", "0") != "1":
+            return self._neighbor_base(offset, leader)
+        if abs(offset) != 1:
+            return self._neighbor_base(offset, leader)
+        n = self._neighbor_base(offset, leader)
+        front, rear = self._scan_lane_neighbors(offset)
+        s = front if leader else rear
+        if s is not None:
+            gap = max(float(s[0]), 0.0)
+            if gap <= self.visibility and (n is None or gap < n[0]):
+                n = (gap, float(s[1]))
+        return n
+
+    def _neighbor_base(self, offset: int, leader: bool):
         """오프셋 차선(-1=오른쪽, 0=현재, +1=왼쪽)의 가장 가까운
         선행(leader=True)/후행 차량을 (거리 m, 그 차량 속도)로 반환.
         visibility 밖이거나 없으면 None."""
@@ -1380,7 +1434,7 @@ class SumoHighwayEnv(gym.Env):
 
         traci getNextTLS가 돌려주는 가장 가까운 신호 그대로다 (거리는 ego 앞범퍼 → 정지선).
         env-v1부터 가공하지 않는다: 황색을 "지나갈 수 있으면 녹색"으로 바꾸던 것과 연달아 있는
-        정지선의 더 엄격한 색을 앞당겨 쓰던 것은 규칙이라 지웠다 (experiment_protocol.md 4-1).
+        정지선의 더 엄격한 색을 앞당겨 쓰던 것은 규칙이라 지웠다 (rules/team/experiment_protocol.md 4-1).
         남은 시간은 판정·보상·데이터용이고 관측에는 넣지 않는다.
         신호를 이미 지났거나 ego가 없으면 None.
         """
@@ -1860,6 +1914,32 @@ class SumoHighwayEnv(gym.Env):
         except traci.TraCIException:
             return None, None
 
+    def hotspot_training_label(self):
+        """Supervised labels on training states only. Lane class 0=left, 1=keep."""
+        ego = self.ego_id
+        if ego not in traci.vehicle.getIDList():
+            return -1, ""
+        edge = traci.vehicle.getRoadID(ego)
+        pos = traci.vehicle.getLanePosition(ego)
+        lane = traci.vehicle.getLaneIndex(ego)
+        for site, road, lo, hi, *_ in self._hotspots:
+            if site not in ("samil_east", "hanbit") or road != edge or not lo - 60 <= pos <= hi:
+                continue
+            if not any(item[0] == site for item in self._hotspot_placed):
+                return -1, ""
+            st = self._current_stop()
+            if (st and st["edge"] == edge and st["lane"] == lane
+                    and st["start"] - 2 <= pos <= st["end"] + self.stop_overshoot):
+                return 1, site
+            lead = traci.vehicle.getLeader(ego, 50)
+            if not lead or not lead[0].startswith("hs_" + site + "_"):
+                return -1, site
+            if (self._is_car_lane(edge, lane + 1) and self._lane_leads_on_route(edge, lane + 1)
+                    and not self._lc_forbidden() and self._lane_change_is_safe(1)):
+                return 0, site
+            return -1, site
+        return -1, ""
+
     def _lane_change_is_safe(self, direction: int) -> bool:
         """차선변경 게이트 (shield의 한 종류): 목표 차선 앞뒤 간격이 충분한가.
 
@@ -2035,8 +2115,9 @@ class SumoHighwayEnv(gym.Env):
 
         도로 상황을 알 수 있을 정도로만 모은다 (모든 차 좌표 같은 재현용 목록은 state 딕셔너리에).
         학습 입력이 아니다 — 학습에는 obs.* 컬럼만 쓴다 (docs/data_columns.md).
-        - 신호등은 경로가 지나는 순서대로 하나당 독립 컬럼: sig{k}.red/yellow/green/stop (0/1),
-          sig{k}.time_to_switch (s), sig{k}.dist (정지선까지 경로상 거리 m, 지났으면 -1)
+        - 신호등은 경로가 지나는 순서대로 정지선 하나당 독립 컬럼: sig{k}.red/yellow/green/stop (0/1),
+          sig{k}.time_to_switch (s), sig{k}.dist (정지선까지 경로상 거리 m, 지났으면 -1).
+          칸은 항상 STATE_SIGNAL_SLOTS개 — 신호가 없는 단계는 모든 값이 -1
         - 정류장은 하나당: stop{k}.status (0 남음 / 1 정차 성공 / -1 놓침), stop{k}.dist (m, 지났으면 -1)
         - 값이 없으면 -1 (예: 앞차 없음)
         ego가 없으면(종료 뒤) 빈 dict.
@@ -2081,6 +2162,10 @@ class SumoHighwayEnv(gym.Env):
                 lo = self._car_lanes(e_in)[0]
                 d = traci.vehicle.getDrivingDistance(e, e_in, traci.lane.getLength(f"{e_in}_{lo}"), lo)
                 col[f"state.sig{k}.dist"] = float(d) if d > -1e5 else -1.0
+            # 신호가 없거나 적은 단계: 남은 칸을 -1(없음)로 채운다
+            for k in range(len(getattr(self, "_route_signals", [])), STATE_SIGNAL_SLOTS):
+                for c in (*SIGNAL_COLORS, "time_to_switch", "dist"):
+                    col[f"state.sig{k}.{c}"] = -1
             for k, st in enumerate(self._stops):
                 col[f"state.stop{k}.status"] = int(self._stop_status[k])
                 d = -1.0
@@ -2130,9 +2215,11 @@ class SumoHighwayEnv(gym.Env):
         lane_change = self._quantize_lane_change(lane_raw)
         lane_change_applied = False
         hits = {"ped": False, "vehicle": False, "signal": False, "lc_gate": False}
-        shield_severity = 0.0
+        shield_severity = shadow_severity = 0.0
         lc_forbidden = False
         lane_before = None
+        lane_edge = None
+        train_lane_penalties = "lane_reversal_penalty" in self.rw
         odo_before = None
 
         # 행동 결정 시점의 전방 신호 (신호 위반 판정 기준 — 정책이 본 관측과 같은 시점)
@@ -2142,6 +2229,8 @@ class SumoHighwayEnv(gym.Env):
         if self.ego_id in traci.vehicle.getIDList():
             v = traci.vehicle.getSpeed(self.ego_id)
             lane_before = self._car_lane_index(self.ego_id)
+            if train_lane_penalties:
+                lane_edge = traci.vehicle.getRoadID(self.ego_id)
             odo_before = traci.vehicle.getDistance(self.ego_id)
 
             # 보행자 필터는 판정(보행자 앞 정당한 대기)에도 쓰므로 항상 계산한다
@@ -2149,6 +2238,7 @@ class SumoHighwayEnv(gym.Env):
             if self.shield_mode != "off":
                 shielded, sh_hits, sev = self._shield_check(accel_raw, v)
                 hits.update(sh_hits)
+                shadow_severity = sev
                 if self.shield_mode == "on":
                     accel_raw, shield_severity = shielded, sev
 
@@ -2156,7 +2246,7 @@ class SumoHighwayEnv(gym.Env):
                          if accel_raw >= 0.0 else accel_raw * self.max_decel)
             dv = accel_cmd * self.step_length
             traci.vehicle.setSpeed(
-                self.ego_id, float(np.clip(v + dv, 0.0, self.vmax)))
+                self.ego_id, float(np.clip(v + dv, 0.0, self.ego_vmax)))
 
             # 금지 구간은 변경 "명령 시점" 위치로 판정한다
             lc_forbidden = lane_change != 0 and self._lc_forbidden()
@@ -2481,6 +2571,43 @@ class SumoHighwayEnv(gym.Env):
                 reward -= float(self.rw.get("no_stop_zone_penalty", 0.0))
         if (terminated or truncated) and not self.eval_mode and self.replay_prob > 0:
             self._update_replay(bool(arrived))
+        if train_lane_penalties:
+            reversal_penalty = unsafe_penalty = 0.0
+            if self.step_count == 1:
+                self._previous_policy_lane_change = None
+            if (alive and lane_change and lane_change_applied
+                    and lane_before is not None and lane_after is not None
+                    and lane_after - lane_before == lane_change
+                    and lane_edge == traci.vehicle.getRoadID(self.ego_id)):
+                previous = self._previous_policy_lane_change
+                if previous and previous[1] == -lane_change and self.step_count - previous[0] <= 10:
+                    reversal_penalty = self.rw["lane_reversal_penalty"]
+                if hits["lc_gate"]:
+                    unsafe_penalty = self.rw["unsafe_lane_change_penalty"]
+                self._previous_policy_lane_change = (self.step_count, lane_change)
+            reward -= reversal_penalty + unsafe_penalty
+            info["lane_reversal_penalty"] = reversal_penalty
+            info["unsafe_lane_change_penalty"] = unsafe_penalty
+        if "hotspot_stall_penalty" in self.rw:
+            recovery = 0.0
+            if (alive and not terminated and ego_speed is not None and ego_speed < 1.5
+                    and not in_stop_area and not self._waiting_for_ped()
+                    and not self._lc_forbidden()):
+                signal_blocks = (signal_after is not None and signal_after[1] <= 25.0
+                                 and self._SIGNAL_STOP_LEVEL.get(signal_after[2], 1.0) > 0.0)
+                leader = traci.vehicle.getLeader(self.ego_id, 20.0)
+                if not signal_blocks and leader and leader[0].startswith("hs_") and leader[1] <= 20.0:
+                    edge = traci.vehicle.getRoadID(self.ego_id)
+                    current = traci.vehicle.getLaneIndex(self.ego_id)
+                    if not edge.startswith(":") and any(
+                            self._is_car_lane(edge, current + direction)
+                            and self._lane_leads_on_route(edge, current + direction)
+                            and self._lane_change_is_safe(direction) for direction in (1, -1)):
+                        recovery = self.rw["hotspot_stall_penalty"]
+            risk = self.rw["unsafe_accel_penalty"] * shadow_severity
+            reward -= recovery + risk
+            info["hotspot_stall_penalty"] = recovery
+            info["unsafe_accel_penalty"] = risk
         info["replayed"] = self._ep_replayed
         return obs, float(reward), terminated, truncated, info
 

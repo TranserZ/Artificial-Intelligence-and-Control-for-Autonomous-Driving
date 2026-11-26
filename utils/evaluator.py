@@ -44,6 +44,8 @@ class DrivingMetrics:
     completion_rate: float = 0.0       # 완주율: 도착 + 놓친 정류장 0인 판 비율 (목표 ≥ 95%)
     intervention_rate: float = 0.0     # 수동개입률: shield가 개입했을(감시)/개입한 스텝 / 전체 스텝
     missed_stop_rate: float = 0.0      # 정류장을 하나라도 놓친 판 비율
+    zone_max_overspeed: float = float("nan")  # 보호구역 최고 초과 속도 (m/s). 제한을 넘긴 폭의 최댓값
+    zone_overspeed_step_rate: float = float("nan")  # 보호구역 스텝 중 제한을 넘긴 비율
 
     def as_dict(self) -> dict:
         return asdict(self)
@@ -56,6 +58,8 @@ class DrivingMetrics:
                 f"보행자충돌={self.ped_collision_rate:.0%}  "
                 f"양보위반={self.yield_violation_rate:.0%}  "
                 f"구역과속={self.zone_overspeed_rate:.0%}  "
+                f"보호구역최고초과={self.zone_max_overspeed * 3.6:.1f}km/h  "
+                f"보호구역과속스텝={self.zone_overspeed_step_rate:.1%}  "
                 f"차로오류={self.wrong_lane_rate:.0%}  "
                 f"완주(정류장 포함)={self.completion_rate:.0%}  "
                 f"수동개입률={self.intervention_rate:.1%}  "
@@ -109,6 +113,9 @@ def _evaluate(policy, env, n_episodes, deterministic, seed_base) -> DrivingMetri
     route_runs = {"straight": [0, 0], "right": [0, 0]}   # [완주, 에피소드]
     speeds, gaps, returns, lengths, lane_changes = [], [], [], [], []
     zone_speeds, n_zone_over = [], 0
+    zone_steps = zone_over_steps = 0
+    zone_max_over = 0.0
+    saw_zone = False
     ZONE_TOL, ZONE_STEPS = 3.0 / 3.6, 2   # +3 km/h를 연속 2스텝(1초) 넘으면 과속
 
     for i in range(n_episodes):
@@ -143,6 +150,14 @@ def _evaluate(policy, env, n_episodes, deterministic, seed_base) -> DrivingMetri
             route = info.get("route", route)
             if info.get("in_school_zone") and info.get("speed") is not None:
                 zone_speeds.append(float(info["speed"]))
+                limit = info.get("zone_limit")
+                if limit is not None:
+                    saw_zone = True
+                    zone_steps += 1
+                    excess = float(info["speed"]) - float(limit)
+                    if excess > 0.0:
+                        zone_over_steps += 1
+                        zone_max_over = max(zone_max_over, excess)
                 over = info["speed"] > (info.get("zone_limit") or 0.0) + ZONE_TOL
                 zone_run = zone_run + 1 if over else 0
                 ep_zone_over = ep_zone_over or zone_run >= ZONE_STEPS
@@ -213,4 +228,6 @@ def _evaluate(policy, env, n_episodes, deterministic, seed_base) -> DrivingMetri
         completion_rate=n_complete / n_episodes,
         intervention_rate=n_shield / max(sum(lengths), 1),
         missed_stop_rate=n_missed_ep / n_episodes,
+        zone_max_overspeed=zone_max_over if saw_zone else float("nan"),
+        zone_overspeed_step_rate=(zone_over_steps / zone_steps) if zone_steps else float("nan"),
     )

@@ -100,7 +100,7 @@ def backup(train_path: str, backup_dir: str, purpose: str, run_name: str = None)
             print("  ⚠ train.py가 바뀌었는데 TRAIN_PURPOSE는 이전 백업과 같습니다. "
                   "이번 학습 목적을 적었는지 확인하세요.")
     now = datetime.now()
-    path = os.path.join(backup_dir, now.strftime("train_%Y%m%d_%H%M%S.py"))
+    path = os.path.join(backup_dir, now.strftime("train_%Y%m%d_%H%M%S") + f"_{os.getpid()}.py")
     header = make_header(cur, purpose, now.strftime("%Y-%m-%d %H:%M"), prev_name, prev_src, run_name)
     with open(path, "w", encoding="utf-8") as f:
         f.write(header + cur)
