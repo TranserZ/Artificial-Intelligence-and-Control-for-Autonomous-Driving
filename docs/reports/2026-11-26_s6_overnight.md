@@ -2,6 +2,8 @@
 
 ## 한눈에 보기
 
+5단계 독립 평가(OBS_SCAN=0) · 충돌 3/100, 장기대기 또는 시간초과 63/100. 보완 D 및 이유 없는 대기 판 수 미측정. [96개 구간 위치·길이](2026-11-26_s5_장기대기.md)
+
 1. 학생과 선생님의 정차·회피 행동 충돌을 검증했다. [8판 대조와 화면](2026-11-26_s6_samil_대조.md)
 2. 8k D 10/10, 충돌 0/10, 탈락 / 16k D 8/10, 충돌 0/10, 탈락 / 24k D 8/10, 충돌 0/10, 탈락
 3. 429.5초 중 왼쪽 변경은 1회였고 게이트가 허용했다. 항상 차단한다는 가설은 기각하며, 과거 학습에 대한 인과관계는 미확정이다.
@@ -49,15 +51,15 @@
 ## 화면과 재현
 
 - A·B의 각 판 정차·회피 화면과 이륜차 좌표는 [대조 보고서](2026-11-26_s6_samil_대조.md)에 있다.
-- klppo3_s6_recovery_step16k, 시드 900100, SUMO 907.0초, 종료 timeout. [대표 프레임](../../results/overnight_s6_final/morning/gui/klppo3_s6_recovery_step16k/900100_site/906.5s.png). `$env:PLACE_FIX='0'; py -3.13 scripts/gui_drive_seed.py --stage 6 --seed 900100 --checkpoint 'C:\Users\USER\Desktop\청계로드-kl-ppo\results\klppo3_s6_recovery\step16k.pt' --delay 80`
-- klppo3_s6_recovery_step24k, 시드 900100, SUMO 264.0초, 종료 timeout. [대표 프레임](../../results/overnight_s6_final/morning/gui/klppo3_s6_recovery_step24k/900100_site/263.5s.png). `$env:PLACE_FIX='0'; py -3.13 scripts/gui_drive_seed.py --stage 6 --seed 900100 --checkpoint 'C:\Users\USER\Desktop\청계로드-kl-ppo\results\klppo3_s6_recovery\step24k.pt' --delay 80`
-- s6_label01, 시드 900100, SUMO 300.5초, 종료 red_light. [대표 프레임](../../results/overnight_s6_final/morning/gui/s6_label01/900100_site/300.0s.png). `$env:PLACE_FIX='0'; py -3.13 scripts/gui_drive_seed.py --stage 6 --seed 900100 --checkpoint 'C:\Users\USER\Desktop\청계로드-kl-ppo\results\s6_label01\step25k.pt' --delay 80`
-- s6_label035, 시드 900100, SUMO 294.5초, 종료 completed. [대표 프레임](../../results/overnight_s6_final/morning/gui/s6_label035/900100_site/294.0s.png). `$env:PLACE_FIX='0'; py -3.13 scripts/gui_drive_seed.py --stage 6 --seed 900100 --checkpoint 'C:\Users\USER\Desktop\청계로드-kl-ppo\results\s6_label035\step25k.pt' --delay 80`
-- s6_label10, 시드 900100, SUMO 280.5초, 종료 completed. [대표 프레임](../../results/overnight_s6_final/morning/gui/s6_label10/900100_site/280.0s.png). `$env:PLACE_FIX='0'; py -3.13 scripts/gui_drive_seed.py --stage 6 --seed 900100 --checkpoint 'C:\Users\USER\Desktop\청계로드-kl-ppo\results\s6_label10\step25k.pt' --delay 80`
-- fix_anchor, 시드 900100, SUMO 907.0초, 종료 timeout. [대표 프레임](../../results/overnight_s6_final/morning/gui/fix_anchor/900100_site/906.5s.png). `$env:PLACE_FIX='1'; py -3.13 scripts/gui_drive_seed.py --stage 6 --seed 900100 --checkpoint 'C:\Users\USER\Desktop\청계로드-kl-ppo\results\klppo3_s6_s0\step100k.pt' --delay 80`
-- final_s5_step250k, 시드 900377, SUMO 213.0초, 종료 completed. [대표 프레임](../../results/overnight_s6_final/morning/gui/final_s5_step250k/900377_site/212.5s.png). `$env:PLACE_FIX='0'; py -3.13 scripts/gui_drive_seed.py --stage 5 --seed 900377 --checkpoint 'C:\Users\USER\Desktop\청계로드-kl-ppo\results\klppo1_s5_s0\step250k.pt' --delay 80`
-- final_s5_step250k, 시드 900300, SUMO 170.0초, 종료 collision. [대표 프레임](../../results/overnight_s6_final/morning/gui/final_s5_step250k/900300_end/168.5s.png). `$env:PLACE_FIX='0'; py -3.13 scripts/gui_drive_seed.py --stage 5 --seed 900300 --checkpoint 'C:\Users\USER\Desktop\청계로드-kl-ppo\results\klppo1_s5_s0\step250k.pt' --delay 80`
-- final_s5_step250k, 시드 900301, SUMO 548.5초, 종료 completed. [대표 프레임](../../results/overnight_s6_final/morning/gui/final_s5_step250k/900301_end/547.0s.png). `$env:PLACE_FIX='0'; py -3.13 scripts/gui_drive_seed.py --stage 5 --seed 900301 --checkpoint 'C:\Users\USER\Desktop\청계로드-kl-ppo\results\klppo1_s5_s0\step250k.pt' --delay 80`
+- klppo3_s6_recovery_step16k, 시드 900100, SUMO 907.0초, 종료 timeout. [대표 프레임](img/900100_site_b7724dd_906.5s.png). `$env:PLACE_FIX='0'; py -3.13 scripts/gui_drive_seed.py --stage 6 --seed 900100 --checkpoint 'C:\Users\USER\Desktop\청계로드-kl-ppo\results\klppo3_s6_recovery\step16k.pt' --delay 80`
+- klppo3_s6_recovery_step24k, 시드 900100, SUMO 264.0초, 종료 timeout. [대표 프레임](img/900100_site_774a3f9_263.5s.png). `$env:PLACE_FIX='0'; py -3.13 scripts/gui_drive_seed.py --stage 6 --seed 900100 --checkpoint 'C:\Users\USER\Desktop\청계로드-kl-ppo\results\klppo3_s6_recovery\step24k.pt' --delay 80`
+- s6_label01, 시드 900100, SUMO 300.5초, 종료 red_light. [대표 프레임](img/900100_site_065b034_300.0s.png). `$env:PLACE_FIX='0'; py -3.13 scripts/gui_drive_seed.py --stage 6 --seed 900100 --checkpoint 'C:\Users\USER\Desktop\청계로드-kl-ppo\results\s6_label01\step25k.pt' --delay 80`
+- s6_label035, 시드 900100, SUMO 294.5초, 종료 completed. [대표 프레임](img/900100_site_9ff922e_294.0s.png). `$env:PLACE_FIX='0'; py -3.13 scripts/gui_drive_seed.py --stage 6 --seed 900100 --checkpoint 'C:\Users\USER\Desktop\청계로드-kl-ppo\results\s6_label035\step25k.pt' --delay 80`
+- s6_label10, 시드 900100, SUMO 280.5초, 종료 completed. [대표 프레임](img/900100_site_9a3016f_280.0s.png). `$env:PLACE_FIX='0'; py -3.13 scripts/gui_drive_seed.py --stage 6 --seed 900100 --checkpoint 'C:\Users\USER\Desktop\청계로드-kl-ppo\results\s6_label10\step25k.pt' --delay 80`
+- fix_anchor, 시드 900100, SUMO 907.0초, 종료 timeout. [대표 프레임](img/900100_site_122f4dc_906.5s.png). `$env:PLACE_FIX='1'; py -3.13 scripts/gui_drive_seed.py --stage 6 --seed 900100 --checkpoint 'C:\Users\USER\Desktop\청계로드-kl-ppo\results\klppo3_s6_s0\step100k.pt' --delay 80`
+- final_s5_step250k, 시드 900377, SUMO 213.0초, 종료 completed. [대표 프레임](img/900377_site_dee394c_212.5s.png). `$env:PLACE_FIX='0'; py -3.13 scripts/gui_drive_seed.py --stage 5 --seed 900377 --checkpoint 'C:\Users\USER\Desktop\청계로드-kl-ppo\results\klppo1_s5_s0\step250k.pt' --delay 80`
+- final_s5_step250k, 시드 900300, SUMO 170.0초, 종료 collision. [대표 프레임](img/900300_end_7aece94_168.5s.png). `$env:PLACE_FIX='0'; py -3.13 scripts/gui_drive_seed.py --stage 5 --seed 900300 --checkpoint 'C:\Users\USER\Desktop\청계로드-kl-ppo\results\klppo1_s5_s0\step250k.pt' --delay 80`
+- final_s5_step250k, 시드 900301, SUMO 548.5초, 종료 completed. [대표 프레임](img/900301_end_750d18e_547.0s.png). `$env:PLACE_FIX='0'; py -3.13 scripts/gui_drive_seed.py --stage 5 --seed 900301 --checkpoint 'C:\Users\USER\Desktop\청계로드-kl-ppo\results\klppo1_s5_s0\step250k.pt' --delay 80`
 - 발표 영상 확인 후보 900377, 주행 686초. 단계 5, PLACE_FIX=0. `py -3.13 scripts/gui_drive_seed.py --stage 5 --seed 900377 --checkpoint 'C:\Users\USER\Desktop\청계로드-kl-ppo\results\klppo1_s5_s0\step250k.pt' --delay 40`. 5단계에는 6단계 불법주정차 요소가 없다.
 
 ## 팀 공유용 배치 조정
