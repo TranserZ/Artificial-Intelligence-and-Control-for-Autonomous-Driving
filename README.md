@@ -29,20 +29,20 @@ python3 -m http.server 8000     # 이 폴더에서 실행 → http://localhost:8
 | 파일 | 내용 |
 |---|---|
 | `index.html`, `style.css`, `app.js` | 페이지 (빌드 과정 없음) |
-| `run-data.js` | 상단 영상과 노선도를 맞추는 주행 로그 (5단계 모델, seed 1000, 스텝별 거리·속도·정차 수) |
-| `fail-data.js` | 테스트 90판(seed 1000~1089) 중 실패한 판의 종료 위치 |
+| `run-data.js` | 상단 영상과 노선도를 맞추는 주행 로그 (5단계 최종 모델, seed 900377, 스텝별 거리·속도·정차 수) |
+| `fail-data.js` | 최종 모델 평가 100판(seed 900300~900399) 중 시간초과·신호위반·충돌로 끝난 13판의 종료 위치 |
 | `media/` | SUMO 화면 녹화 (H.264, 소리 없음) |
 | `fonts/` | 서울남산체, 서울한강체에서 페이지에 쓰는 글자만 남긴 woff2 |
 | `tools/` | 영상과 수치를 만든 스크립트 |
 
 ## 영상과 테스트 판 수치를 만든 방법
 
-영상과 실패 위치 그림은 5단계 BC 모델로 만들었습니다(팀 최종 모델은 이 모델을 PPO로 미세조정한 `model/kl-ppo` 브랜치의 `results/klppo1_s5_s0/step250k.pt`). `model/dongyeon-bc56` 브랜치의 `models/dongyeon_bc/s5_student.pt` 를 `CGC_STAGE=5`, 안전 필터 감시 모드, 결정적 행동으로 실행했습니다 (SUMO 1.27.1).
+영상과 실패 위치 그림은 팀 최종 모델(`results/klppo1_s5_s0/step250k.pt`)로 만들었습니다. `CGC_STAGE=5 OBS_SCAN=0`, 안전 필터 감시 모드, 결정적 행동으로 실행했습니다 (SUMO 1.27.1).
 
-- `tools/render_run.py`: 학생 모델을 numpy 로 계산해 주행시키고, sumo-gui 화면을 스텝마다 저장하고 로그를 남깁니다. `--nogui` 면 로그만 남깁니다.
-- `tools/eval5.sh`: seed 1000~1089 를 화면 없이 실행합니다.
-- `tools/analyze5.py`: 판별 종료 사유와 위치를 집계합니다. 결과: 완주 80, 시간초과 7, 신호위반 2, 충돌 1.
+- `tools/render_kl.py`: 평가(`drive_parallel.py`)와 같은 환경과 정책으로 한 판을 주행시키고, sumo-gui 화면을 스텝마다 저장하고 로그를 남깁니다. `--nogui` 면 로그만 남깁니다. 상단 영상은 seed 900377(686초, 정차 5곳), 실패 장면은 seed 900317(광교 교차로 정지)과 900374(신호위반)입니다.
 - `tools/enc.sh`: 저장한 화면을 mp4 로 묶습니다 (배경색 교체, 12배속).
+- 실패 위치는 평가 100판의 판별 결과(종료 사유와 주행거리)에서 가져왔습니다.
+- `tools/render_run.py`, `tools/eval5.sh`, `tools/analyze5.py`: 이전에 5단계 BC 모델(`s5_student.pt`) 영상과 테스트 판 집계를 만들 때 쓴 스크립트입니다.
 
 스크립트 안의 경로는 만든 사람 컴퓨터 기준이라 실행하려면 고쳐야 합니다.
 

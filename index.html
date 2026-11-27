@@ -67,7 +67,7 @@
   </div>
 </section>
 
-<section class="run" id="run" aria-label="5단계 BC 모델 주행 영상">
+<section class="run" id="run" aria-label="최종 모델 주행 영상">
   <div class="run-in">
     <div class="line-panel">
       <div class="line-head">
@@ -85,7 +85,7 @@
     </div>
 
     <figure class="screen">
-      <video id="runVideo" aria-label="5단계 BC 모델이 청계광장에서 청계4가까지 주행하는 SUMO 화면" src="media/run-full.mp4" poster="media/run-full.jpg" muted loop playsinline preload="metadata"></video>
+      <video id="runVideo" aria-label="5단계 최종 모델이 청계광장에서 광장시장 앞까지 주행하는 SUMO 화면" src="media/run-full.mp4" poster="media/run-full.jpg" muted loop playsinline preload="metadata"></video>
       <div class="readout" aria-live="off">
         <button id="playBtn" type="button" class="play" aria-pressed="false">재생</button>
         <dl>
@@ -95,7 +95,7 @@
           <div><dt>정차</dt><dd><span id="rS">0</span> / 5</dd></div>
         </dl>
       </div>
-      <figcaption>이 영상은 최종 모델의 출발점인 5단계 모방학습(BC) 모델(<code>s5_student.pt</code>)이 한 판(seed 1000)을 주행한 기록입니다. 최종 모델은 이 모델을 강화학습(PPO)으로 미세조정한 것입니다. 규칙이나 안전 필터 없이 모델 출력만으로 주행했고, 정류장 5곳에 모두 정차한 뒤 675초에 도착했습니다. 영상은 12배속입니다. 노선도의 버스 위치는 주행 로그에서 가져왔고, 노선을 누르면 그 지점부터 재생됩니다.</figcaption>
+      <figcaption>5단계 최종 모델(<code>step250k.pt</code>)이 평가 판 하나(seed 900377)를 주행한 기록입니다. 규칙이나 안전 필터 없이 모델 출력만으로 주행했고, 정류장 5곳에 모두 정차한 뒤 686초에 도착했습니다. 영상은 12배속입니다. 노선도의 버스 위치는 주행 로그에서 가져왔고, 노선을 누르면 그 지점부터 재생됩니다.</figcaption>
     </figure>
   </div>
 </section>
@@ -239,7 +239,7 @@
     </figure>
     <figure>
       <video class="loop" src="media/clip-signal.mp4" poster="media/clip-signal.jpg" muted loop playsinline preload="none"></video>
-      <figcaption><b>신호 대기</b> 청계2가 교차로 앞. 앞차 뒤에서 44초 대기.</figcaption>
+      <figcaption><b>신호 대기</b> 청계2가 교차로 앞. 앞차 뒤에서 24초 대기.</figcaption>
     </figure>
     <figure>
       <video class="loop" src="media/clip-zone.mp4" poster="media/clip-zone.jpg" muted loop playsinline preload="none"></video>
@@ -250,7 +250,7 @@
       <figcaption><b>혼잡 구간</b> 합류 차량과 오토바이가 섞인 구간에서 앞차를 따라 주행.</figcaption>
     </figure>
   </div>
-  <p class="note">위 주행 영상(5단계 BC 모델, seed 1000)에서 잘라 낸 장면입니다. 초록색 차량이 버스입니다.</p>
+  <p class="note">위 주행 영상(5단계 최종 모델, seed 900377)에서 잘라 낸 장면입니다. 초록색 차량이 버스입니다.</p>
   </div>
 </section>
 
@@ -392,24 +392,24 @@
   </header>
   <div class="sec-body">
   <div class="prose">
-    <p>아래 그림은 최종 모델의 출발점인 5단계 BC 모델이 테스트 판 가운데 90판(seed 1000~1089) 중 실패한 10판에서 주행이 끝난 위치입니다. 광교 교차로와 청계3가 교차로 두 곳에 8판이 모여 있습니다. PPO 미세조정 뒤에도 교차로 안에서 멈추는 문제는 남았습니다(평가 100판 중 시간초과 7판).</p>
+    <p>아래 그림은 최종 모델이 평가 100판 중 실패한 13판에서 주행이 끝난 위치입니다(종점에 도착했지만 정류장을 놓친 3판은 제외). 광교 교차로 안에서 멈춘 시간초과가 6판으로 가장 많습니다.</p>
   </div>
 
   <figure class="wide">
     <div class="line-scroll">
-      <svg id="failLine" class="line" viewBox="0 0 1120 190" role="img" aria-label="5단계 BC 모델 테스트 90판의 실패 위치. 광교 교차로에 시간초과 4판, 청계2가 동쪽 정지선에 신호위반 2판, 청계3가 교차로에 시간초과 3판과 충돌 1판."></svg>
+      <svg id="failLine" class="line" viewBox="0 0 1120 190" role="img" aria-label="최종 모델 평가 100판의 실패 위치. 광교 교차로에 시간초과 6판, 청계1가·광교 정류장 부근에 충돌 2판, 무교로 부근에 충돌 1판, 청계2가 동쪽 정지선에 신호위반 2판, 수표교 정지선에 신호위반 1판, 청계3가 교차로에 시간초과 1판."5단계 BC 모델 테스트 90판의 실패 위치. 광교 교차로에 시간초과 4판, 청계2가 동쪽 정지선에 신호위반 2판, 청계3가 교차로에 시간초과 3판과 충돌 1판."></svg>
     </div>
-    <figcaption>점 하나가 한 판입니다. <i class="dot d-to"></i>시간초과 7 <i class="dot d-red"></i>신호위반 2 <i class="dot d-col"></i>충돌 1</figcaption>
+    <figcaption>점 하나가 한 판입니다. <i class="dot d-to"></i>시간초과 7 <i class="dot d-red"></i>신호위반 3 <i class="dot d-col"></i>충돌 3</figcaption>
   </figure>
 
   <div class="clips">
     <figure>
       <video class="loop" src="media/clip-fail-stall.mp4" poster="media/clip-fail-stall.jpg" muted loop playsinline preload="none"></video>
-      <figcaption><b>교차로 안 정지 (seed 1008)</b> 광교 교차로 출구 횡단보도 앞에서 멈춘 뒤 제한 시간 1,800초까지 출발하지 않음.</figcaption>
+      <figcaption><b>교차로 안 정지 (seed 900317)</b> 광교 교차로 출구 횡단보도 앞에서 멈춘 뒤 제한 시간 1,800초까지 출발하지 않음.</figcaption>
     </figure>
     <figure>
       <video class="loop" src="media/clip-fail-red.mp4" poster="media/clip-fail-red.jpg" muted loop playsinline preload="none"></video>
-      <figcaption><b>신호위반 (seed 1010)</b> 청계2가 교차로 동쪽 정지선에서 감속이 늦어 시속 18&nbsp;km로 통과.</figcaption>
+      <figcaption><b>신호위반 (seed 900374)</b> 청계2가 교차로 동쪽 정지선 앞에서 감속이 늦어 적색에 정지선을 넘음.</figcaption>
     </figure>
   </div>
 
@@ -418,8 +418,8 @@
     <li>PPO 미세조정의 효과는 100판으로는 확인되지 않았습니다. 같은 평가 판에서 BC 모델은 완주 86%, 충돌 2%, 최종 모델은 완주 84%, 충돌 3%입니다.</li>
     <li>최종 모델은 평가 100판 중 63판에서 60초 이상 멈춘 구간이 있었습니다(저장소 README 기준, 맥에서 다시 돌린 재평가에서는 64판). 이 수는 정지선 앞 적색 대기를 이미 뺀 것이고, 황색 대기와 신호 대기열까지 빼고 다시 세면 19판입니다. 이동 중 평균 속도는 시속 19.6&nbsp;km, 정지 시간을 포함하면 시속 10.9&nbsp;km입니다(<a href="https://github.com/TranserZ/Artificial-Intelligence-and-Control-for-Autonomous-Driving/blob/main/docs/reports/2026-11-26_%EA%B0%95%EB%8F%99%EC%97%B0_%EC%B2%AD%EA%B3%84%EC%B2%9C%EB%A1%9C_5%EB%8B%A8%EA%B3%84_300%ED%8C%90_%EC%9E%AC%ED%8F%89%EA%B0%80.md">11-26 재평가 보고서</a>).</li>
     <li>같은 100판에서 어린이보호구역 안 과속 step은 0.9%였고(최대 초과 2.0&nbsp;m/s), 횡단보도 양보 위반은 1 step이었습니다. 보호구역 과속은 최종 모델의 보상에 들어 있지 않습니다.</li>
-    <li>BC 모델 테스트 90판의 시간초과 7판은 모두 교차로 안에서 정지한 뒤 다시 출발하지 않은 경우입니다. 광교 교차로에서 4판, 청계3가 교차로에서 3판입니다.</li>
-    <li>모델은 매 순간의 관측만 보기 때문에 황색이 언제 켜졌는지 모릅니다. 신호위반 2판은 이러한 이유로 감속이 늦은 경우입니다.</li>
+    <li>시간초과 7판은 모두 교차로 안에서 정지한 뒤 다시 출발하지 않은 경우입니다. 광교 교차로에서 6판, 청계3가 교차로에서 1판입니다.</li>
+    <li>모델은 매 순간의 관측만 보기 때문에 황색이 언제 켜졌는지 모릅니다. 신호위반 3판은 모두 정지선 앞에서 감속이 늦은 경우입니다.</li>
     <li>팀 기준은 학습 시드 3개의 평균으로 판정하게 되어 있지만, 위 결과는 모두 학습 시드 1개로 얻은 값입니다.</li>
     <li>학생 성능은 전문가 시범에 의존합니다. 5단계 시범에서는 전체 스텝의 약 50%에서 안전 필터가 행동을 수정했습니다.</li>
     <li>교통량과 보행량은 가정한 값입니다. 무단횡단과 자전거는 환경에 없습니다.</li>
