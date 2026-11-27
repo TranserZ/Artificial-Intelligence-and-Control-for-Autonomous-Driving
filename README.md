@@ -14,6 +14,18 @@ KL 정규화 PPO는 PPO로 보상을 높이면서, 출발점인 행동 복제 �
 KL 벌점을 주면 행동 복제 정책의 안정적인 운전을 유지하면서 보상이 높아지는 방향으로만 조금씩 고칠 수 있다고 생각했습니다. 
 그 결과 4단계에서는 완주 100%, 충돌 0%, 5단계에서는 완주 93.3%, 충돌 3.3%(개발 시드 30판)를 얻었습니다.
 
+다음과 같이 이 모델을 발전시켜 나갔습니다.
+<img width="1915" height="1074" alt="image" src="https://github.com/user-attachments/assets/8b13f045-f0c5-4957-a9a4-27d88e213431" />
+<img width="1919" height="1076" alt="image" src="https://github.com/user-attachments/assets/6ba32ff1-d5c7-412a-a1c9-f33a94de4b73" />
+<img width="1918" height="1073" alt="image" src="https://github.com/user-attachments/assets/5980e557-2c20-49cb-a2ba-910d996538d5" />
+<img width="1919" height="1074" alt="image" src="https://github.com/user-attachments/assets/0d5be6e6-c278-4b4c-9c30-9a8f2b8b7d85" />
+<img width="1919" height="1072" alt="image" src="https://github.com/user-attachments/assets/7bbaa355-635d-498a-b257-e9d0e46c412a" />
+
+
+
+
+
+
 코드와 파일 이름에서는 이 방법을 줄여서 KL-PPO(`kl_ppo`, `klppo`)라고 부릅니다.
 
 ## 링크
