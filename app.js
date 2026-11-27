@@ -5,7 +5,7 @@
 //   dataset: Hugging Face 데이터셋 주소 (https://huggingface.co/datasets/...)
 const LINKS = {
   slides: "",
-  dataset: "",
+  dataset: "https://huggingface.co/datasets/CheonggyeRoad/Dataset",
 };
 
 for (const a of document.querySelectorAll("a[data-link]")) {
