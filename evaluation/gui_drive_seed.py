@@ -1,8 +1,8 @@
 """단일 시드 GUI 주행 — 충돌 장면 확인용.
 
     $env:CGC_STAGE=6; $env:OBS_SCAN=1
-    py -3.13 scripts/gui_drive_seed.py --seed 900114
-    py -3.13 scripts/gui_drive_seed.py --seed 900114 --model student
+    py -3.13 evaluation/gui_drive_seed.py --seed 900114
+    py -3.13 evaluation/gui_drive_seed.py --seed 900114 --model student
 """
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ import numpy as np
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-from scripts.drive_parallel import end_reason, policy_action, prepare_sumo  # noqa: E402
+from evaluation.drive_parallel import end_reason, policy_action, prepare_sumo  # noqa: E402
 
 KL_200K = os.path.join(ROOT, "results", "klppo1_s6_s1", "step200k.pt")
 STUDENT = os.path.join(os.path.dirname(ROOT), "청계로드-dongyeon-d54a761", "models", "dongyeon_bc", "s6_student_obsfix.pt")
@@ -41,10 +41,10 @@ def main():
     os.environ["CGC_STAGE"] = str(args.stage)
     os.environ["OBS_SCAN"] = "1"
 
-    from env.mdp_config import ACTION, OBSERVATION, SIMULATION
-    from env.road_config import EGO, ROAD, TRAFFIC
-    from env.sumo_env import SumoHighwayEnv
-    from train import HPARAMS, REWARD
+    from environment.mdp_config import ACTION, OBSERVATION, SIMULATION
+    from environment.road_config import EGO, ROAD, TRAFFIC
+    from environment.sumo_env import SumoHighwayEnv
+    from training.train import HPARAMS, REWARD
     from algorithms.kl_ppo import load_eval_policy
     import traci
 

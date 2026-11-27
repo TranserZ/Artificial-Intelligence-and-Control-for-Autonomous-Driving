@@ -299,7 +299,7 @@ CHEONGGYECHEON = {
     "roii": True,
     # 단계별 맵 (env/curriculum.py): 1 정류장 → 2 신호·횡단보도 → 3 끼어들기 →
     # 4 어린이보호구역 → 5 오토바이 → 6 불법주정차. 뒤 단계는 앞 단계를 모두 포함.
-    # 환경변수 CGC_STAGE가 있으면 그 값을 쓴다 (예: CGC_STAGE=1 python train.py ...).
+    # 환경변수 CGC_STAGE가 있으면 그 값을 쓴다 (예: CGC_STAGE=1 python training/train.py ...).
     "stage": 6,
     # 청계천 모든 차량(일반차·끼어드는 차·오토바이·버스)의 최고속도 (m/s).
     # 도로 제한속도도 30 km/h (서울시 안전속도 5030, 청계천로 전 구간 30 km/h).
@@ -312,7 +312,7 @@ CHEONGGYECHEON = {
 }
 
 if CHEONGGYECHEON["enabled"]:
-    from env.curriculum import elements as _stage_elements, resolve_stage as _resolve_stage
+    from environment.curriculum import elements as _stage_elements, resolve_stage as _resolve_stage
     CHEONGGYECHEON["stage"] = _resolve_stage(CHEONGGYECHEON["stage"])
     ROAD = {**ROAD, "layout": "cheonggyecheon",
             "length": CHEONGGYECHEON["route_length"],

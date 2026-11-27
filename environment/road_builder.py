@@ -16,25 +16,25 @@ import subprocess
 import sys
 
 from sumolib import checkBinary  # SUMO 실행파일(sumo, netconvert 등) 경로를 찾아주는 유틸
-from env.mdp_config import SIMULATION
+from environment.mdp_config import SIMULATION
 try:
-    from env.road_config import SCENERY
+    from environment.road_config import SCENERY
 except ImportError:      # 구버전 설정 하위호환
     SCENERY = {"trees": False}
 try:
-    from env.road_config import TRAFFIC_LIGHT
+    from environment.road_config import TRAFFIC_LIGHT
 except ImportError:      # 신호등 설정이 없는 구버전 설정 하위호환
     TRAFFIC_LIGHT = {"enabled": False}
 try:
-    from env.road_config import INTERSECTION, PEDESTRIANS
+    from environment.road_config import INTERSECTION, PEDESTRIANS
 except ImportError:      # 교차로 설정이 없는 구버전 설정 하위호환
     INTERSECTION, PEDESTRIANS = {}, {"enabled": False}
 try:
-    from env.road_config import SIGNAL_PLAN
+    from environment.road_config import SIGNAL_PLAN
 except ImportError:      # 실제 교차로 신호 계획이 없는 구버전 설정 하위호환
     SIGNAL_PLAN = {}
 try:
-    from env.road_config import SCHOOL
+    from environment.road_config import SCHOOL
 except ImportError:      # 학교/어린이 보호구역 설정이 없는 구버전 설정 하위호환
     SCHOOL = {"enabled": False}
 
@@ -74,7 +74,7 @@ def _build_cheonggyecheon(ego: dict, out_dir: str, demo_ego: bool = False,
     import make_cgc_scenario
 
     # 단계별 맵 (env/curriculum.py): ROAD["elements"]에 없는 요소는 만들지 않는다
-    from env.curriculum import has
+    from environment.curriculum import has
     road = road or {}
     signals_on, school_on = has(road, "signal"), has(road, "school_zone")
     print(f"[단계별 맵] {road.get('stage', '-')}단계: {', '.join(road.get('elements') or ['전체'])}")
@@ -475,7 +475,7 @@ def build(road: dict, ego: dict, traffic: dict, out_dir: str,
     # ──────────────────────────────────────────────────────
     school_path = os.path.join(out_dir, "highway.school.xml")
     if use_school:
-        from env.school_assets import make_assets
+        from environment.school_assets import make_assets
         layout = school_layout(road)
         make_assets(SCHOOL.get("name", "학교"), int(round(layout["limit"] * 3.6)),
                     SCHOOL.get("line_color", "255,200,0"))
@@ -921,7 +921,7 @@ def _school_site(sz: dict):
 def _write_school(out_dir: str, road: dict, sz: dict):
     import math
     import xml.etree.ElementTree as ET
-    from env.school_assets import FILES, SIZE
+    from environment.school_assets import FILES, SIZE
 
     pave = SCHOOL.get("pave_color", "150,35,35")
     yellow = SCHOOL.get("line_color", "255,200,0")

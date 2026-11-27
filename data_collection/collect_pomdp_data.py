@@ -25,12 +25,12 @@
   (pip install libsumo). --workers N으로 SUMO 인스턴스 N개를 병렬로 돌려 더 줄인다.
 
 예시:
-    python collect_pomdp_data.py --episodes 100
-    python collect_pomdp_data.py --episodes 10 --gui
-    python collect_pomdp_data.py --policy keep-lane --episodes 20
-    python collect_pomdp_data.py --model results/run_xxx/model.pt --episodes 100   # 학습한 PPO로 수집
-    python collect_pomdp_data.py --model results/run_xxx/model.pt --stochastic    # 샘플링 행동
-    python collect_pomdp_data.py --episodes 200 --workers 8   # SUMO 8개 병렬 수집
+    python data_collection/collect_pomdp_data.py --episodes 100
+    python data_collection/collect_pomdp_data.py --episodes 10 --gui
+    python data_collection/collect_pomdp_data.py --policy keep-lane --episodes 20
+    python data_collection/collect_pomdp_data.py --model results/run_xxx/model.pt --episodes 100   # 학습한 PPO로 수집
+    python data_collection/collect_pomdp_data.py --model results/run_xxx/model.pt --stochastic    # 샘플링 행동
+    python data_collection/collect_pomdp_data.py --episodes 200 --workers 8   # SUMO 8개 병렬 수집
 
 출력:
     data/pomdp_YYYYMMDD_HHMMSS.jsonl.gz
@@ -57,13 +57,18 @@ from datetime import datetime
 
 import numpy as np
 
-from env.road_config import ROAD, EGO, TRAFFIC
-from env.mdp_config import SIMULATION, OBSERVATION, ACTION
-from env import road_builder
-from env.sumo_env import SumoHighwayEnv, SIGNAL_COLORS
-from train import HPARAMS, REWARD  # 학습과 같은 보상 조건 + PPO 네트워크 구조
+import sys
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # 저장소 루트
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)  # environment / algorithms / utils / training 를 루트 기준으로 import
 
-BASE = os.path.dirname(os.path.abspath(__file__))
+from environment.road_config import ROAD, EGO, TRAFFIC
+from environment.mdp_config import SIMULATION, OBSERVATION, ACTION
+from environment import road_builder
+from environment.sumo_env import SumoHighwayEnv, SIGNAL_COLORS
+from training.train import HPARAMS, REWARD  # 학습과 같은 보상 조건 + PPO 네트워크 구조
+
+BASE = ROOT  # data/, environment/ 기준 (저장소 루트)
 
 
 def detect_algorithm(model_path: str) -> str:
@@ -471,7 +476,7 @@ def main():
 
     # 도로 파일은 부모에서 한 번만 생성한다 (워커들이 동시에 쓰면 파일이 깨진다).
     sumocfg = road_builder.build(ROAD, EGO, TRAFFIC,
-                                 os.path.join(BASE, "env", "sumo"))
+                                 os.path.join(BASE, "environment", "sumo"))
 
     t0 = time.time()
     if workers == 1:

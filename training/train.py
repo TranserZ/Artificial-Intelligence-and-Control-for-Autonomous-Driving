@@ -11,7 +11,7 @@
 ║    네트워크 / 평가  → utils/networks.py, utils/evaluator.py       ║
 ╚══════════════════════════════════════════════════════════════════╝
 
-실행:  python train.py
+실행:  python training/train.py
 """
 import argparse
 import json
@@ -22,18 +22,23 @@ import numpy as np
 import torch
 from datetime import datetime
 
-from env.road_config import ROAD, EGO, TRAFFIC
-from env.mdp_config import SIMULATION, OBSERVATION, ACTION
-from env.mdp_config import REWARD as REWARD_DEFAULTS
-from env import road_builder
-from env.sumo_env import SumoHighwayEnv
+import sys
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # 저장소 루트
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)  # environment / algorithms / utils / training 를 루트 기준으로 import
+
+from environment.road_config import ROAD, EGO, TRAFFIC
+from environment.mdp_config import SIMULATION, OBSERVATION, ACTION
+from environment.mdp_config import REWARD as REWARD_DEFAULTS
+from environment import road_builder
+from environment.sumo_env import SumoHighwayEnv
 
 from algorithms.ppo import PPO
 from utils.buffer import RolloutBuffer
 from utils.logger import RunLogger
 from utils import train_backup
 
-BASE = os.path.dirname(os.path.abspath(__file__))
+BASE = ROOT  # results/, environment/, train_file_backup/ 기준 (저장소 루트)
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -263,9 +268,9 @@ def snapshot_configs(run_dir: str):
     이 파일 안에 있으므로, 나중에 "이 결과가 어떤 설정이었나"를
     정확히 되짚을 수 있다.
     """
-    for src in [os.path.join(BASE, "env", "road_config.py"),
-                os.path.join(BASE, "env", "mdp_config.py"),
-                os.path.join(BASE, "train.py")]:
+    for src in [os.path.join(BASE, "environment", "road_config.py"),
+                os.path.join(BASE, "environment", "mdp_config.py"),
+                os.path.abspath(__file__)]:
         shutil.copy(src, run_dir)
 
 
@@ -387,7 +392,7 @@ if __name__ == "__main__":
             f"\nStage 6: asymmetric lane anchor, reversal penalty -1, unsafe actual lane change penalty {-args.unsafe_lane_penalty:g}. "
             "Shield shadow only. Replay 0.3, critic warmup, lane sampling at temperature 1."
         )
-    saved = train_backup.backup(os.path.join(BASE, "train.py"), BACKUP_DIR,
+    saved = train_backup.backup(os.path.abspath(__file__), BACKUP_DIR,
                                 purpose, os.path.basename(run_dir))
     if saved:
         print(f"train.py 백업: {os.path.relpath(saved, BASE)}")
@@ -607,7 +612,7 @@ if __name__ == "__main__":
         agent.save(model_path)
         snapshot_configs(run_dir)
         print(f"\n저장 완료: {model_path}")
-        print(f"재생 방법:      python test.py "
+        print(f"재생 방법:      python evaluation/test.py "
               f"{os.path.relpath(model_path, BASE)}")
         print(f"학습 곡선 보기: tensorboard --logdir {RESULTS_DIR}"
               f"  → http://localhost:6006")

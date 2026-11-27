@@ -1,7 +1,7 @@
 """collect_pomdp_data.py로 수집한 NPZ/JSONL 데이터로 Behavior Cloning 학습.
 
 사용 예시:
-    python train_bc.py --data data/pomdp_example.npz
+    python training/train_bc.py --data data/pomdp_example.npz
     tensorboard --logdir results
     브라우저에서 http://localhost:6006 접속
 
@@ -21,6 +21,8 @@ import csv
 import json
 from contextlib import closing
 from datetime import datetime
+import os
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -28,10 +30,14 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # 저장소 루트
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+
 from algorithms.bc import BCPolicy
 
 
-BASE = Path(__file__).resolve().parent
+BASE = Path(__file__).resolve().parent.parent  # 저장소 루트 (results/ 기준)
 
 
 def load_data(path):
@@ -440,7 +446,7 @@ def main():
     print(f"Best model           : {out_dir / 'model.pt'}")
     print(f"Last model           : {out_dir / 'last_model.pt'}")
     print(f"Training log         : {log_path}")
-    print(f"Evaluation           : python test.py {out_dir / 'model.pt'} --algorithm bc --nogui")
+    print(f"Evaluation           : python evaluation/test.py {out_dir / 'model.pt'} --algorithm bc --nogui")
     print(f"TensorBoard          : tensorboard --logdir \"{out_dir.parent}\"  → http://localhost:6006")
     print("=" * 70)
 

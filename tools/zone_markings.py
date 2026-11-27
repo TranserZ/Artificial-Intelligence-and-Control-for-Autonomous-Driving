@@ -62,7 +62,7 @@ def _speed_asset(fname, key, limit_kmh):
         return fname
     alt = {"speed": f"school_speed{limit_kmh}.png",
            "sign_start": f"school_sign_start{limit_kmh}.png"}[key]
-    here = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "env", "assets", alt)
+    here = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "environment", "assets", alt)
     return alt if os.path.exists(here) else fname
 
 
@@ -368,7 +368,7 @@ def _import_sumolib():
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--out-dir", default=os.path.join(ROOT, "env", "cheonggyecheon"))
+    ap.add_argument("--out-dir", default=os.path.join(ROOT, "environment", "cheonggyecheon"))
     args = ap.parse_args()
     sumolib = _import_sumolib()
     net = sumolib.net.readNet(os.path.join(args.out_dir, "cgc.net.xml"))

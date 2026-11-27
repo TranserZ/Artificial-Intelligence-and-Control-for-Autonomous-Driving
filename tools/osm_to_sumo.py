@@ -506,7 +506,7 @@ def _prune_background(edges, nodes, corridor_nodes):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--osm", default="data/osm/cheonggyecheon.osm")
-    ap.add_argument("--out", default="env/cheonggyecheon")
+    ap.add_argument("--out", default="environment/cheonggyecheon")
     a = ap.parse_args()
     convert(a.osm, a.out)
 

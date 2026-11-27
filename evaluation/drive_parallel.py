@@ -1,7 +1,7 @@
 """PPO 또는 KL-PPO 체크포인트를 여러 판에 병렬로 달린다.
 
     $env:CGC_STAGE = "4"
-    py -3.13 scripts/drive_parallel.py --model <ckpt> --seeds 900100-900129 --shield shadow
+    py -3.13 evaluation/drive_parallel.py --model <ckpt> --seeds 900100-900129 --shield shadow
 """
 from __future__ import annotations
 
@@ -51,10 +51,10 @@ def end_reason(info, terminated, truncated) -> str:
 
 
 def _make_env(sumocfg, shield):
-    from env.mdp_config import ACTION, OBSERVATION, SIMULATION
-    from env.road_config import EGO, ROAD, TRAFFIC
-    from env.sumo_env import SumoHighwayEnv
-    from train import REWARD
+    from environment.mdp_config import ACTION, OBSERVATION, SIMULATION
+    from environment.road_config import EGO, ROAD, TRAFFIC
+    from environment.sumo_env import SumoHighwayEnv
+    from training.train import REWARD
     sim = {**SIMULATION, "shield": {**SIMULATION["shield"], "mode": shield}}
     return SumoHighwayEnv(
         cfg_path=sumocfg, road=ROAD, ego=EGO, mdp_sim=sim, mdp_obs=OBSERVATION,
@@ -125,7 +125,7 @@ def run_seed(sumocfg, seed, model, shield, deterministic=True, explore_std=0.0,
     import torch
     import traci
     from algorithms.kl_ppo import KLPPO, load_eval_policy
-    from train import HPARAMS
+    from training.train import HPARAMS
     from utils.official_metrics import EpisodeMetrics
     torch.set_num_threads(1)
     if teacher:
@@ -385,8 +385,8 @@ def format_table(title, stats) -> str:
 
 
 def prepare_sumo():
-    from env import road_builder
-    from env.road_config import EGO, ROAD, TRAFFIC
+    from environment import road_builder
+    from environment.road_config import EGO, ROAD, TRAFFIC
     work = tempfile.mkdtemp(prefix="cheonggye_drive_")
     return work, road_builder.build(ROAD, EGO, TRAFFIC, work)
 

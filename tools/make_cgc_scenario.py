@@ -1002,8 +1002,8 @@ def build(net_path, out_dir, args):
 
 def parse_args(argv=None):
     ap = argparse.ArgumentParser()
-    ap.add_argument("--net", default="env/cheonggyecheon/cgc.net.xml")
-    ap.add_argument("--out", default="env/cheonggyecheon")
+    ap.add_argument("--net", default="environment/cheonggyecheon/cgc.net.xml")
+    ap.add_argument("--out", default="environment/cheonggyecheon")
     ap.add_argument("--lines", default=None,
                     help=f"노선 설정 YAML (기본 {LINES_YAML}, 없으면 내장 청계A01)")
     ap.add_argument("--line", default="A01_east",

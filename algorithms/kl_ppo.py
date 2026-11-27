@@ -218,7 +218,7 @@ class KLPPO:
                     self._episode_records = []
                 self._episode_records.append(trace_row)
                 if terminated or truncated:
-                    from scripts.drive_parallel import end_reason
+                    from evaluation.drive_parallel import end_reason
                     path = Path(trace_dir)
                     path.mkdir(parents=True, exist_ok=True)
                     records = self._episode_records

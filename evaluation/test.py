@@ -1,10 +1,10 @@
 """학습된 모델을 sumo-gui로 재생하고 주행 지표를 출력한다.
 
 사용법:
-    python test.py results/run_20260824_153012/model.pt   ← 모델 경로 지정
-    python test.py                                        ← 최근 run 자동 선택
-    python test.py --episodes 5 --nogui                   ← 화면 없이 지표만 측정
-    python test.py results/bc_example/model.pt --algorithm bc --nogui
+    python evaluation/test.py results/run_20260824_153012/model.pt   ← 모델 경로 지정
+    python evaluation/test.py                                        ← 최근 run 자동 선택
+    python evaluation/test.py --episodes 5 --nogui                   ← 화면 없이 지표만 측정
+    python evaluation/test.py results/bc_example/model.pt --algorithm bc --nogui
 
 빨간 차가 ego. 앞차가 느리면 감속하고 앞이 비면 가속하는지 관찰해보자.
 """
@@ -13,10 +13,15 @@ import glob
 import os
 import torch
 
-from env.road_config import ROAD, EGO, TRAFFIC
-from env.mdp_config import SIMULATION, OBSERVATION, ACTION
-from env import road_builder
-from env.sumo_env import SumoHighwayEnv
+import sys
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # 저장소 루트
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)  # environment / algorithms / utils / training 를 루트 기준으로 import
+
+from environment.road_config import ROAD, EGO, TRAFFIC
+from environment.mdp_config import SIMULATION, OBSERVATION, ACTION
+from environment import road_builder
+from environment.sumo_env import SumoHighwayEnv
 
 from algorithms.ppo import PPO
 from algorithms.bc import BCPolicy
@@ -25,9 +30,9 @@ from utils.evaluator import evaluate_policy
 
 # train.py와 동일한 네트워크 구조로 만들어야 가중치를 불러올 수 있으므로
 # 하이퍼파라미터를 그대로 가져온다 (구조 관련 항목만 실제로 쓰임).
-from train import HPARAMS, RESULTS_DIR, REWARD  # ← 보상도 train과 동일 조건
+from training.train import HPARAMS, RESULTS_DIR, REWARD  # ← 보상도 train과 동일 조건
 
-BASE = os.path.dirname(os.path.abspath(__file__))
+BASE = ROOT  # results/, environment/ 기준 (저장소 루트)
 
 
 def find_latest_model() -> str:
@@ -107,7 +112,7 @@ if __name__ == "__main__":
     # 주의: 현재 env/ 설정과 다른 설정으로 학습된 모델이면 성능이 이상할 수 있다.
     # 그 run의 설정 스냅샷은 model.pt와 같은 폴더의 *_config.py 에서 확인 가능.
     sumocfg = road_builder.build(ROAD, EGO, TRAFFIC,
-                                 os.path.join(BASE, "env", "sumo"))
+                                 os.path.join(BASE, "environment", "sumo"))
     env = SumoHighwayEnv(
         cfg_path=sumocfg,
         road=ROAD, ego=EGO,

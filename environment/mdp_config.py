@@ -43,7 +43,7 @@ SIMULATION = {
 #   + 정차 감속 + 보행자·끼어들기 여유 → 1200초(2400스텝).
 # 단계별 맵(2026-11-21): 실측 신호 주기(110~170초, 버스 방향 녹색 27~43%)와 최고속도 30 km/h에서
 #   데모 버스(정류장 15초) 주행시간이 690~1010초 (6단계, 본선 400대/시간) → 1800초(3600스텝).
-from env.road_config import CHEONGGYECHEON as _CGC  # noqa: E402
+from environment.road_config import CHEONGGYECHEON as _CGC  # noqa: E402
 if _CGC["enabled"]:
     SIMULATION["max_steps"] = 3600
 

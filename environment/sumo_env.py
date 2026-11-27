@@ -59,7 +59,7 @@ sys.path.append(os.path.join(os.environ["SUMO_HOME"], "tools"))
 import traci
 from sumolib import checkBinary
 
-from env.safety_filter import PedSafetyFilter
+from environment.safety_filter import PedSafetyFilter
 
 
 def _load_zone_rows(filename, columns):
@@ -159,7 +159,7 @@ class SumoHighwayEnv(gym.Env):
         # ----- 도로/차량 설정에서 필요한 값들 -----
         self.vmax = float(road["speed_limit"])   # 속도 정규화 기준
         # 단계별 맵 (env/curriculum.py): 이번 맵에서 켜진 요소. 없으면(예전 설정) 전부 켜짐
-        from env.curriculum import has as _has
+        from environment.curriculum import has as _has
         self.stage = road.get("stage")
         self.has_parking = _has(road, "illegal_parking")
         self.has_school = _has(road, "school_zone")
