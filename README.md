@@ -198,16 +198,38 @@ L = −L_CLIP(PPO) + β · KL(π_θ ‖ π_BC)
 ## 폴더 구조
 
 ```
+[환경 — 팀 공용, PPO·KL-PPO가 같이 씀]
+env/                        SUMO 환경과 도로·MDP 설정. 단계별 차이는 파일 복사 없이 환경변수로
+                            (CGC_STAGE=1~6, OBS_SCAN=0/1, PLACE_FIX, CGC_THROUGH_VPH 등)
+config/lines.yaml           버스 노선·정류장
+data/road_data/, data/osm/  도로 실측 자료와 지도 원본
+
+[학습]
+train.py                    팀 공용 학습 진입점. --ref 를 주면 KL-PPO 로 학습
+algorithms/kl_ppo.py        KL-PPO 학습·불러오기 (algorithms/ppo.py 는 팀 공용 PPO)
+
+[모델]
 models/kl_ppo/
 ├── stage4/   step100k.pt, config.json, training_log.csv
-├── stage5/   step250k.pt (5단계 최종), config.json, mdp_config.py, road_config.py, train.py, training_log.csv
+├── stage5/   step250k.pt (5단계 최종), config.json, training_log.csv
+│             mdp_config.py, road_config.py, train.py  ← 학습 당시 자동 저장한 사본(재현 기록용, 실행에 쓰지 않음)
 └── stage6/   s6_label035.pt (마지막 체크포인트, 약 2.5만 스텝), config.json, training_log.csv
-algorithms/kl_ppo.py        KL-PPO 학습·불러오기
+
+[평가·진단]
 utils/official_metrics.py   교수님 공식 지표 A~H 계산
-scripts/drive_parallel.py   병렬 평가
+scripts/drive_parallel.py   병렬 평가 (다른 KL-PPO 평가·진단 스크립트가 이 파일을 불러 씀)
 scripts/gui_drive_seed.py   SUMO-GUI로 한 판 보기
 scripts/lw_pattern_s5.py    5단계 장기대기 패턴 분석
+scripts/pingpong_diagnose_s6.py, collision_diagnose_s6.py, samil_counterfactual.py  6단계 진단
+
+[데이터 수집]
+collect_pomdp_data.py       팀 공용 POMDP 데이터 수집 (scripts/pomdp_collect_smoke.py 는 짧은 확인용)
+
+[기록]
 docs/reports/               실험 보고서 (전체 정리: 2026-11-26_최종_과정정리.docx)
+docs/reports/huiyoung/      특수구역 확인 화면·기하 검증 결과 (scripts/check_*·validate_geometry.py 출력)
+project_materials/          수업 자료
+results/                    학습·평가 출력 (팀 옛 결과 일부만 git에 있음)
 ```
 
 체크포인트는 일반 PPO `state_dict`가 아니라 KL-PPO 형식입니다. `algorithms/kl_ppo.py`의 `KLPPO.from_checkpoint`로 불러옵니다.

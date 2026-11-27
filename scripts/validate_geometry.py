@@ -19,7 +19,7 @@
     현재 경로의 가장 가까운 엣지/교차로 내부 차로에 공간 매칭한다 (두 net은 같은 투영).
 
 실행:  py -X utf8 scripts/validate_geometry.py [--rebuild]
-출력:  data_huiyoung/report/geometry_validation.md / .csv
+출력:  docs/reports/huiyoung/geometry_validation.md / .csv
 """
 import argparse
 import csv
@@ -53,7 +53,7 @@ NO_STOP_CSV = os.path.join(BASE, "data", "road_data", "no_stop_zones.csv")
 SCHOOL_CSV = os.path.join(BASE, "data", "road_data", "school_zones.csv")
 OLD_NET_REV = "88bd499"                      # 도로망 정리(bus_line) 이전 net
 OLD_NET_PATH = "env/cheonggyecheon/cgc.net.xml"
-OUT_DIR = os.path.join(BASE, "data_huiyoung", "report")
+OUT_DIR = os.path.join(BASE, "docs", "reports", "huiyoung")
 
 ROUTE_ID = "r0"
 ROUTE_REAL_LENGTH = 2146.0
