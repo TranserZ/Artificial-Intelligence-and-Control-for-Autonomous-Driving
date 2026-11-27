@@ -242,11 +242,11 @@ td code { font-size: 0.8rem; }
 .bar-v {
   --v: 0; display: block; position: relative; padding-left: 0.5rem; line-height: 1.5rem; color: #fff; white-space: nowrap;
   background:
-    linear-gradient(var(--ink), var(--ink)) 95% 0 / 2px 100% no-repeat,
+    linear-gradient(var(--ink), var(--ink)) 85% 0 / 2px 100% no-repeat,
     linear-gradient(to right, var(--blue) calc(var(--v) * 1%), var(--blue-wash) 0);
 }
 .bar-v.miss { background:
-    linear-gradient(var(--ink), var(--ink)) 95% 0 / 2px 100% no-repeat,
+    linear-gradient(var(--ink), var(--ink)) 85% 0 / 2px 100% no-repeat,
     linear-gradient(to right, #4a70b6 calc(var(--v) * 1%), var(--blue-wash) 0); }
 .bar-v.low { color: var(--ink); padding-left: calc(var(--v) * 1% + 0.5rem); }
 
