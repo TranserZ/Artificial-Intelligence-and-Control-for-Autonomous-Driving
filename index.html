@@ -112,7 +112,7 @@
     <p>이 프로젝트의 목표는 사람의 개입을 줄여, 미국 자동차기술자협회(SAE)가 정한 자율주행 4단계(정해진 구역 안에서 사람이 개입하지 않아도 되는 고도 자동화)에 다가가는 모델을 만드는 것입니다.</p>
     <p>이 프로젝트에서는 청계A01의 동행 구간(청계광장 → 청계4가, 2.1&nbsp;km)을 SUMO로 만들었습니다. 도로 형상은 OpenStreetMap, 차로 수는 로드뷰 조사, 신호 주기는 서울시 T-DATA 실측값과 교통영향평가 자료를 썼습니다.</p>
     <p>같은 도로에 ① 정류장 ② 신호 ③ 끼어들기 ④ 어린이보호구역 ⑤ 오토바이를 차례로 추가해 5단계 환경을 만들고, 단계마다 버스 주행 모델을 학습했습니다. 학습에는 규칙 기반 전문가의 주행을 따라 하는 모방학습을 썼고, 5단계 최종 모델은 모방학습 모델을 PPO로 미세조정했습니다.</p>
-    <p>완주율은 1~3단계 97% 이상, 4단계 93.3%, 5단계 87%입니다. 다섯 단계 모두 팀 기준인 85%를 넘었습니다.</p>
+    <p>평가 판 기준 완주율은 1~3단계 97% 이상, 4단계 93.3%, 5단계 87%이고, 다섯 단계 모두 팀 기준인 85%를 넘었습니다. 5단계 최종 모델로 데이터를 수집한 6,000판에서는 81.0%였습니다.</p>
   </div>
 
   <dl class="facts">
@@ -349,6 +349,13 @@
   <div class="prose">
     <p>4단계 BC 모델에서 시작해, PPO를 더해도 BC가 배운 주행이 무너지지 않는지 확인하기 위해 KL 페널티를 준 PPO 미세조정을 30만 step 학습했습니다. 앞서 BC 모델에 PPO를 그대로 이어 학습했을 때 주행이 무너졌기 때문에, 이미 잘 달리는 4단계에서 안정성부터 확인한 것입니다. 10만 step 체크포인트는 개발 판 30개에서 완주 100%, 충돌 0%를 유지했고, KL 페널티가 없는 대조군은 완주 80%, 충돌 20%로 무너졌습니다.</p>
   </div>
+
+  <h3>5단계 최종 모델 (BC 후 PPO 미세조정)</h3>
+  <div class="prose">
+    <p>최종 모델은 5단계 BC 모델(<code>s5_student.pt</code>)에서 시작해 같은 방식으로 PPO를 30만 step 더 학습한 것입니다. KL 페널티 계수는 0.1에서 시작해 0.01 아래로 내리지 않았고, 차선변경 출력은 BC 모델의 것을 그대로 두고 가감속만 학습했습니다. 보상에서 속도 항은 뺐고, 가치 신경망은 정책과 분리했습니다. 학습률은 정책 1e-5, 가치 1e-4, 할인율은 0.99입니다.</p>
+    <p>평가와 데이터 수집에는 25만 step 체크포인트(<code>step250k.pt</code>)를 썼습니다. 개발 판 30개에서 완주 93.3%, 충돌 1판이었고, 학습에 쓰지 않은 평가 판 100개에서 완주 87%, 충돌 3%입니다.</p>
+  </div>
+  <p class="links"><a href="https://github.com/TranserZ/Artificial-Intelligence-and-Control-for-Autonomous-Driving/tree/model/kl-ppo/results/klppo1_s5_s0">최종 모델 폴더 (step250k.pt, 학습 설정, 평가 방법)</a></p>
   </div>
 </section>
 
@@ -452,7 +459,7 @@
     <p>6단계(5단계 + 불법주정차)도 학습했지만 팀 기준을 넘지 못해, 팀 최종 환경은 5단계로 정했습니다.</p>
   </div>
 
-  <h4>6단계 최종 모델</h4>
+  <h4>6단계 BC 모델</h4>
   <div class="tbl">
     <table class="narrow">
       <thead><tr><th>평가 판</th><th class="n">판 수</th><th class="n">완주</th><th class="n">충돌</th></tr></thead>
@@ -503,7 +510,7 @@
   </div>
 
   <div class="prose">
-    <p>수집 코드는 <code>collect_pomdp_data.py</code>이고, 전문가 또는 학생이 주행하는 동안 스텝마다 한 행을 기록합니다. 제출한 5단계 데이터는 최종 모델(PPO 미세조정)이 주행한 기록입니다. 값이 없는 칸은 −1입니다. 신호가 없는 1단계에서는 신호 관련 42칸이 모두 −1입니다.</p>
+    <p>수집 코드는 <code>collect_pomdp_data.py</code>이고, 모델이 주행하는 동안 스텝마다 한 행을 기록합니다. 값이 없는 칸은 −1입니다. 신호가 없는 1단계에서는 신호 관련 42칸이 모두 −1입니다.</p>
   </div>
 
 <pre class="code" tabindex="0"><code>import pandas as pd
@@ -512,9 +519,29 @@ df = pd.read_csv("data/&lt;이름&gt;.table.csv.gz")
 X = df.filter(like="obs.").to_numpy()                               # 관측 67개
 y = df[["action_raw.accel", "action_raw.lane_change"]].to_numpy()   # BC 정답</code></pre>
 
+  <h3>5단계 수집 내용</h3>
+  <div class="prose">
+    <p>제출한 데이터는 5단계 최종 모델(<code>step250k.pt</code>)이 규칙과 안전 필터 없이 결정적 행동으로 주행한 기록입니다. 담당 번호마다 seed 2,000개를 맡아 2,000판씩 수집했고, 충돌이나 시간초과로 끝난 판도 빼지 않고 담았습니다. 판은 <code>seed</code> 열로 구분합니다.</p>
+  </div>
+  <div class="tbl">
+    <table class="narrow">
+      <thead><tr><th>담당</th><th>seed</th><th class="n">판 수</th><th class="n">행 수</th><th class="n">SUMO</th></tr></thead>
+      <tbody>
+        <tr><td>1번</td><td>5,000,000 ~ 5,001,999</td><td class="n">2,000</td><td class="n">2,894,132</td><td class="n">1.25.0</td></tr>
+        <tr><td>2번</td><td>5,010,000 ~ 5,011,999</td><td class="n">2,000</td><td class="n">2,931,022</td><td class="n">1.27.1</td></tr>
+        <tr><td>3번</td><td>5,020,000 ~ 5,021,999</td><td class="n">수집 중</td><td class="n">–</td><td class="n">1.25.0</td></tr>
+        <tr><td>4번</td><td>5,030,000 ~ 5,031,999</td><td class="n">2,000</td><td class="n">2,901,267</td><td class="n">1.25.0</td></tr>
+        <tr><td><b>1·2·4번 합계</b></td><td></td><td class="n">6,000</td><td class="n">8,726,421</td><td class="n"></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note">환경 변수는 <code>CGC_STAGE=5</code>, <code>OBS_SCAN=0</code>입니다. 6,000판의 충돌률은 4.78%이고 담당별로는 1번 5.55%, 2번 3.25%, 4번 5.55%입니다. 2번만 SUMO 버전이 달라 차이가 난 것으로 봅니다.</p>
+
   <p class="links">
     <a data-link="dataset" href="#">Hugging Face 데이터셋</a>
     <a href="https://github.com/TranserZ/Artificial-Intelligence-and-Control-for-Autonomous-Driving/blob/BehaviorCloning/docs/data_columns.md">컬럼 정의 전체 (data_columns.md)</a>
+    <a href="https://github.com/TranserZ/Artificial-Intelligence-and-Control-for-Autonomous-Driving/tree/data/s5-mingi/data_mingi">수집 데이터 1·4번 (GitHub)</a>
+    <a href="https://github.com/TranserZ/Artificial-Intelligence-and-Control-for-Autonomous-Driving/tree/data/s5-p2-dongyeon/data_dongyeon/s5_data_p2">수집 데이터 2번 (GitHub)</a>
   </p>
   </div>
 </section>
@@ -538,14 +565,15 @@ y = df[["action_raw.accel", "action_raw.lane_change"]].to_numpy()   # BC 정답<
     </li>
     <li>
       <h3>박선우</h3>
-      <p>순수 PPO 단계별 학습, 어텐션 정책 실험, 단일 PPO 한계 분석</p>
+      <p>순수 PPO 단계별 학습, 어텐션 정책 실험, 단일 PPO 한계 분석, 데이터셋 정리와 Hugging Face 업로드</p>
       <a href="https://github.com/TranserZ/Artificial-Intelligence-and-Control-for-Autonomous-Driving/tree/model/sunwoo-ppo-stage/docs/experiments">model/sunwoo-ppo-stage 브랜치</a>
     </li>
     <li>
       <h3>김희영</h3>
-      <p>정류장 위치, 차로 수, 어린이보호구역, 불법주정차 다발구역의 위치 로드뷰 조사, 테스트 스크립트 제작, 모방학습 모델의 PPO 미세조정</p>
+      <p>정류장 위치, 차로 수, 어린이보호구역, 불법주정차 다발구역의 위치 로드뷰 조사, 테스트 스크립트 제작, 모방학습 모델의 PPO 미세조정(5단계 최종 모델)</p>
       <a href="https://github.com/TranserZ/Artificial-Intelligence-and-Control-for-Autonomous-Driving/tree/huiyoung/ppo">순수 PPO 실험 브랜치</a>
       <a href="https://github.com/TranserZ/Artificial-Intelligence-and-Control-for-Autonomous-Driving/tree/huiyoung/bc-ppo-kl">모방학습 + PPO 미세조정 브랜치</a>
+      <a href="https://github.com/TranserZ/Artificial-Intelligence-and-Control-for-Autonomous-Driving/tree/model/kl-ppo/results/klppo1_s5_s0">5단계 최종 모델 폴더</a>
     </li>
   </ul>
   </div>

@@ -37,7 +37,7 @@ python3 -m http.server 8000     # 이 폴더에서 실행 → http://localhost:8
 
 ## 영상과 테스트 판 수치를 만든 방법
 
-`model/dongyeon-bc56` 브랜치의 `models/dongyeon_bc/s5_student.pt` 를 `CGC_STAGE=5`, 안전 필터 감시 모드, 결정적 행동으로 실행했습니다 (SUMO 1.27.1).
+영상과 실패 위치 그림은 5단계 BC 모델로 만들었습니다(팀 최종 모델은 이 모델을 PPO로 미세조정한 `model/kl-ppo` 브랜치의 `results/klppo1_s5_s0/step250k.pt`). `model/dongyeon-bc56` 브랜치의 `models/dongyeon_bc/s5_student.pt` 를 `CGC_STAGE=5`, 안전 필터 감시 모드, 결정적 행동으로 실행했습니다 (SUMO 1.27.1).
 
 - `tools/render_run.py`: 학생 모델을 numpy 로 계산해 주행시키고, sumo-gui 화면을 스텝마다 저장하고 로그를 남깁니다. `--nogui` 면 로그만 남깁니다.
 - `tools/eval5.sh`: seed 1000~1089 를 화면 없이 실행합니다.
