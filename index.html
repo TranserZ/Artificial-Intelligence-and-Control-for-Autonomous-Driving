@@ -42,9 +42,19 @@
 
 <section class="plate" id="top">
   <div class="plate-in">
-    <p class="plate-course">성균관대학교 자율주행인공지능및제어 2026년 2학기 최종 프로젝트</p>
-    <h1>청계천 자율주행버스 노선의 SUMO 재현과 단계별 모방학습</h1>
-    <p class="plate-team">청계로드 <span>조민기 · 강동연 · 박선우 · 김희영</span></p>
+    <div class="plate-top">
+      <div class="plate-main">
+        <h1>청계천 자율주행버스 노선의 SUMO 재현과 단계별 모방학습</h1>
+        <p class="plate-team">청계로드 <span>조민기 · 강동연 · 박선우 · 김희영</span></p>
+        <p class="plate-course">성균관대학교 자율주행인공지능및제어 2026년 2학기 최종 프로젝트</p>
+      </div>
+      <div class="sign" aria-hidden="true">
+        <p class="sign-no"><span>청계</span>A01</p>
+        <div class="sign-line"><i></i><i></i></div>
+        <p class="sign-ends"><span>청계광장</span><span>청계4가</span></p>
+        <p class="sign-sub">동행 2.1 km · 정류장 5곳</p>
+      </div>
+    </div>
 
     <ul class="res" aria-label="제출 자료">
       <li><a data-link="code" href="https://github.com/TranserZ/Artificial-Intelligence-and-Control-for-Autonomous-Driving"><b>코드</b><span>GitHub 저장소</span></a></li>
@@ -88,10 +98,15 @@
   </div>
 </section>
 
-<div class="route">
+<div class="route" id="route">
+<i class="route-bus" aria-hidden="true"></i>
 
 <section class="sec" id="about">
-  <h2>개요</h2>
+  <header class="sec-head">
+    <h2>개요</h2>
+    <p class="sec-en" lang="en">Overview</p>
+  </header>
+  <div class="sec-body">
   <div class="prose">
     <p>청계A01은 청계광장과 광장시장 사이 청계천로를 운행하는 서울시 자율주행버스입니다. 차량은 운전석이 없는 8인승 셔틀 ROii이고 시속 20&nbsp;km 안팎으로 다닙니다. 1년간의 운행 중 타 차량의 끼어들기로 인한 접촉 사고가 발생했으며, 여전히 사람의 개입이 필요하다는 한계도 남아 있습니다.</p>
     <p>이 프로젝트의 목표는 사람의 개입을 줄여, 미국 자동차기술자협회(SAE)가 정한 자율주행 4단계(정해진 구역 안에서 사람이 개입하지 않아도 되는 고도 자동화)에 다가가는 모델을 만드는 것입니다.</p>
@@ -108,10 +123,15 @@
     <div><dt>관측</dt><dd>67차원<small>버스 위치에서 볼 수 있는 정보만 사용</small></dd></div>
     <div><dt>행동</dt><dd>가감속, 차선변경<small>가감속은 연속값, 차선은 왼쪽/유지/오른쪽</small></dd></div>
   </dl>
+  </div>
 </section>
 
-<section class="sec" id="process">
-  <h2>프로젝트 진행 과정</h2>
+<section class="sec full" id="process">
+  <header class="sec-head">
+    <h2>프로젝트 진행 과정</h2>
+    <p class="sec-en" lang="en">Process</p>
+  </header>
+  <div class="sec-body">
   <div class="prose tl-intro">
     <p>처음에는 모두 강화학습(PPO)부터 시도했고, 실패한 이유를 확인한 뒤 ① PPO 보강 ② 모방학습(BC) ③ 모방학습 후 PPO 미세조정으로 나누어 진행했습니다. 서로 결과를 공유하며 다음 학습에 참고했습니다.</p>
   </div>
@@ -177,11 +197,16 @@
     <div><dt>할인율(γ)</dt><dd>나중에 받을 보상을 지금 얼마나 반영할지 정하는 값. 작을수록 가까운 미래만 봄.</dd></div>
     <div><dt>어텐션 정책</dt><dd>주변 차, 신호, 정류장 중 지금 중요한 것에 더 집중하도록 만든 신경망 구조.</dd></div>
   </dl>
+  </div>
 </section>
 
 
 <section class="sec" id="road">
-  <h2>도로 환경</h2>
+  <header class="sec-head">
+    <h2>도로 환경</h2>
+    <p class="sec-en" lang="en">Road</p>
+  </header>
+  <div class="sec-body">
   <div class="prose">
     <p>청계천로는 청계천 양쪽의 일방통행 도로입니다. 버스의 동행 경로는 엣지 24개, 길이 2,137&nbsp;m이고 로드뷰로 잰 2,146&nbsp;m와 0.4% 차이입니다. 차로 수는 로드뷰 조사표와 비교해 엣지 24개 모두 맞췄습니다.</p>
   </div>
@@ -216,10 +241,15 @@
     <li>모든 차량의 최고 속도는 시속 30&nbsp;km입니다.</li>
     <li>버스는 ROii 제원(길이 4.9&nbsp;m, 폭 2.1&nbsp;m, 가속 1.0&nbsp;m/s², 감속 2.5&nbsp;m/s²)으로 설정했습니다.</li>
   </ul>
+  </div>
 </section>
 
 <section class="sec" id="stages">
-  <h2>단계별 환경</h2>
+  <header class="sec-head">
+    <h2>단계별 환경</h2>
+    <p class="sec-en" lang="en">Stages</p>
+  </header>
+  <div class="sec-body">
   <div class="prose">
     <p>같은 도로에 요소를 하나씩 추가했고, 뒤 단계는 앞 단계의 요소를 모두 포함합니다.</p>
     <p>관측 67차원은 다섯 단계에서 같습니다. 그 단계에 아직 없는 요소의 칸도 비워 두지 않고 “해당 없음” 값으로 채웁니다. 예를 들어 1단계에는 신호가 없지만 신호 칸 6개는 “보이는 신호 없음” 값으로 들어갑니다. 입력 크기가 늘 같아서, 앞 단계에서 학습한 모델을 다음 단계 학습의 출발점으로 그대로 쓸 수 있습니다.</p>
@@ -278,10 +308,15 @@
     </figure>
   </div>
   <p class="note">위 주행 영상(5단계 모델, seed 1000)에서 잘라 낸 장면입니다. 초록색 차량이 버스입니다.</p>
+  </div>
 </section>
 
 <section class="sec" id="method">
-  <h2>학습 방법</h2>
+  <header class="sec-head">
+    <h2>학습 방법</h2>
+    <p class="sec-en" lang="en">Training</p>
+  </header>
+  <div class="sec-body">
   <div class="prose">
     <p>처음에는 PPO만으로 학습했습니다. 베이스라인 PPO는 테스트 100판에서 한 판도 완주하지 못했습니다. 학습이 진행될수록 신호 앞에서 멈춘 뒤 다시 출발하지 않게 됐습니다. 움직이다 충돌하면 크게 감점되고 서 있으면 감점이 작아서, 서 있는 것을 가장 손해가 적은 행동으로 배운 것입니다. 보상 항목을 줄인 실험에서도 첫 정류장에 정차한 뒤 출발하지 않았습니다. 정류장만 있는 1단계에서 순수 PPO의 최고 완주율은 60%였습니다.</p>
     <p>이후 모방학습으로 바꿨습니다. 규칙으로 주행하는 전문가를 만들고, 전문가의 주행 데이터로 학생 모델을 학습하는 방식입니다.</p>
@@ -314,10 +349,15 @@
   <div class="prose">
     <p>4단계 BC 모델에서 시작해, PPO를 더해도 BC가 배운 주행이 무너지지 않는지 확인하기 위해 KL 페널티를 준 PPO 미세조정을 30만 step 학습했습니다. 앞서 BC 모델에 PPO를 그대로 이어 학습했을 때 주행이 무너졌기 때문에, 이미 잘 달리는 4단계에서 안정성부터 확인한 것입니다. 10만 step 체크포인트는 개발 판 30개에서 완주 100%, 충돌 0%를 유지했고, KL 페널티가 없는 대조군은 완주 80%, 충돌 20%로 무너졌습니다.</p>
   </div>
+  </div>
 </section>
 
 <section class="sec" id="results">
-  <h2>결과</h2>
+  <header class="sec-head">
+    <h2>결과</h2>
+    <p class="sec-en" lang="en">Results</p>
+  </header>
+  <div class="sec-body">
   <div class="prose">
     <p>완주는 종점에 도착하고 정류장을 모두 정차한 판입니다. 팀 기준은 완주율 85% 이상, 수동개입률 16% 이하입니다.</p>
   </div>
@@ -365,10 +405,15 @@
     </table>
   </div>
   <p class="note">테스트 판 결과는 저장소의 최종 모델(<code>s5_student.pt</code>)을 감시 모드로 다시 실행한 값입니다(SUMO 1.27.1). 완주 80판, 시간초과 7판, 신호위반 2판, 충돌 1판입니다.</p>
+  </div>
 </section>
 
 <section class="sec" id="limits">
-  <h2>한계</h2>
+  <header class="sec-head">
+    <h2>한계</h2>
+    <p class="sec-en" lang="en">Limitations</p>
+  </header>
+  <div class="sec-body">
   <div class="prose">
     <p>테스트 90판 중 실패한 10판의 종료 위치입니다. 광교 교차로와 청계3가 교차로 두 곳에 8판이 모여 있습니다.</p>
   </div>
@@ -428,10 +473,15 @@
     </table>
   </div>
   <p class="note">30판 중 19판에서 장시간 멈춤이 있어 테스트 판 평가로 넘어가지 못했습니다. 정류장 바로 뒤에 주차된 오토바이가 있으면 정차와 회피가 부딪혔고, 옆 차로가 비어 있어도 버스가 차로를 바꾸지 않았습니다.</p>
+  </div>
 </section>
 
 <section class="sec" id="data">
-  <h2>데이터셋</h2>
+  <header class="sec-head">
+    <h2>데이터셋</h2>
+    <p class="sec-en" lang="en">Dataset</p>
+  </header>
+  <div class="sec-body">
   <div class="prose">
     <p>한 행이 한 스텝(0.5초)인 표 형식입니다. 컬럼은 167개이고 다섯 단계에서 같습니다. 학습 입력은 <code>obs.*</code> 67개이고, 나머지는 행동, 보상, 사건 기록, 분석용 시뮬레이터 상태입니다.</p>
   </div>
@@ -464,10 +514,15 @@ y = df[["action_raw.accel", "action_raw.lane_change"]].to_numpy()   # BC 정답<
     <a data-link="dataset" href="#">Hugging Face 데이터셋</a>
     <a href="https://github.com/TranserZ/Artificial-Intelligence-and-Control-for-Autonomous-Driving/blob/BehaviorCloning/docs/data_columns.md">컬럼 정의 전체 (data_columns.md)</a>
   </p>
+  </div>
 </section>
 
 <section class="sec" id="team">
-  <h2>팀</h2>
+  <header class="sec-head">
+    <h2>팀</h2>
+    <p class="sec-en" lang="en">Team</p>
+  </header>
+  <div class="sec-body">
   <ul class="team">
     <li>
       <h3>조민기 <small>팀장</small></h3>
@@ -491,6 +546,7 @@ y = df[["action_raw.accel", "action_raw.lane_change"]].to_numpy()   # BC 정답<
       <a href="https://github.com/TranserZ/Artificial-Intelligence-and-Control-for-Autonomous-Driving/tree/huiyoung/bc-ppo-kl">모방학습 + PPO 미세조정 브랜치</a>
     </li>
   </ul>
+  </div>
 </section>
 
 </div>

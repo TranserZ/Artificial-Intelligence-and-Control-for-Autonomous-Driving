@@ -216,3 +216,23 @@ if ("IntersectionObserver" in window) {
     loops.observe(v);
   }
 }
+
+// ── 세로 노선: 읽은 위치까지 진하게, 지난 구간은 고리를 채운다 ──
+const route = document.getElementById("route");
+if (route) {
+  const secs = [...route.querySelectorAll(".sec")];
+  let queued = false;
+  function mark() {
+    queued = false;
+    const r = route.getBoundingClientRect();
+    const at = innerHeight * 0.35;
+    const p = Math.min(Math.max(at - r.top, 0), r.height);
+    route.style.setProperty("--p", p.toFixed(0) + "px");
+    for (const s of secs) s.classList.toggle("passed", s.getBoundingClientRect().top <= at);
+  }
+  route.classList.add("live");
+  mark();
+  const ask = () => { if (!queued) { queued = true; requestAnimationFrame(mark); } };
+  addEventListener("scroll", ask, { passive: true });
+  addEventListener("resize", ask);
+}
