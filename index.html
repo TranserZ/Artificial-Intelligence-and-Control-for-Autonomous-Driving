@@ -332,11 +332,11 @@
         <tr><th>2 신호등, 횡단보도</th><td>BC + DAgger 1회</td><td class="n">30판</td><td class="bar-col"><span class="bar-v" style="--v:97">97%</span></td><td class="n">0%</td><td class="n">0%</td><td class="n">3%</td><td class="n">1.0%</td></tr>
         <tr><th>3 끼어들기</th><td>BC</td><td class="n">90판</td><td class="bar-col"><span class="bar-v" style="--v:98.9">98.9%</span></td><td class="n">1.1%</td><td class="n">0%</td><td class="n">0%</td><td class="n">0.5%</td></tr>
         <tr><th>4 어린이보호구역</th><td>BC</td><td class="n">90판</td><td class="bar-col"><span class="bar-v miss" style="--v:93.3">93.3%</span></td><td class="n">2.2%</td><td class="n">0%</td><td class="n">2.2%</td><td class="n">3.3%</td></tr>
-        <tr><th>5 오토바이</th><td>BC</td><td class="n">90판</td><td class="bar-col"><span class="bar-v miss" style="--v:87.8">87.8%</span></td><td class="n">6.7%</td><td class="n">3.3%</td><td class="n">2.2%</td><td class="n">0.3%</td></tr>
+        <tr><th>5 오토바이</th><td>BC</td><td class="n">90판</td><td class="bar-col"><span class="bar-v miss" style="--v:87.8">87.8%</span></td><td class="n">4.78%*</td><td class="n">3.3%</td><td class="n">2.2%</td><td class="n">0.3%</td></tr>
       </tbody>
     </table>
   </div>
-  <p class="note">막대의 세로선이 기준 95%입니다. 1~4단계는 조민기, 5단계는 강동연이 학습했습니다. 학습 시드는 1개이고, 평가 판은 학습에 쓰지 않은 seed입니다. 개입률은 감시 모드의 안전 필터가 개입 조건에 해당한 스텝의 비율입니다.</p>
+  <p class="note">막대의 세로선이 기준 95%입니다. 1~4단계는 조민기, 5단계는 강동연이 학습했습니다. 학습 시드는 1개이고, 평가 판은 학습에 쓰지 않은 seed입니다. 개입률은 감시 모드의 안전 필터가 개입 조건에 해당한 스텝의 비율입니다. * 5단계 충돌률은 PPO 미세조정 모델(아래 ⑤)로 주행한 데이터 수집 4,000판(조민기·강동연 수집분) 기준입니다. BC 모델의 90판 평가에서는 6.7%였습니다.</p>
 
   <h3>5단계 학습 시도</h3>
   <div class="tbl">
@@ -360,6 +360,7 @@
       <tbody>
         <tr><td>개발 30판 + 학습 범위 60판</td><td class="n">90</td><td class="n">87.8%</td><td class="n">6.7%</td><td class="n">3.3%</td><td class="n">2.2%</td><td class="n">0.3%</td></tr>
         <tr><td>팀 공통 테스트 판 (seed 1000~1089)</td><td class="n">90</td><td class="n">88.9%</td><td class="n">1.1%</td><td class="n">2.2%</td><td class="n">7.8%</td><td class="n">0.4%</td></tr>
+        <tr><td>데이터 수집 판 (PPO 미세조정 모델, 조민기·강동연 수집분)</td><td class="n">4,000</td><td class="n">–</td><td class="n">4.78%</td><td class="n">–</td><td class="n">–</td><td class="n">–</td></tr>
       </tbody>
     </table>
   </div>
