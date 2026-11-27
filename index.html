@@ -380,7 +380,7 @@
       </tbody>
     </table>
   </div>
-  <p class="note">테스트 판과 300판 재평가는 저장소의 <code>s5_student.pt</code>를 감시 모드로 다시 실행한 값입니다(SUMO 1.27.1). 300판은 seed 1000~1099, 2000~2109와 첫 줄 90판의 같은 seed를 다시 실행한 결과를 합친 것입니다(재실행에서는 충돌 5판, 시간초과 3판). 데이터 수집 판은 최종 모델이 주행한 6,000판이고(3번 수집분은 수집 중이라 제외), 종점 도착은 주행거리로 셌습니다. 충돌 287판은 보행자 150판, 차량 137판입니다.</p>
+  <p class="note">테스트 판과 300판 재평가는 저장소의 <code>s5_student.pt</code>를 감시 모드로 다시 실행한 값입니다(SUMO 1.27.1). 300판은 seed 1000~1099, 2000~2109와 첫 줄 90판의 같은 seed를 다시 실행한 결과를 합친 것입니다(재실행에서는 충돌 5판, 시간초과 3판). 데이터 수집 판은 최종 모델이 주행한 6,000판이고(3번 수집분은 수집 설정이 달라 제외, 데이터셋 구간 참고), 종점 도착은 주행거리로 셌습니다. 충돌 287판은 보행자 150판, 차량 137판입니다.</p>
   <p class="note">6,000판 합계 충돌률은 4.78%(95% 신뢰구간 4.3~5.4%, Wilson)로 과제 기준 5% 미만을 충족하지만, 신뢰구간이 5%를 포함합니다. 담당별로는 1번과 4번이 각각 5.55%, 2번이 3.25%입니다. SUMO 1.25.0으로 모은 1·4번 4,000판만 보면 5.55%로 기준을 넘고, 차이는 보행자 충돌에서 납니다(1·2·4번 순서로 60판, 20판, 70판).</p>
   </div>
 </section>
@@ -537,8 +537,8 @@
   </header>
   <div class="sec-body">
   <div class="prose">
-    <p>한 행이 한 step(0.5초)의 transition입니다. 과제 기준은 10<sup>7</sup>개 이상이고, 지금까지 8,726,421개(87%)를 모았습니다. 나머지는 3번 수집분과 2번 추가 1,000판으로 채우는 중입니다. Hugging Face에는 지금까지 모은 1·2·4번 6,000판이 담당별 폴더(<code>data_mingi</code>, <code>data_dongyeon</code>)로 올라가 있습니다.</p>
-    <p>파일은 250판 묶음마다 두 가지입니다. <code>.table.csv.gz</code>는 모든 항목을 167개 컬럼으로 편 표이고, <code>.npz</code>는 학습에 바로 쓰는 배열입니다. 학습 입력은 <code>obs.*</code> 67개이고, 나머지는 행동, 보상, 사건 기록, 분석용 시뮬레이터 상태입니다. 컬럼 구성은 단계와 상관없이 같고, 공개한 데이터는 5단계입니다.</p>
+    <p>한 행이 한 step(0.5초)의 transition입니다. 과제 기준은 10<sup>7</sup>개 이상입니다. 1·2·4번 6,000판과 2번 추가 1,000판을 합쳐 7,000판, 10,201,396개를 모았습니다. Hugging Face에는 담당 번호별 폴더(<code>seed1</code>~<code>seed4</code>)로 1~4번 8,000판 12,174,418개가 올라가 있고, 2번 추가분은 저장소 브랜치 <code>data/s5-p2-dongyeon</code>에 있습니다. 3번 묶음은 수집 설정이 달라 아래 결과 집계에는 넣지 않았습니다.</p>
+    <p>파일은 묶음마다 두 가지입니다(1·2·4번은 250판, 3번은 2,000판이 한 묶음). <code>.table.csv.gz</code>는 모든 항목을 167개 컬럼으로 편 표이고, <code>.npz</code>는 학습에 바로 쓰는 배열입니다. 학습 입력은 <code>obs.*</code> 67개이고, 나머지는 행동, 보상, 사건 기록, 분석용 시뮬레이터 상태입니다. 컬럼 구성은 단계와 상관없이 같고, 공개한 데이터는 5단계입니다.</p>
   </div>
 
   <div class="tbl">
@@ -561,7 +561,7 @@
 
 <pre class="code" tabindex="0"><code>import pandas as pd
 
-df = pd.read_csv("s5_klppo_p1_b0.table.csv.gz")
+df = pd.read_csv("seed1/s5_klppo_p1_b0.table.csv.gz")
 X = df.filter(like="obs.").to_numpy()                               # 관측 67개
 y = df[["action_raw.accel", "action_raw.lane_change"]].to_numpy()   # 행동</code></pre>
 
@@ -593,20 +593,23 @@ y = df[["action_raw.accel", "action_raw.lane_change"]].to_numpy()   # 행동</co
       <tbody>
         <tr><td>1번</td><td>5,000,000 ~ 5,001,999</td><td class="n">2,000</td><td class="n">2,894,132</td><td class="n">1.25.0</td></tr>
         <tr><td>2번</td><td>5,010,000 ~ 5,011,999</td><td class="n">2,000</td><td class="n">2,931,022</td><td class="n">1.27.1</td></tr>
-        <tr><td>2번 추가</td><td>5,012,000 ~ 5,012,999</td><td class="n">수집 중</td><td class="n">–</td><td class="n">1.27.1</td></tr>
-        <tr><td>3번</td><td>5,020,000 ~ 5,021,999</td><td class="n">수집 중</td><td class="n">–</td><td class="n">1.25.0</td></tr>
+        <tr><td>2번 추가</td><td>5,012,000 ~ 5,012,999</td><td class="n">1,000</td><td class="n">1,474,975</td><td class="n">1.27.1</td></tr>
+        <tr><td>3번*</td><td>5,020,000 ~ 5,021,999</td><td class="n">2,000</td><td class="n">3,447,997</td><td class="n">–</td></tr>
         <tr><td>4번</td><td>5,030,000 ~ 5,031,999</td><td class="n">2,000</td><td class="n">2,901,267</td><td class="n">1.25.0</td></tr>
-        <tr><td><b>1·2·4번 합계</b></td><td></td><td class="n">6,000</td><td class="n">8,726,421</td><td class="n"></td></tr>
+        <tr><td><b>1·2·4번 합계</b></td><td>결과 집계에 쓴 판</td><td class="n">6,000</td><td class="n">8,726,421</td><td class="n"></td></tr>
+        <tr><td><b>2번 추가 포함</b></td><td>3번을 뺀 전체</td><td class="n">7,000</td><td class="n">10,201,396</td><td class="n"></td></tr>
       </tbody>
     </table>
   </div>
-  <p class="note">환경 변수는 <code>CGC_STAGE=5</code>, <code>OBS_SCAN=0</code>입니다. 6,000판의 충돌률은 4.78%이고 담당별로는 1번 5.55%, 2번 3.25%, 4번 5.55%입니다. 2번은 SUMO 버전과 운영체제(macOS)가 달랐고, 이 차이가 원인인지는 확인하지 못했습니다.</p>
+  <p class="note">환경 변수는 <code>CGC_STAGE=5</code>, <code>OBS_SCAN=0</code>입니다. 6,000판의 충돌률은 4.78%이고 담당별로는 1번 5.55%, 2번 3.25%, 4번 5.55%입니다. 2번은 SUMO 버전과 운영체제(macOS)가 달랐고, 이 차이가 원인인지는 확인하지 못했습니다. 2번 추가 1,000판은 6,000판 집계 뒤에 모아서 위 비율에 들어 있지 않습니다.</p>
+  <p class="note">* 3번 묶음은 한 판의 최대 길이가 2,400 step이고 표가 161컬럼(<code>state.sig6.*</code> 6개 없음)이어서 1·2·4번(3,600 step, 167컬럼)과 수집 설정이 다릅니다. 종점에 도착한 판이 없어(가장 멀리 간 판이 1,306&nbsp;m) 결과 집계와 위 합계에서 뺐습니다.</p>
 
   <p class="links">
     <a data-link="dataset" href="https://huggingface.co/datasets/CheonggyeRoad/Dataset">Hugging Face 데이터셋</a>
     <a href="https://github.com/TranserZ/Artificial-Intelligence-and-Control-for-Autonomous-Driving/blob/BehaviorCloning/docs/data_columns.md">컬럼 정의 전체 (data_columns.md)</a>
     <a href="https://github.com/TranserZ/Artificial-Intelligence-and-Control-for-Autonomous-Driving/tree/data/s5-mingi/data_mingi">수집 데이터 합본 폴더 (GitHub)</a>
     <a href="https://github.com/TranserZ/Artificial-Intelligence-and-Control-for-Autonomous-Driving/tree/data/s5-p2-dongyeon/data_dongyeon/s5_data_p2">수집 데이터 2번 원본 (GitHub)</a>
+    <a href="https://github.com/TranserZ/Artificial-Intelligence-and-Control-for-Autonomous-Driving/tree/data/s5-p2-dongyeon/data_dongyeon/s5_data_p2x">수집 데이터 2번 추가 1,000판 (GitHub)</a>
   </p>
   </div>
 </section>
