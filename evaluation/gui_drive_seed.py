@@ -39,7 +39,7 @@ def main():
         args.screenshots.mkdir(parents=True, exist_ok=True)
 
     os.environ["CGC_STAGE"] = str(args.stage)
-    os.environ["OBS_SCAN"] = "1"
+    os.environ.setdefault("OBS_SCAN", "1")  # 환경변수로 준 값을 우선 (최종 5단계 모델은 OBS_SCAN=0)
 
     from environment.mdp_config import ACTION, OBSERVATION, SIMULATION
     from environment.road_config import EGO, ROAD, TRAFFIC
