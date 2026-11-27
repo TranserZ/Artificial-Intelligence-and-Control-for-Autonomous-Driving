@@ -4,7 +4,7 @@
 //   slides:  발표 PDF. site 폴더에 slides.pdf 로 넣고 "slides.pdf" 라고 적으면 로그인 없이 열린다.
 //   dataset: Hugging Face 데이터셋 주소 (https://huggingface.co/datasets/...)
 const LINKS = {
-  slides: "",
+  slides: "slides.pdf",
   dataset: "https://huggingface.co/datasets/CheonggyeRoad/Dataset",
 };
 
