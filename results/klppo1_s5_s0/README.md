@@ -15,5 +15,5 @@ $env:OBS_SCAN='0'
 $env:STOP_FIX='0'
 $env:PLACE_FIX='0'
 $env:CGC_THROUGH_VPH='400'
-py -3.13 scripts/drive_parallel.py --model results/klppo1_s5_s0/step250k.pt --seeds 900300-900399 --shield shadow --workers 4 --json-out results/local_evaluation/stage5.json
+py -3.13 evaluation/drive_parallel.py --model results/klppo1_s5_s0/step250k.pt --seeds 900300-900399 --shield shadow --workers 4 --json-out results/local_evaluation/stage5.json
 ~~~

@@ -1,0 +1,7 @@
+# Python 3.13 에서 확인한 버전. SUMO(traci, sumolib)는 pip 이 아니라 SUMO 1.27.1 설치본의 tools/ 를 쓴다 (README 참고).
+torch==2.15.0
+numpy==2.5.4
+gymnasium==1.4.0
+PyYAML==6.0.3
+pillow==13.0.0
+tensorboard==2.21.0

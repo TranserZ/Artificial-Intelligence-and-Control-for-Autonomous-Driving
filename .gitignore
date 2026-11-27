@@ -17,6 +17,12 @@ results/run_20261029_200354/
 !/results/klppo1_s5_s0/train.py
 !/results/klppo1_s5_s0/training_log.csv
 !/results/klppo1_s5_s0/README.md
+!/results/exp-ppo-stage1/
+/results/exp-ppo-stage1/*
+!/results/exp-ppo-stage1/config.json
+!/results/s5_student/
+/results/s5_student/*
+!/results/s5_student/s5_student.pt
 /train_file_backup/
 *.tmp
 ~$*.docx
