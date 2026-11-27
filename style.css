@@ -143,7 +143,6 @@ code { font-family: var(--code); font-size: 0.86em; }
 .res a[aria-disabled="true"] { cursor: default; }
 .res a[aria-disabled="true"] b { color: #c3d3ee; text-decoration: none; }
 .res a[aria-disabled="true"] b::after { content: ""; }
-.res a[aria-disabled="true"] span::after { content: " · 준비 중"; }
 
 /* ── 노선 안내판 + 주행 화면 ───────────────── */
 .run { padding: 0 var(--gut); margin-top: calc(-1 * clamp(4.5rem, 9vw, 6.5rem)); }
@@ -159,7 +158,7 @@ code { font-family: var(--code); font-size: 0.86em; }
 .line-dir { font-size: 0.97rem; color: var(--ink-2); }
 .line-dir i { font-style: normal; color: var(--blue); }
 .line-scroll { overflow-x: auto; scrollbar-width: thin; scrollbar-color: var(--blue-soft) transparent; }
-.line { width: 100%; min-width: 47rem; height: auto; cursor: pointer; touch-action: pan-x; }
+.line { width: 100%; min-width: 47rem; height: auto; cursor: pointer; }
 #failLine { cursor: default; }
 .line text { font-family: var(--sign); fill: var(--ink); }
 .line .t-km { fill: var(--ink-2); font-size: 13px; }
@@ -241,6 +240,8 @@ figcaption, .note { font-size: 0.97rem; line-height: 1.7; color: var(--ink-2); }
 .prose { max-width: var(--col); }
 .prose p + p { margin-top: 1.15em; }
 .plain { max-width: var(--col); margin: 0; padding: 0; list-style: none; }
+.prose + .plain { margin-top: 0.9rem; }
+.plain + .prose { margin-top: 1.4rem; }
 .plain li { position: relative; padding-left: 1.15rem; }
 .plain li + li { margin-top: 0.55em; }
 .plain li::before { content: ""; position: absolute; left: 0; top: 0.82em; width: 0.42rem; height: 0.42rem; border-radius: 50%; background: var(--blue); }
@@ -270,7 +271,7 @@ td.n, th.n { text-align: right; white-space: nowrap; }
 table.narrow { max-width: 40rem; }
 .tbl table { min-width: 40rem; }
 .tbl table.narrow { min-width: 0; }
-tbody td:first-child { white-space: nowrap; }
+tbody td:first-child { white-space: normal; min-width: 8rem; }
 #data tbody td:first-child { white-space: normal; }
 .tbl + .prose, .tbl + .code { margin-top: 1.5rem; }
 td b { font-weight: 500; color: var(--blue); }

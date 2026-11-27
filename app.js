@@ -13,6 +13,8 @@ for (const a of document.querySelectorAll("a[data-link]")) {
   if (!(key in LINKS)) continue;
   if (LINKS[key]) {
     a.href = LINKS[key];
+    const sub = a.querySelector("span");
+    if (sub) sub.textContent = sub.textContent.replace(" · 준비 중", "");
   } else {
     a.removeAttribute("href");
     a.setAttribute("aria-disabled", "true");
