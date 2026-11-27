@@ -41,7 +41,7 @@ class DrivingMetrics:
     zone_mean_speed: float = float("nan")  # 보호구역 안 평균 속도 (m/s)
     zone_p85_speed: float = float("nan")   # 보호구역 안 85퍼센타일 속도 (m/s)
     # ---- env-v1 목표 지표 (experiment_protocol.md 3-1) ----
-    completion_rate: float = 0.0       # 완주율: 도착 + 놓친 정류장 0인 판 비율 (목표 ≥ 95%)
+    completion_rate: float = 0.0       # 완주율: 도착 + 놓친 정류장 0인 판 비율 (목표 ≥ 85%, 초기 목표 95%)
     intervention_rate: float = 0.0     # 수동개입률: shield가 개입했을(감시)/개입한 스텝 / 전체 스텝
     missed_stop_rate: float = 0.0      # 정류장을 하나라도 놓친 판 비율
     zone_max_overspeed: float = float("nan")  # 보호구역 최고 초과 속도 (m/s). 제한을 넘긴 폭의 최댓값
