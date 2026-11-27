@@ -1,5 +1,10 @@
 *.pyc
 __pycache__/
+.ipynb_checkpoints/
+# SUMO 임시 출력 (지금 코드는 쓰지 않지만 실수로 올라가지 않게)
+tripinfo*.xml
+fcd*.xml
+*.sumo.log
 crossroad_api_config.py
 data/road_data/국토교통부_교통영향평가_기하구조정보_*.csv
 env/sumo/cgc.*
@@ -8,15 +13,6 @@ results/run_20261029_200354/
 
 # 실험 원자료와 중간 산출물
 /results/*
-!/results/klppo1_s5_s0/
-/results/klppo1_s5_s0/*
-!/results/klppo1_s5_s0/step250k.pt
-!/results/klppo1_s5_s0/config.json
-!/results/klppo1_s5_s0/mdp_config.py
-!/results/klppo1_s5_s0/road_config.py
-!/results/klppo1_s5_s0/train.py
-!/results/klppo1_s5_s0/training_log.csv
-!/results/klppo1_s5_s0/README.md
 /train_file_backup/
 *.tmp
 ~$*.docx
