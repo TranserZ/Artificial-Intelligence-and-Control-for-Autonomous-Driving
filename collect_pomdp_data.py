@@ -86,11 +86,11 @@ def make_policy(args, env, worker_seed: int):
     if args.policy == "ppo":
         # test.py와 동일: train.py의 HPARAMS로 같은 구조를 만든 뒤 가중치만 덮어쓴다.
         # seed는 워커마다 다르게 (--stochastic 샘플링이 워커 간에 겹치지 않도록).
-        from algorithms.ppo import PPO
-        agent = PPO(obs_dim=env.observation_space.shape[0],
-                    act_dim=env.action_space.shape[0],
-                    **{**HPARAMS, "device": args.device, "seed": worker_seed})
-        agent.load(args.model)
+        # KL-PPO 체크포인트(format == "kl_ppo")도 읽도록 평가 스크립트와 같은 로더를 쓴다.
+        from algorithms.kl_ppo import load_eval_policy
+        agent = load_eval_policy(args.model, env.observation_space.shape[0],
+                                 env.action_space.shape[0],
+                                 {**HPARAMS, "device": args.device, "seed": worker_seed})
         deterministic = not args.stochastic   # hybrid: (μ, argmax 차선) / 샘플링
 
         def act(obs):
