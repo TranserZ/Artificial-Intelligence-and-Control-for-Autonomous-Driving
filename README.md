@@ -39,14 +39,16 @@ PowerShell (현재 창에만 적용. 영구 적용은 시스템 환경 변수에
 ```powershell
 $env:SUMO_HOME = "C:\Program Files (x86)\Eclipse\Sumo"
 $env:PYTHONPATH = "$env:SUMO_HOME\tools"
+$env:PYTHONUTF8 = "1"   # 한글·기호 로그를 파일로 저장할 때 cp949 인코딩 오류 방지 (Windows)
 sumo --version   # Eclipse SUMO sumo 1.27.1
 ```
 
-bash (macOS·Linux):
+bash (macOS·Linux, Windows Git Bash):
 
 ```bash
 export SUMO_HOME=/usr/share/sumo        # 설치 경로에 맞게
 export PYTHONPATH="$SUMO_HOME/tools"
+export PYTHONUTF8=1
 ```
 
 ## 설치
