@@ -86,11 +86,10 @@ def make_policy(args, env, worker_seed: int):
     if args.policy == "ppo":
         # test.py와 동일: train.py의 HPARAMS로 같은 구조를 만든 뒤 가중치만 덮어쓴다.
         # seed는 워커마다 다르게 (--stochastic 샘플링이 워커 간에 겹치지 않도록).
-        from algorithms.ppo import PPO
-        agent = PPO(obs_dim=env.observation_space.shape[0],
-                    act_dim=env.action_space.shape[0],
-                    **{**HPARAMS, "device": args.device, "seed": worker_seed})
-        agent.load(args.model)
+        from algorithms.kl_ppo import load_eval_policy
+        # PPO state_dict와 KL-PPO 체크포인트(format="kl_ppo")를 모두 받는다.
+        agent = load_eval_policy(args.model, env.observation_space.shape[0],
+                                 env.action_space.shape[0], {**HPARAMS, "seed": worker_seed})
         deterministic = not args.stochastic   # hybrid: (μ, argmax 차선) / 샘플링
 
         def act(obs):
@@ -252,7 +251,7 @@ def collect(args, sumocfg, episodes, worker_id, jsonl_path, npz_path, tag=""):
         # 느린 대신 보통 20~30% 추가 절감.
         with gzip.open(jsonl_path, "wt", encoding="utf-8", compresslevel=6) as jf:
             for ep in episodes:
-                obs, _ = env.reset(seed=args.seed + ep)
+                obs, _ = env.reset(seed=args.seed + ep - args.episode_offset)
                 state_t = env.get_privileged_state()
                 done = False
                 t = 0
@@ -345,7 +344,7 @@ def collect(args, sumocfg, episodes, worker_id, jsonl_path, npz_path, tag=""):
                     detected_xy_buf.extend((d["x"], d["y"]) for d in detected)
                     detected_offsets.append(len(detected_xy_buf))
 
-                    row = table_row(env, ep, args.seed + ep, t, obs, obs_names, action, info,
+                    row = table_row(env, ep, args.seed + ep - args.episode_offset, t, obs, obs_names, action, info,
                                     reward, terminated, truncated, state_cols, args.ndigits)
                     if table_w is None:
                         table_w = csv.DictWriter(table_f, fieldnames=list(row))
@@ -358,7 +357,7 @@ def collect(args, sumocfg, episodes, worker_id, jsonl_path, npz_path, tag=""):
                     obs = next_obs
                     state_t = state_tp1  # 스텝 끝의 상태 = 다음 스텝 시작의 상태
 
-                print(f"{tag}episode {ep + 1:4d}/{args.episodes} | "
+                print(f"{tag}episode {ep - args.episode_offset + 1:4d}/{args.episodes} | "
                       f"steps={t:4d} return={ep_return:8.3f}", flush=True)
     finally:
         env.close()
@@ -444,6 +443,9 @@ def main():
     parser.add_argument("--device", default="cpu",
                         help="정책 추론 장치 (cpu/cuda). 관측 1개씩 추론이라 cpu로 충분")
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--episode-offset", type=int, default=0,
+                        help="episode 번호 시작값 (여러 명이 나눠 수집할 때 번호가 겹치지 않게). "
+                             "시드는 그대로 --seed + 0..episodes-1")
     parser.add_argument("--gui", action="store_true",
                         help="SUMO GUI로 수집. 기본은 headless")
     parser.add_argument("--workers", type=int, default=1,
@@ -478,10 +480,10 @@ def main():
 
     t0 = time.time()
     if workers == 1:
-        total = collect(args, sumocfg, list(range(args.episodes)), 0,
+        total = collect(args, sumocfg, list(range(args.episode_offset, args.episode_offset + args.episodes)), 0,
                         jsonl_path, npz_path)
     else:
-        chunks = [c.tolist() for c in np.array_split(np.arange(args.episodes), workers)]
+        chunks = [c.tolist() for c in np.array_split(np.arange(args.episode_offset, args.episode_offset + args.episodes), workers)]
         parts = [(os.path.join(args.out_dir, f".{name}.w{w}.jsonl.gz"),
                   os.path.join(args.out_dir, f".{name}.w{w}.npz"))
                  for w in range(workers)]
