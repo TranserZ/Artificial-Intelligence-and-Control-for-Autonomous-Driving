@@ -92,7 +92,7 @@ bash에서는 아래 한 줄로 설치합니다.
 | `environment/` | SUMO 주행 환경입니다. 도로, 신호, 정류장 설정(`road_config.py`), 관측과 보상 설정(`mdp_config.py`), 도로 생성(`road_builder.py`), 단계별 맵(`curriculum.py`), 어린이보호구역 표지 그림, 네트워크 파일이 있습니다. |
 | `training/` | 학습 스크립트입니다. PPO와 KL 정규화 PPO 학습(`train.py`), 행동 복제 학습(`train_bc.py`)이 있습니다. |
 | `evaluation/` | 평가 스크립트입니다. 여러 판을 동시에 평가하는 `drive_parallel.py`, SUMO 화면으로 한 판을 보는 `gui_drive_seed.py`, 모델 하나를 재생하는 `test.py`가 있습니다. |
-| `data_collection/` | 주행 데이터 수집 스크립트(`collect_pomdp_data.py`)입니다. 데이터 컬럼 설명은 `docs/data_columns.md`에 있습니다. |
+| `data_collection/` | 주행 데이터 수집 스크립트(`collect_pomdp_data.py`)입니다. |
 | `algorithms/` | PPO, KL 정규화 PPO(`kl_ppo.py`), 행동 복제 정책 코드입니다. 학습, 평가, 수집이 함께 사용합니다. |
 | `utils/` | 신경망, 버퍼, 로거, 평가 지표 코드입니다. |
 | `tools/` | 지도 데이터(OSM)를 SUMO 도로로 바꾸고, 시나리오와 신호, 노면 표시를 만드는 도구입니다. 주행 환경이 실행 중에 사용합니다. |
